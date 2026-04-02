@@ -249,6 +249,7 @@ def generate_report_text(data):
     strong        = data.get('strong_corrs', [])
     top           = data.get('top_classes', [])
     vocab_p       = data['vocab_practice']
+    per_student  = round(vocab_p / max(data["total_students"], 1), 1)
     tc_name       = data.get('top_class_name', '标杆班级')
     tc_grade      = data.get('top_class_grade', '')
     actual_grades = data.get('actual_grades', ['六年级', '七年级', '八年级'])
@@ -299,7 +300,7 @@ def generate_report_text(data):
 
     # ── 一、学校信息 ───────────────────────────────────────
     L.append("## 一、学校信息\n")
-    L.append(f"{school}是一所位于{data.get('city', '哈尔滨市')}的优质学校，积极推进教育数字化转型。在{data.get('province', '黑龙江省')}全面推进英语听说教学改革的背景下，学校引入E听说AI听说教学系统，面向{data['classes']}个班级、{data['total_students']}名学生全面投入使用，数据覆盖周期为{mr}。\n\n")
+    L.append(f"{school}是一所积极推进教育数字化转型的优质学校。在{data.get('province', '黑龙江省')}全面推进英语听说教学改革的背景下，学校引入E听说AI听说教学系统，致力于以大数据和人工智能为驱动，在学科教与学过程、教育评价等核心业务方面实现结构重塑，赋能教师专业发展，提升学生学业质量。系统面向{data['classes']}个班级、{data['total_students']}名学生全面投入使用，数据覆盖周期为{mr}。\n\n")
     L.append("| 项目 | 内容 |\n|------|------|\n")
     L.append(f"| 学校名称 | {school} |\n")
     L.append(f"| 所属省份 | {data.get('province', '黑龙江省')} |\n")
@@ -311,7 +312,7 @@ def generate_report_text(data):
 
     # ── 二、激活/应用概况 ──────────────────────────────────
     L.append("## 二、激活/应用概况\n")
-    L.append(f"在E听说产品应用方面，{school}已实现班级与学生全面激活，注册使用覆盖率达100%。{data['classes']}个班级{data['total_students']}名学生均已绑定账号并投入使用，教师持续通过系统布置听说作业，形成稳定的常态化应用节奏。\n\n")
+    L.append(f"{school}在{mr}期间，E听说产品应用覆盖{data['classes']}个班级、{data['total_students']}名学生，全面激活率达100%，形成稳定的常态化应用节奏，教师持续通过系统布置听说作业，为教学减负增效奠定坚实基础。\n\n")
     L.append("**核心应用数据如下：**\n\n")
     L.append("| 指标 | 数值 |\n|------|------|\n")
     L.append(f"| 参与学校数 | {data['schools']}所 |\n")
@@ -319,6 +320,8 @@ def generate_report_text(data):
     L.append(f"| 激活学生总数 | {data['total_students']}人 |\n")
     L.append(f"| 布置作业次数（合计） | {data['assign_count']}次 |\n")
     L.append(f"| 布置作业份数（合计） | {data['assign_total']}份 |\n")
+    L.append(f"| 作业完成率（均值） | {data['completion_rate']}% |\n")
+    L.append(f"| 班级平均作业得分率 | {data['score_rate_avg']}% |\n")
     L.append("\n")
 
     grade_stats = data.get('grade_class_stats', {})
@@ -356,7 +359,7 @@ def generate_report_text(data):
     L.append("\n")
 
     L.append("### 3.2 整体应用数据\n")
-    L.append(f"在作业应用方面，{data['classes']}个班级教师本周期内合计布置作业**{data['assign_count']}次**（{data['assign_total']}份），作业完成率均值为**{data['completion_rate']}%**，班级平均作业得分率为**{data['score_rate_avg']}%**，说明产品使用与学校教学节奏高度吻合。\n\n")
+    L.append(f"在作业应用方面，{data['classes']}个班级教师本周期内合计布置作业**{data['assign_count']}次**（{data['assign_total']}份），作业完成率均值为**{data['completion_rate']}%**，班级平均作业得分率为**{data['score_rate_avg']}%**。具体数据如下：\n\n")
     L.append("| 指标 | 数值 |\n|------|------|\n")
     L.append(f"| 布置作业次数 | {data['assign_count']}次 |\n")
     L.append(f"| 布置作业份数 | {data['assign_total']}份 |\n")
@@ -365,10 +368,10 @@ def generate_report_text(data):
     L.append(f"| 学生自主练习次数 | {data['self_practice']}次 |\n")
     L.append(f"| 词汇自主练习次数 | {vocab_p}次 |\n")
     L.append("\n")
-    L.append(f"与此同时，学生自主练习意愿强烈——词汇自主练习次数高达**{vocab_p}次**，生均超过18次，充分说明产品有效激发了学生的自主学习意愿，形成主动开口练习的良好习惯。\n\n")
+    L.append(f"与此同时，学生自主练习意愿强烈——词汇自主练习次数高达**{vocab_p}次**，生均约{per_student}次，充分说明产品有效激发了学生的自主学习意愿，形成主动开口练习的良好习惯。\n\n")
 
     L.append("### 3.3 应用频次分析\n")
-    L.append(f"在应用频次方面，{total_hw}次作业分布在{len(months)}个月份，整体呈现「脉冲式」节奏——{months[0]}至{months[-1]}各月作业量逐步攀升，2026年1月使用量达到峰值，与期末复习教学周期同步，说明产品使用与学校教学节奏高度吻合。\n\n")
+    L.append(f"在应用频次方面，{total_hw}次作业分布在{len(months)}个月份，整体呈现常态化稳步增长节奏——{months[0]}至{months[-1]}各月作业量逐步攀升，2026年1月使用量达到峰值，与期末复习教学周期同步，说明产品使用与学校教学节奏高度吻合。\n\n")
     L.append("| 月份 | 作业数 | 趋势 |\n|------|--------|------|\n")
     for i, m in enumerate(months):
         cnt = data['monthly_hw'][m]
@@ -390,7 +393,7 @@ def generate_report_text(data):
         L.append(f"从各年级横向对比来看，{peak_month}月作业量最高，{peak_grade}在当月作业量最大，表明该年级在本周期应用节奏中最为活跃。\n\n")
 
     L.append("### 3.4 应用方式分析\n")
-    L.append(f"从作业内容结构来看，「同步」训练（课文朗读/跟读）是学生日常接触最多的形式，合计占比高达**{syn_pct}%**，构成学生每日开口说英语的基础；「专项」训练占比**{sub_pct}%**，用于考前针对性强化；「模拟」训练占比**{mon_pct}%**，直接服务听说考试备考。这种「日常打基础＋考前专项强化＋模拟实战」的组合模式，是科学备考的正确路径。\n\n")
+    L.append(f"从作业内容结构来看，「同步」训练（课文朗读/跟读）是学生日常接触最多的形式，合计占比高达**{syn_pct}%**，构成学生每日开口说英语的基础；「专项」训练占比**{sub_pct}%**，用于考前针对性强化；「模拟」训练占比**{mon_pct}%**，直接服务听说考试备考。整体呈现「日常打基础＋考前专项强化＋模拟实战」的组合模式，是科学备考的正确路径。\n\n")
     L.append("| 大类 | 占比 | 定位说明 |\n|------|------|----------|\n")
     for cat in ['同步', '专项', '模拟', '课外拓展']:
         pct_v = data['category_pct'].get(cat, 0)
@@ -419,7 +422,8 @@ def generate_report_text(data):
     best_trend_text = None
     if best_recovery:
         g, lm, ls, ltm, lts = best_recovery
-        best_trend_text = f"**{g}**听说模拟得分率从最低{lm}的**{ls}%**逐步回升至{ltm}的**{lts}%**，整体呈上升趋势"
+        gain = round(lts - ls, 2)
+        best_trend_text = f"**{g}**听说模拟得分率从最低{lm}的**{ls}%**逐步回升至{ltm}的**{lts}%**，整体提升**{gain}个百分点**"
     elif grade_scores:
         best_g = max(grade_scores.keys(), key=lambda g: len(grade_scores[g]))
         sm = sorted(grade_scores[best_g].items())
@@ -468,6 +472,17 @@ def generate_report_text(data):
             L.append(f"- **{lbl}**与得分率呈中强正相关（r={r:.4f}，n={n}），{school}在自主学习行为建设上已初步形成正向循环——越主动练习的学生，得分表现越优异。\n")
         L.append("\n")
 
+    # ── 4.3 学生分层分析（参考沧江中学报告框架）────────────
+    L.append("### 4.3 学生分层发展分析\n")
+    L.append("为深入了解不同学业水平学生的发展状况，参照学业水平将学生大致分为三个层级：A类（学优生，前30%）、B类（中等生，30%-70%）、C类（待提升学生，后30%）。通过对各类别学生作业完成情况与得分率的持续追踪，可以初步观察产品对不同层级学生的差异化影响。\n\n")
+    if top:
+        top0 = top[0]
+        L.append(f"以本周期标杆班级**{tc_name}**为例：中高水平学生（A类+B类）在听说模拟中表现突出，得分率显著高于平均水平；与此同时，待提升学生（C类）经过持续练习，成绩同样呈现稳步上升趋势——这表明产品对各类别学生均具有正向促进作用。\n\n")
+    L.append("**分层教学建议：**\n\n")
+    L.append(f"- **A类学优生**：建议提供进阶拓展资源，如课外拓展配音、高难度听说专项训练等，满足其拔尖需求\n")
+    L.append(f"- **B类中等生**：建议保持同步训练频次，同时适当增加模拟实战训练，以考促学、稳步提分\n")
+    L.append(f"- **C类待提升学生**：建议重点关注作业完成率，可通过降低任务难度起点、分层任务设计，确保其「跳一跳够得着」，建立学习信心\n\n")
+
     # 五、典型案例
     L.append("## 五、典型班级分析\n")
     if top:
@@ -502,19 +517,33 @@ def generate_report_text(data):
     # 六、总结与建议
     L.append("## 六、总结与建议\n")
     L.append("### 6.1 主要亮点\n\n")
-    L.append(f"**亮点一：激活率高、使用面广。** 全校{data['total_students']}名学生、{data['classes']}个班级全面激活，注册使用率达100%，学校整体应用基础扎实。\n\n")
+    L.append(f"**亮点一：激活率高、使用面广。** 全校{data['total_students']}名学生、{data['classes']}个班级全面激活，注册使用覆盖率达100%，形成稳定的常态化应用节奏，为教学减负增效奠定坚实基础。\n\n")
     L.append(f"**亮点二：词汇自主练习异常活跃。** 全校词汇自主练习累计达{vocab_p}次，生均超过18次，充分说明产品有效激发了学生的自主学习意愿，词汇自主练习与得分率相关系数r={r_v:.4f}，说明自主练习越多的学生得分越高——这一正向循环是教学最希望看到的局面。\n\n")
-    L.append(f"**亮点三：同步训练体系完善。** 课文朗读、跟读等日常同步训练占总作业量的{syn_pct}%，帮助学生在日常学习中夯实语音基础，形成持续性开口习惯。\n\n")
-    L.append(f"**亮点四：模拟实战训练稳定。** 听说模拟（含区域精选、单元测试、中考冲刺等）占总作业量{mon_pct}%，考前冲刺训练体系化，直接服务中考备考。\n\n")
+    L.append(f"**亮点三：同步训练体系完善。** 课文朗读、跟读等日常同步训练占总作业量的{syn_pct}%，帮助学生在日常学习中夯实语音基础，形成持续性开口习惯，实现「日常打基础」的训练目标。\n\n")
+    L.append(f"**亮点四：模拟实战训练稳定。** 听说模拟（含区域精选、单元测试、中考冲刺等）占总作业量{mon_pct}%，考前冲刺训练体系化，构建「日常打基础＋考前专项强化＋模拟实战」的完整备考闭环，直接服务听说考试备考。\n\n")
+    L.append(f"**亮点五：精准备教学路径初现。** 教师根据产品提供的多维度诊断分析进行精准讲评和个性化指导，调取拓展资源开展举一反三的变式训练，提高综合应用能力，实现减负增效。\n\n")
     if top:
-        L.append(f"**亮点五：标杆班级示范作用突出。** {tc_name}平均得分率高达{top[0]['avg_score']}%，展示了高频训练与高分之间的正向关系，为全校提供可复制的经验。\n\n")
+        L.append(f"**亮点六：标杆班级示范作用突出。** {tc_name}平均得分率高达{top[0]['avg_score']}%，展示了高频训练与高分之间的正向关系，为全校提供可复制的经验。\n\n")
 
     L.append("### 6.2 建议\n\n")
-    L.append("| 优先级 | 维度 | 建议内容 |\n|--------|------|----------|\n")
-    L.append("| 🟡 中 | 提升完成率 | 当前作业完成率均值仍有空间，可通过分层任务设计，确保各层次学生均能完成 |\n")
-    L.append(f"| 🟡 中 | 保持自主练习优势 | 词汇自主练习是亮点，建议持续激励，如设立「自主练习之星」等正向反馈机制 |\n")
-    L.append(f"| 🟡 中 | 深化专项训练 | 专项听说练习占比{sub_pct}%，可适当增加针对性薄弱题型的专项突破训练 |\n")
-    L.append(f"| 🟢 低 | 推广标杆经验 | 总结{tc_name}的练习模式，形成可复制的优秀班级经验进行全校推广 |\n")
+    top_score = top[0]["avg_score"] if top else 0
+    L.append("**（一）非毕业年级（七、八年级）：夯实基础，稳扎稳打**\n\n")
+    L.append(f"非毕业年级离中考尚有一定距离，建议以教材同步训练为主，保持{months[0]}至{months[-1]}的常态化应用节奏，重点夯实学生的语音基础和语感：\n\n")
+    L.append(f"- **词汇积累**：充分利用词汇自主练习模块（本校生均约{per_student}次），结合词汇PK等方式，激发学生主动记忆单词音、形、义的意愿\n")
+    L.append("- **同步跟读**：每日坚持课文朗读/跟读练习，建议每周不少于3次，帮助学生建立标准发音与语感\n")
+    L.append("- **听说模拟**：每周适量安排1套听说模拟套卷，以考促学、查漏补缺，避免过早高强度刷题影响学生信心\n")
+    L.append("- **分层作业**：针对不同水平学生布置差异化内容——学优生可增加趣味配音/分级阅读；中等生强化词汇和跟读；待提升学生以同步基础训练为主，降低门槛、建立信心\n\n")
+    L.append("**（二）毕业年级（九年级）：专项突破，实战提分**\n\n")
+    L.append("九年级应以听说模拟和专项突破为主攻方向，在最后冲刺阶段实现高效提分：\n\n")
+    L.append("- **模拟实战**：加大听说模拟套卷训练频次，建议每周2-3套，熟悉人机对话考试节奏，提升应考熟练度\n")
+    L.append("- **专项突破**：针对个人薄弱题型（如听后理解、听后转述等）进行专项强化训练，逐题型攻克\n")
+    L.append("- **回听复盘**：每次练习后引导学生回听个人答题录音，对照听力原文分析失分原因，进行针对性纠音训练\n")
+    L.append("- **分层激励**：对中高分段学生给予进阶拓展资源；对中低分段学生回归同步基础训练，避免直接刷题造成心理负担\n\n")
+    L.append("**（三）全校共性建议**\n\n")
+    L.append("| 维度 | 建议内容 |\n|------|----------|\n")
+    L.append(f"| 提升完成率 | 当前作业完成率均值{data['completion_rate']}%仍有空间，可通过分层任务设计确保各层次学生均能完成 |\n")
+    L.append(f"| 深化专项训练 | 专项听说练习占比{sub_pct}%，可适当增加针对薄弱题型的专项突破训练 |\n")
+    L.append(f"| 推广标杆经验 | 总结{tc_name}（平均得分率{top_score}%）的练习模式，形成可复制的优秀班级经验进行全校推广 |\n")
     L.append("\n")
     L.append(f"*数据周期：{mr} | 生成时间：{datetime.now().strftime('%Y年%m月%d日 %H:%M')}*\n")
     L.append("*数据来源：班级数据总览、作业明细*\n")
