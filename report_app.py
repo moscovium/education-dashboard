@@ -197,6 +197,18 @@ def analyze_data(class_df, hw_df):
         for _, row in ca.head(10).iterrows()
     ]
 
+    # 各年级汇总（布置作业次数、作业份数、平均完成率、平均得分率）
+    grade_class_stats = {}
+    for grade, grp in class_df.groupby('年级'):
+        g = str(grade)
+        grade_class_stats[g] = {
+            'hw_times':   int(grp['布置作业次数'].sum()),
+            'hw_count':    int(grp['布置作业份数'].sum()),
+            'completion_rate': round(float(pd.to_numeric(grp['作业完成率'], errors='coerce').mean()) * 100, 2),
+            'score_rate':  round(float(pd.to_numeric(grp['作业得分率'], errors='coerce').mean()) * 100, 2),
+        }
+    results['grade_class_stats'] = grade_class_stats
+
     months = sorted(results.get('monthly_hw', {}).keys())
     results['month_range'] = f"{min(months)} 至 {max(months)}" if months else "N/A"
     return results
@@ -273,12 +285,15 @@ def generate_report_text(data):
     L.append(f"| 布置作业份数（合计） | {data['assign_total']}份 |\n")
     L.append("\n")
     top10 = data.get('class_assign_top10', [])
-    if top10:
-        L.append("**各班级布置作业次数排行（前10名）：**\n\n")
-        L.append("| 排名 | 班级 | 年级 | 布置作业次数 | 布置作业份数 |\n")
-        L.append("|------|------|------|------------|------------|\n")
-        for i, c in enumerate(top10, 1):
-            L.append(f"| {i} | {c['class_name']} | {c['grade']} | {c['hw_times']}次 | {c['hw_count']}份 |\n")
+    # 年级汇总（布置作业次数、作业份数、平均完成率）
+    grade_stats = data.get('grade_class_stats', {})
+    if grade_stats:
+        L.append("**各年级作业布置汇总：**\n\n")
+        L.append("| 年级 | 布置作业次数 | 布置作业份数 | 平均完成率 | 平均得分率 |\n")
+        L.append("|------|------------|------------|----------|----------|\n")
+        for grade in sorted(grade_stats.keys()):
+            g = grade_stats[grade]
+            L.append(f"| {grade} | {g['hw_times']}次 | {g['hw_count']}份 | {g['completion_rate']}% | {g['score_rate']}% |\n")
         L.append("\n")
     L.append("> 数据来源：班级数据总览、作业明细\n\n")
 
@@ -330,13 +345,10 @@ def generate_report_text(data):
 
     L.append("### 3.4 应用方式分析\n")
     L.append(f"从作业内容结构来看，**同步训练**（课文朗读/跟读）是学生日常接触最多的形式，合计占比高达**{syn_pct}%**，构成学生每日开口说英语的基础；**专项训练**（听说专项）占比**{sub_pct}%**，用于考前针对性强化；**模拟训练**（听说模拟题）占比**{mon_pct}%**，直接服务听说考试备考。这种'日常打基础 + 考前专项强化 + 模拟实战'的组合模式，是科学备考的正确路径。\n\n")
-    L.append("| 大类 | 占比 | 核心子类及次数 |\n|------|------|----------------|\n")
-    sub = data.get('sub_counts', {})
+    L.append("| 大类 | 占比 | 定位说明 |\n|------|------|----------|\n")
     for cat in ['同步', '专项', '模拟', '课外拓展']:
         pct_v = data['category_pct'].get(cat, 0)
-        subs  = sorted([(k, v) for k, v in sub.items() if isinstance(k, tuple) and k[0] == cat], key=lambda x: -x[1])[:3]
-        top3  = '、'.join([f"{k}({v}次)" for k, v in subs])
-        L.append(f"| {cat} | {pct_v}% | {top3} |\n")
+        L.append(f"| {cat} | {pct_v}% | {cat_meta.get(cat,'')} |\n")
     L.append("\n")
 
     # 四、应用效果分析
@@ -374,26 +386,29 @@ def generate_report_text(data):
         L.append(f"| {m} | {score}% |\n")
     L.append("\n")
     L.append("**各年级听说模拟得分率趋势：**\n\n")
-    for grade, monthly in sorted(grade_scores.items()):
-        vals = [f"{m}:{s}%" for m, s in sorted(monthly.items())]
-        L.append(f"- **{grade}**：{' → '.join(vals)}\n")
-    L.append("\n")
-
-    L.append("### 4.2 相关性分析\n")
-    L.append("以班级为单位，分析各类学习行为与作业得分率之间的相关性（Pearson相关系数）：\n\n")
-    L.append("| 分析维度 | 相关系数 | 样本量 | 强度判定 | 结论 |\n")
-    L.append("|---------|---------|--------|---------|------|\n")
-    for lbl, r, n in [
-        ('词汇自主练习次数 vs 平均得分率', r_v, n_v),
-        ('作业完成率 vs 平均得分率',        r_c, n_c),
-        ('自主练习次数 vs 平均得分率',      r_s, n_s),
-    ]:
-        d    = corr_label(r)
-        flag = " ✅" if abs(r) >= 0.4 else ""
-        L.append(f"| {lbl} | {r:.4f} | {n}个班级 | {d}{flag} | {'正向关联' if r > 0.3 else '需进一步观察'} |\n")
+    # 交叉表：行=月份，列=年级
+    all_grades_sorted = sorted(grade_scores.keys())
+    L.append("| 月份 | " + " | ".join(all_grades_sorted) + " |\n")
+    L.append("|" + "|".join(["------"] * (len(all_grades_sorted)+1)) + "\n")
+    for m in months:
+        vals = [str(grade_scores.get(g, {}).get(m, '—')) + '%' for g in all_grades_sorted]
+        L.append(f"| {m} | " + " | ".join(vals) + " |\n")
     L.append("\n")
 
     if strong:
+        L.append("### 4.2 相关性分析\n")
+        L.append("以班级为单位，分析各类学习行为与作业得分率之间的相关性（Pearson相关系数）：\n\n")
+        L.append("| 分析维度 | 相关系数 | 样本量 | 强度判定 | 结论 |\n")
+        L.append("|---------|---------|--------|---------|------|\n")
+        for lbl, r, n in [
+            ('词汇自主练习次数 vs 平均得分率', r_v, n_v),
+            ('作业完成率 vs 平均得分率',        r_c, n_c),
+            ('自主练习次数 vs 平均得分率',      r_s, n_s),
+        ]:
+            d    = corr_label(r)
+            flag = " ✅" if abs(r) >= 0.4 else ""
+            L.append(f"| {lbl} | {r:.4f} | {n}个班级 | {d}{flag} | {'正向关联' if r > 0.3 else '需进一步观察'} |\n")
+        L.append("\n")
         L.append("**Pearson相关系数理论说明：**\n\n")
         L.append("| 系数范围 | 相关强度 | 统计含义 |\n")
         L.append("|---------|---------|---------|\n")
@@ -406,9 +421,6 @@ def generate_report_text(data):
         for lbl, r, n in strong:
             L.append(f"- **{lbl}**与得分率呈中强正相关（r={r:.4f}，n={n}），{school}在自主学习行为建设上已初步形成正向循环——越主动练习的学生，得分表现越优异。\n")
         L.append("\n")
-    else:
-        best = max([('词汇自主练习', r_v), ('作业完成率', r_c), ('自主练习', r_s)], key=lambda x: abs(x[1]))
-        L.append(f"**分析：** 以上三项与得分率相关性均属中等偏弱（最强为{best[0]}，r={best[1]:.4f}），建议持续积累数据后再做进一步分析。\n\n")
 
     # 五、典型案例
     L.append("## 五、典型案例/学校分析\n")
@@ -433,9 +445,7 @@ def generate_report_text(data):
             for m in sorted(top_mock_m.keys()):
                 v = top_mock_m[m]
                 L.append(f"| {m} | {v['score']}% | {v['count']}次 |\n")
-            L.append("\n")
-
-        L.append("**全校TOP5班级（按总作业量排名）：**\n\n")
+            L.append("**全校TOP5班级（按总作业量排名）：**\n\n")
         L.append("| 排名 | 班级 | 年级 | 总作业次数 | 听说模拟次数 | 平均得分率 |\n")
         L.append("|------|------|------|----------|------------|--------|\n")
         for i, c in enumerate(top, 1):
@@ -731,17 +741,17 @@ def export_to_docx(report_md: str, charts: dict = None) -> tuple:
     pending_charts = {}         # 当前节待插入图表 {key: caption}
 
     CHART_MAP = {
-        '四、': {
+        '三、': {
             'monthly_line':       '图1  月度作业总量趋势',
             'grade_monthly_line': '图2  各年级月度作业量趋势',
-            'cat_stacked':        '图3  各月各类作业量分布',
-            'cat_pie':            '图4  作业类型占比分布',
+        },
+        '四、': {
+            'cat_stacked':   '图3  各月各类作业量分布',
+            'cat_pie':       '图4  作业类型占比分布',
+            'mock_score':    '图5  听说模拟类月均得分率趋势',
+            'grade_score':   '图6  各年级听说模拟得分率趋势',
         },
         '五、': {
-            'mock_score':  '图5  听说模拟类月均得分率趋势',
-            'grade_score': '图6  各年级听说模拟得分率趋势',
-        },
-        '六、': {
             'top_class_trend': '图7  标杆班级月度得分率走势',
         },
     }
@@ -749,6 +759,10 @@ def export_to_docx(report_md: str, charts: dict = None) -> tuple:
     def flush_section_charts():
         """将当前节所有待插图表插入文档，并标记已处理"""
         global section_had_table
+        if pending_charts:
+            # 图表与上文（通常是表格）之间空一行
+            gap = doc.add_paragraph()
+            para_fmt(gap, space_before=0, space_after=0, line_spacing=0)
         for key, caption in list(pending_charts.items()):
             if charts and key in charts:
                 add_chart_image(key, caption, width=Cm(13), height=Cm(6.5))
