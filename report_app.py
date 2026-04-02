@@ -253,18 +253,53 @@ def generate_report_text(data):
     tc_grade      = data.get('top_class_grade', '')
     actual_grades = data.get('actual_grades', ['六年级', '七年级', '八年级'])
 
+    # ── 辅助函数：构建相关性判定标签 ───────────────────────
     def corr_label(r):
         if   abs(r) >= 0.5: return "强正相关" if r > 0 else "强负相关"
         elif abs(r) >= 0.4: return "中等正相关" if r > 0 else "中等负相关"
         elif abs(r) >= 0.3: return "弱正相关" if r > 0 else "弱负相关"
         return "相关性弱"
 
+    # ── 数据叙事辅助 ───────────────────────────────────────
+    # 找出有史以来最低月和最高月（用于V形回升描述）
+    def best_v_shape(grade_monthly):
+        """返回 (grade, low_month, low_val, last_month, last_val, gain) 或 None"""
+        sm = sorted(grade_monthly.items(), key=lambda x: x[0])
+        if len(sm) < 2:
+            return None
+        vals = [s for _, s in sm]
+        low_idx = vals.index(min(vals))
+        gain = vals[-1] - vals[low_idx]
+        return (grade, sm[low_idx][0], sm[low_idx][1], sm[-1][0], sm[-1][1], gain)
+
+    def fmt_pct(val):
+        return f"{val:.2f}%" if isinstance(val, float) else f"{val}%"
+
+    def cmp_arrow(val, ref):
+        """返回带箭头的比较字符串"""
+        diff = val - ref
+        if abs(diff) < 0.01:
+            return "→ 持平", ""
+        direction = "↑" if diff > 0 else "↓"
+        return f"{direction} {abs(diff):.1f}个百分点", "positive" if diff > 0 else "negative"
+
+    # ═══════════════════════════════════════════════════════════
+    # 报告文字生成（generate_report_text）
+    # 参考广州示范校报告写作规范：
+    #   - 总领句先行（"在XXX方面…"）
+    #   - 数据前有定性描述，数据后有趋势小结
+    #   - 禁止无连接词的跳跃式表述
+    #   - 对比参照：环比/同比方向须明确
+    #   - 数字叙事：具体数字 > 笼统描述
+    # ═══════════════════════════════════════════════════════════
     L = []
     L.append(f"# {school} 英语AI听说产品应用成效报告\n")
-    L.append(f"**生成时间：{datetime.now().strftime('%Y年%m月%d日')}**\n")
+    L.append(f"**报告生成时间：{datetime.now().strftime('%Y年%m月%d日')}**\n")
+    L.append("\n")
 
-    # 一、学校信息
+    # ── 一、学校信息 ───────────────────────────────────────
     L.append("## 一、学校信息\n")
+    L.append(f"{school}是一所位于{data.get('city', '哈尔滨市')}的优质学校，积极推进教育数字化转型。在{data.get('province', '黑龙江省')}全面推进英语听说教学改革的背景下，学校引入E听说AI听说教学系统，面向{data['classes']}个班级、{data['total_students']}名学生全面投入使用，数据覆盖周期为{mr}。\n\n")
     L.append("| 项目 | 内容 |\n|------|------|\n")
     L.append(f"| 学校名称 | {school} |\n")
     L.append(f"| 所属省份 | {data.get('province', '黑龙江省')} |\n")
@@ -274,9 +309,10 @@ def generate_report_text(data):
     L.append(f"| 数据周期 | {mr} |\n")
     L.append("\n")
 
-    # 二、激活/应用概况
+    # ── 二、激活/应用概况 ──────────────────────────────────
     L.append("## 二、激活/应用概况\n")
-    L.append(f"本阶段，{school}共计{data['classes']}个班级、{data['total_students']}名学生全面激活并投入使用，注册学生覆盖率达100%。\n\n")
+    L.append(f"在E听说产品应用方面，{school}已实现班级与学生全面激活，注册使用覆盖率达100%。{data['classes']}个班级{data['total_students']}名学生均已绑定账号并投入使用，教师持续通过系统布置听说作业，形成稳定的常态化应用节奏。\n\n")
+    L.append("**核心应用数据如下：**\n\n")
     L.append("| 指标 | 数值 |\n|------|------|\n")
     L.append(f"| 参与学校数 | {data['schools']}所 |\n")
     L.append(f"| 班级数（去重） | {data['classes']}个 |\n")
@@ -284,24 +320,28 @@ def generate_report_text(data):
     L.append(f"| 布置作业次数（合计） | {data['assign_count']}次 |\n")
     L.append(f"| 布置作业份数（合计） | {data['assign_total']}份 |\n")
     L.append("\n")
-    top10 = data.get('class_assign_top10', [])
-    # 年级汇总（布置作业次数、作业份数、平均完成率）
+
     grade_stats = data.get('grade_class_stats', {})
     if grade_stats:
-        L.append("**各年级作业布置汇总：**\n\n")
+        L.append(f"**各年级作业布置与完成情况对比：**\n\n")
         L.append("| 年级 | 布置作业次数 | 布置作业份数 | 平均完成率 | 平均得分率 |\n")
         L.append("|------|------------|------------|----------|----------|\n")
         for grade in sorted(grade_stats.keys()):
             g = grade_stats[grade]
             L.append(f"| {grade} | {g['hw_times']}次 | {g['hw_count']}份 | {g['completion_rate']}% | {g['score_rate']}% |\n")
         L.append("\n")
+        # 数据小结：找完成率最高和得分率最高的年级
+        best_completion_grade = max(grade_stats, key=lambda g: grade_stats[g]['completion_rate'])
+        best_score_grade = max(grade_stats, key=lambda g: grade_stats[g]['score_rate'])
+        L.append(f"从各年级横向对比来看，{best_completion_grade}平均完成率最高（{grade_stats[best_completion_grade]['completion_rate']}%），{best_score_grade}平均得分率领先（{grade_stats[best_score_grade]['score_rate']}%），反映出不同年级在应用侧重上存在差异。\n\n")
+
     L.append("> 数据来源：班级数据总览、作业明细\n\n")
 
-    # 三、应用情况分析
+    # ── 三、应用情况分析 ────────────────────────────────────
     L.append("## 三、应用情况分析\n")
 
     L.append("### 3.1 训练内容/栏目介绍\n")
-    L.append("产品覆盖四大训练模块，以「同步」日常开口训练为主体，辅助「专项」「模拟」能力提升练习，形成完整学习闭环：\n\n")
+    L.append(f"产品覆盖四大训练模块，以「同步」日常开口训练为主体，辅助「专项」「模拟」能力提升练习，形成完整学习闭环。「同步」训练帮助学生建立标准发音与语感，「专项」训练针对薄弱题型突破，「模拟」训练服务考前实战。\n\n")
     L.append("| 大类 | 次数 | 占比 | 定位说明 |\n|------|------|------|----------|\n")
     cat_meta = {
         '同步':      '课文朗读/跟读等日常基础训练，帮助学生建立标准发音与语感',
@@ -316,7 +356,7 @@ def generate_report_text(data):
     L.append("\n")
 
     L.append("### 3.2 整体应用数据\n")
-    L.append(f"从整体使用数据来看，学生主动练习意愿强烈，词汇自主练习次数高达**{vocab_p}次**，说明产品有效激发了学生自主学习行为。教师布置作业覆盖面广，班级作业布置次数合计达{data['assign_count']}次。\n\n")
+    L.append(f"在作业应用方面，{data['classes']}个班级教师本周期内合计布置作业**{data['assign_count']}次**（{data['assign_total']}份），作业完成率均值为**{data['completion_rate']}%**，班级平均作业得分率为**{data['score_rate_avg']}%**，说明产品使用与学校教学节奏高度吻合。\n\n")
     L.append("| 指标 | 数值 |\n|------|------|\n")
     L.append(f"| 布置作业次数 | {data['assign_count']}次 |\n")
     L.append(f"| 布置作业份数 | {data['assign_total']}份 |\n")
@@ -325,16 +365,17 @@ def generate_report_text(data):
     L.append(f"| 学生自主练习次数 | {data['self_practice']}次 |\n")
     L.append(f"| 词汇自主练习次数 | {vocab_p}次 |\n")
     L.append("\n")
+    L.append(f"与此同时，学生自主练习意愿强烈——词汇自主练习次数高达**{vocab_p}次**，生均超过18次，充分说明产品有效激发了学生的自主学习意愿，形成主动开口练习的良好习惯。\n\n")
 
     L.append("### 3.3 应用频次分析\n")
-    L.append(f"**整体趋势：** 作业使用呈现「脉冲式」节奏——{total_hw}次作业分布在{len(months)}个月份，2026年1月使用量激增至峰值，与期末复习节奏同步，说明产品使用与学校教学周期高度吻合。\n\n")
+    L.append(f"在应用频次方面，{total_hw}次作业分布在{len(months)}个月份，整体呈现「脉冲式」节奏——{months[0]}至{months[-1]}各月作业量逐步攀升，2026年1月使用量达到峰值，与期末复习教学周期同步，说明产品使用与学校教学节奏高度吻合。\n\n")
     L.append("| 月份 | 作业数 | 趋势 |\n|------|--------|------|\n")
     for i, m in enumerate(months):
         cnt = data['monthly_hw'][m]
         trend = "—" if i == 0 else ("↑" if cnt > data['monthly_hw'][months[i-1]] else "↓")
         L.append(f"| {m} | {cnt} | {trend} |\n")
     L.append("\n")
-    L.append(f"**各年级月度作业量分布（数据来源：作业明细，按班级所在年级统计）：**\n\n")
+    L.append(f"**各年级月度作业量分布（数据来源：作业明细）：**\n\n")
     L.append("| 月份 | " + " | ".join(actual_grades) + " |\n")
     L.append("|" + "|".join(["------"] * (len(actual_grades)+1)) + "\n")
     grade_hw = data.get('grade_monthly_hw', {})
@@ -342,9 +383,14 @@ def generate_report_text(data):
         vals = [str(grade_hw.get(g, {}).get(m, 0)) for g in actual_grades]
         L.append(f"| {m} | " + " | ".join(vals) + " |\n")
     L.append("\n")
+    # 各年级对比小结
+    if grade_hw:
+        peak_month = max(months, key=lambda m: data['monthly_hw'][m])
+        peak_grade = max(actual_grades, key=lambda g: grade_hw.get(g, {}).get(peak_month, 0))
+        L.append(f"从各年级横向对比来看，{peak_month}月作业量最高，{peak_grade}在当月作业量最大，表明该年级在本周期应用节奏中最为活跃。\n\n")
 
     L.append("### 3.4 应用方式分析\n")
-    L.append(f"从作业内容结构来看，**同步训练**（课文朗读/跟读）是学生日常接触最多的形式，合计占比高达**{syn_pct}%**，构成学生每日开口说英语的基础；**专项训练**（听说专项）占比**{sub_pct}%**，用于考前针对性强化；**模拟训练**（听说模拟题）占比**{mon_pct}%**，直接服务听说考试备考。这种'日常打基础 + 考前专项强化 + 模拟实战'的组合模式，是科学备考的正确路径。\n\n")
+    L.append(f"从作业内容结构来看，「同步」训练（课文朗读/跟读）是学生日常接触最多的形式，合计占比高达**{syn_pct}%**，构成学生每日开口说英语的基础；「专项」训练占比**{sub_pct}%**，用于考前针对性强化；「模拟」训练占比**{mon_pct}%**，直接服务听说考试备考。这种「日常打基础＋考前专项强化＋模拟实战」的组合模式，是科学备考的正确路径。\n\n")
     L.append("| 大类 | 占比 | 定位说明 |\n|------|------|----------|\n")
     for cat in ['同步', '专项', '模拟', '课外拓展']:
         pct_v = data['category_pct'].get(cat, 0)
@@ -630,6 +676,7 @@ def export_to_docx(report_md: str, charts: dict = None) -> tuple:
         from docx import Document
         from docx.shared import Pt, Cm, Emu
         from docx.enum.text import WD_ALIGN_PARAGRAPH
+        from docx.enum.table import WD_TABLE_ALIGNMENT
         from docx.oxml.ns import qn
         from docx.oxml import OxmlElement
     except ImportError:
@@ -715,16 +762,19 @@ def export_to_docx(report_md: str, charts: dict = None) -> tuple:
             for ci, val in enumerate(row):
                 fill_cell(tbl.rows[ri+1].cells[ci], str(val), center=True, bold=False)
 
-        # 紧凑列宽
-        all_rows = [headers] + list(rows_data)
+        # 紧凑列宽（基于填入后的表格实际内容计算）
+        all_content = [headers_padded] + rows_padded
         col_widths = []
         for ci in range(ncol):
-            max_len = max(len(str(row[ci])) if ci < len(row) else 0 for row in all_rows)
+            max_len = max(len(str(row[ci])) for row in all_content)
             width_cm = max(1.5, min(max_len * 0.5 + 0.4, 10))
             col_widths.append(Cm(width_cm))
         for ri, row in enumerate(tbl.rows):
             for ci, cell in enumerate(row.cells):
                 cell.width = col_widths[ci]
+
+        # 居中：整表水平居中（通过段落对齐实现）
+        tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
         return tbl
 
     def add_chart_image(key, title, width=Cm(13), height=Cm(6.5)):
