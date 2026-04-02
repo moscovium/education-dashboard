@@ -423,7 +423,7 @@ def generate_report_text(data):
         L.append("\n")
 
     # 五、典型案例
-    L.append("## 五、典型案例/学校分析\n")
+    L.append("## 五、典型班级分析\n")
     if top:
         top0 = top[0]
         L.append(f"以**{tc_name}（{tc_grade}）**作为标杆班级（数据周期内作业总量全校第一）：\n\n")
@@ -431,21 +431,22 @@ def generate_report_text(data):
         L.append(f"- 听说模拟平均得分率高达**{top0['avg_score']}%**，居全校前列\n\n")
 
         top_all_m = data.get('top_class_all_monthly', {})
-        if top_all_m:
-            L.append("**标杆班级月度作业量（所有类目）：**\n\n")
-            L.append("| 月份 | 作业次数 |\n|------|--------|\n")
-            for m in sorted(top_all_m.keys()):
-                L.append(f"| {m} | {top_all_m[m]}次 |\n")
+        top_mock_m = data.get('top_class_mock_monthly', {})
+
+        if top_all_m and top_mock_m:
+            # 合并为一个表：三列
+            L.append("| 月份 | 所有类目布置作业次数 | 听说模拟类目布置作业次数 | 得分率 |\n")
+            L.append("|------|------------------|----------------------|--------|\n")
+            all_months = sorted(set(top_all_m.keys()) | set(top_mock_m.keys()))
+            for m in all_months:
+                all_cnt = top_all_m.get(m, '—')
+                mdata = top_mock_m.get(m, None)
+                mock_cnt = mdata['count'] if mdata else '—'
+                score    = f"{mdata['score']}%" if mdata else '—'
+                L.append(f"| {m} | {all_cnt} | {mock_cnt} | {score} |\n")
             L.append("\n")
 
-        top_mock_m = data.get('top_class_mock_monthly', {})
-        if top_mock_m:
-            L.append("**标杆班级听说模拟月度得分率：**\n\n")
-            L.append("| 月份 | 得分率 | 作业次数 |\n|------|--------|--------|\n")
-            for m in sorted(top_mock_m.keys()):
-                v = top_mock_m[m]
-                L.append(f"| {m} | {v['score']}% | {v['count']}次 |\n")
-            L.append("**全校TOP5班级（按总作业量排名）：**\n\n")
+        L.append("**全校TOP5班级（按总作业量排名）：**\n\n")
         L.append("| 排名 | 班级 | 年级 | 总作业次数 | 听说模拟次数 | 平均得分率 |\n")
         L.append("|------|------|------|----------|------------|--------|\n")
         for i, c in enumerate(top, 1):
@@ -581,30 +582,33 @@ def make_charts(data):
         )
         charts['grade_score'] = fig6
 
-    top_m = data.get('top_class_monthly', {})
-    if top_m:
-        tm = sorted(top_m.keys())
-        sc_t = [top_m[m]['score'] for m in tm]
-        ct_t = [top_m[m]['count'] for m in tm]
+    top_all_m = data.get('top_class_all_monthly', {})
+    top_mock_m = data.get('top_class_mock_monthly', {})
+    if top_all_m and top_mock_m:
+        all_months = sorted(set(top_all_m.keys()) | set(top_mock_m.keys()))
+        sc_t  = [top_mock_m.get(m, {}).get('score', None) for m in all_months]
+        ct_t  = [top_all_m.get(m, 0) for m in all_months]
+        sc_t_fmt = [f"{s}%" if s is not None else '—' for s in sc_t]
+
         fig7 = make_subplots(specs=[[{"secondary_y": True}]])
         fig7.add_trace(go.Scatter(
-            x=tm, y=sc_t, name='得分率%',
+            x=all_months, y=sc_t, name='听说模拟得分率',
             mode='lines+markers+text',
             line=dict(color='#4C78A8', width=2.5), marker=dict(size=8),
-            text=[f"{s}%" for s in sc_t], textposition='top center', textfont=dict(size=10),
+            text=sc_t_fmt, textposition='top center', textfont=dict(size=10),
             yaxis='y'
         ))
         fig7.add_trace(go.Bar(
-            x=tm, y=ct_t, name='作业量',
-            opacity=0.3, marker_color='#ccc', yaxis='y2'
+            x=all_months, y=ct_t, name='所有类目布置次数',
+            opacity=0.35, marker_color='#F58518', yaxis='y2'
         ))
         fig7.update_layout(
-            title=dict(text=f"图7 {data.get('top_class_name','')}月度得分率与作业量", font=dict(size=16)),
+            title=dict(text=f"图7 {data.get('top_class_name','')}月度作业量与听说模拟得分率组合图", font=dict(size=16)),
             template='plotly_white', height=380,
             legend=dict(orientation='h', yanchor='bottom', y=1.02),
             hovermode='x unified'
         )
-        fig7.update_layout(yaxis2=dict(title_text='作业次数', overlaying='y', side='right'))
+        fig7.update_layout(yaxis2=dict(title_text='布置次数', overlaying='y', side='right'))
         fig7.update_yaxes(title_text='得分率（%）', range=[0, 100])
         charts['top_class_trend'] = fig7
 
@@ -685,9 +689,16 @@ def export_to_docx(report_md: str, charts: dict = None) -> tuple:
         tblPr.append(tblBorders)
 
     def add_border_table(headers, rows_data):
-        """有边框线表格（用于4.1和7.2等正式表格）：黑体五号(10.5pt)，紧凑列宽"""
-        ncol = len(headers)
-        tbl = doc.add_table(rows=1+len(rows_data), cols=ncol)
+        """有边框线表格：黑体五号(10.5pt)，紧凑列宽，防御性列数对齐"""
+        # 统一列数：取所有行的最大列数，不足者在末尾补空字符串
+        all_rows_raw = [headers] + list(rows_data)
+        ncol = max(len(row) for row in all_rows_raw) if all_rows_raw else 1
+        def pad_row(row):
+            return list(row) + [''] * (ncol - len(row))
+        headers_padded = pad_row(headers)
+        rows_padded    = [pad_row(r) for r in rows_data]
+
+        tbl = doc.add_table(rows=1+len(rows_padded), cols=ncol)
         tbl.style = 'Table Grid'
         FNAME = '宋体'; FSIZE = 10.5
 
@@ -698,9 +709,9 @@ def export_to_docx(report_md: str, charts: dict = None) -> tuple:
             r = p.add_run(text)
             set_font(r, FNAME, FSIZE, bold)
 
-        for ci, h in enumerate(headers):
+        for ci, h in enumerate(headers_padded):
             fill_cell(tbl.rows[0].cells[ci], h, center=True, bold=True)
-        for ri, row in enumerate(rows_data):
+        for ri, row in enumerate(rows_padded):
             for ci, val in enumerate(row):
                 fill_cell(tbl.rows[ri+1].cells[ci], str(val), center=True, bold=False)
 
@@ -744,15 +755,15 @@ def export_to_docx(report_md: str, charts: dict = None) -> tuple:
         '三、': {
             'monthly_line':       '图1  月度作业总量趋势',
             'grade_monthly_line': '图2  各年级月度作业量趋势',
+            'cat_stacked':        '图3  各月各类作业量分布',
         },
         '四、': {
-            'cat_stacked':   '图3  各月各类作业量分布',
             'cat_pie':       '图4  作业类型占比分布',
             'mock_score':    '图5  听说模拟类月均得分率趋势',
             'grade_score':   '图6  各年级听说模拟得分率趋势',
         },
         '五、': {
-            'top_class_trend': '图7  标杆班级月度得分率走势',
+            'top_class_trend': '图7  标杆班级月度作业量与得分率组合图',
         },
     }
 
