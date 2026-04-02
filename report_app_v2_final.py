@@ -344,25 +344,18 @@ def generate_report_text(data):
 
     L.append("### 4.1 成绩数据对比\n")
     grade_scores = data.get('mock_hw_grade_monthly', {})
-    # 找最优回升案例（从最低点到最后一个月的最大涨幅）
-    best_recovery = None
-    best_gain = 0
-    for grade, monthly in grade_scores.items():
+    best_trend_text = None
+    for grade, monthly in sorted(grade_scores.items()):
         sm = sorted(monthly.items())
         if len(sm) >= 2:
             vals = [s for _, s in sm]
             low_idx = vals.index(min(vals))
             if low_idx < len(vals) - 1 and vals[-1] > vals[low_idx]:
-                gain = vals[-1] - vals[low_idx]
-                if gain > best_gain:
-                    best_gain = gain
-                    best_recovery = (grade, sm[low_idx][0], sm[low_idx][1], sm[-1][0], sm[-1][1])
-
-    best_trend_text = None
-    if best_recovery:
-        g, lm, ls, ltm, lts = best_recovery
-        best_trend_text = f"**{g}**听说模拟得分率从最低{lm}的**{ls}%**逐步回升至{ltm}的**{lts}%**，整体呈上升趋势"
-    elif grade_scores:
+                low_m, low_s = sm[low_idx]
+                last_m, last_s = sm[-1]
+                best_trend_text = f"**{grade}**听说模拟得分率从最低{low_m}的**{low_s}%**逐步回升至{last_m}的**{last_s}%**，整体呈上升趋势"
+                break
+    if not best_trend_text and grade_scores:
         best_g = max(grade_scores.keys(), key=lambda g: len(grade_scores[g]))
         sm = sorted(grade_scores[best_g].items())
         best_trend_text = f"**{best_g}**听说模拟月均得分率走势：{' → '.join([f'{m}{s}%' for m,s in sm])}"

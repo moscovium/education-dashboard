@@ -1,5 +1,5 @@
 """
-E听说 成效报告对话系统 v2.0
+E听说 成效报告对话系统 v2.1
 """
 import streamlit as st
 import pandas as pd
@@ -344,25 +344,18 @@ def generate_report_text(data):
 
     L.append("### 4.1 成绩数据对比\n")
     grade_scores = data.get('mock_hw_grade_monthly', {})
-    # 找最优回升案例（从最低点到最后一个月的最大涨幅）
-    best_recovery = None
-    best_gain = 0
-    for grade, monthly in grade_scores.items():
+    best_trend_text = None
+    for grade, monthly in sorted(grade_scores.items()):
         sm = sorted(monthly.items())
         if len(sm) >= 2:
             vals = [s for _, s in sm]
             low_idx = vals.index(min(vals))
             if low_idx < len(vals) - 1 and vals[-1] > vals[low_idx]:
-                gain = vals[-1] - vals[low_idx]
-                if gain > best_gain:
-                    best_gain = gain
-                    best_recovery = (grade, sm[low_idx][0], sm[low_idx][1], sm[-1][0], sm[-1][1])
-
-    best_trend_text = None
-    if best_recovery:
-        g, lm, ls, ltm, lts = best_recovery
-        best_trend_text = f"**{g}**听说模拟得分率从最低{lm}的**{ls}%**逐步回升至{ltm}的**{lts}%**，整体呈上升趋势"
-    elif grade_scores:
+                low_m, low_s = sm[low_idx]
+                last_m, last_s = sm[-1]
+                best_trend_text = f"**{grade}**听说模拟得分率从最低{low_m}的**{low_s}%**逐步回升至{last_m}的**{last_s}%**，整体呈上升趋势"
+                break
+    if not best_trend_text and grade_scores:
         best_g = max(grade_scores.keys(), key=lambda g: len(grade_scores[g]))
         sm = sorted(grade_scores[best_g].items())
         best_trend_text = f"**{best_g}**听说模拟月均得分率走势：{' → '.join([f'{m}{s}%' for m,s in sm])}"
@@ -470,7 +463,9 @@ def make_charts(data):
     CC = {'同步': '#4C78A8', '专项': '#F58518', '模拟': '#E45756', '课外拓展': '#72D7B8'}
     cats = ['同步', '专项', '模拟', '课外拓展']
     months = sorted(data.get('monthly_hw', {}).keys())
+    actual_grades = data.get('actual_grades', ['六年级', '七年级', '八年级'])
 
+    # 图1 月度作业总量
     totals = [data['monthly_hw'].get(m, 0) for m in months]
     fig = go.Figure()
     fig.add_trace(go.Scatter(
@@ -488,9 +483,10 @@ def make_charts(data):
     )
     charts['monthly_line'] = fig
 
+    # 图2 各年级月度作业量
     grade_hw = data.get('grade_monthly_hw', {})
     fig2 = go.Figure()
-    for grade in ['六年级', '七年级', '八年级']:
+    for grade in actual_grades:
         gd = grade_hw.get(grade, {})
         y = [gd.get(m, 0) for m in months]
         fig2.add_trace(go.Scatter(
@@ -505,6 +501,7 @@ def make_charts(data):
     )
     charts['grade_monthly_line'] = fig2
 
+    # 图3 月度大类堆叠
     fig3 = go.Figure()
     for cat in cats:
         y = [data.get('cat_monthly', {}).get(m, {}).get(cat, 0) for m in months]
@@ -518,6 +515,7 @@ def make_charts(data):
     )
     charts['cat_stacked'] = fig3
 
+    # 图4 饼图
     cat_pct = data.get('category_pct', {})
     fig4 = go.Figure()
     fig4.add_trace(go.Pie(
@@ -532,6 +530,7 @@ def make_charts(data):
     )
     charts['cat_pie'] = fig4
 
+    # 图5 听说模拟月均得分率
     mock_scores = data.get('mock_hw_score_monthly', {})
     if mock_scores:
         ms = sorted(mock_scores.keys())
@@ -541,325 +540,7 @@ def make_charts(data):
             x=ms, y=sc, mode='lines+markers+text',
             line=dict(color='#E45756', width=3), marker=dict(size=9, color='#E45756'),
             fill='tozeroy', fillcolor='rgba(228,87,86,0.1)',
-            text=[f"{s}%" for s in sc], textposition='top center', textfont=dict(size=11),
-            name='得分率'
-        ))
-        fig5.update_layout(
-            title=dict(text='图5 听说模拟类月均得分率趋势', font=dict(size=16)),
-            xaxis_title='月份', yaxis_title='得分率（%）',
-            height=380, template='plotly_white',
-            yaxis=dict(range=[0, 100]), margin=dict(b=40)
-        )
-        charts['mock_score'] = fig5
-
-    grade_scores = data.get('mock_hw_grade_monthly', {})
-    if grade_scores:
-        fig6 = go.Figure()
-        for grade in sorted(grade_scores.keys()):
-            gm = sorted(grade_scores[grade].items())
-            xs = [m for m, s in gm]
-            ys = [s for m, s in gm]
-            fig6.add_trace(go.Scatter(
-                name=grade, x=xs, y=ys,
-                mode='lines+markers', line=dict(width=2.5),
-                marker=dict(size=7, color=GC.get(grade, '#999'))
-            ))
-        fig6.update_layout(
-            title=dict(text='图6 各年级听说模拟得分率月度对比', font=dict(size=16)),
-            xaxis_title='月份', yaxis_title='得分率（%）',
-            height=380, template='plotly_white', yaxis=dict(range=[0, 100])
-        )
-        charts['grade_score'] = fig6
-
-    top_m = data.get('top_class_monthly', {})
-    if top_m:
-        tm = sorted(top_m.keys())
-        sc_t = [top_m[m]['score'] for m in tm]
-        ct_t = [top_m[m]['count'] for m in tm]
-        fig7 = make_subplots(specs=[[{"secondary_y": True}]])
-        fig7.add_trace(go.Scatter(
-            x=tm, y=sc_t, name='得分率%',
-            mode='lines+markers+text',
-            line=dict(color='#4C78A8', width=2.5), marker=dict(size=8),
-            text=[f"{s}%" for s in sc_t], textposition='top center', textfont=dict(size=10),
-            yaxis='y'
-        ))
-        fig7.add_trace(go.Bar(
-            x=tm, y=ct_t, name='作业量',
-            opacity=0.3, marker_color='#ccc', yaxis='y2'
-        ))
-        fig7.update_layout(
-            title=dict(text=f"图7 {data.get('top_class_name','')}月度得分率与作业量", font=dict(size=16)),
-            template='plotly_white', height=380,
-            legend=dict(orientation='h', yanchor='bottom', y=1.02),
-            hovermode='x unified'
-        )
-        fig7.update_layout(yaxis2=dict(title_text='作业次数', overlaying='y', side='right'))
-        fig7.update_yaxes(title_text='得分率（%）', range=[0, 100])
-        charts['top_class_trend'] = fig7
-
-    return charts
-def export_to_docx(report_md: str, charts: dict = None) -> tuple:
-    """导出为公文格式Word
-
-    格式要求：
-    - 标题：方正小标宋简体，二号(22pt)，居中
-    - 一级标题：黑体，三号(16pt)
-    - 二级标题：楷体_GB2312，三号(16pt)
-    - 正文：仿宋_GB2312，三号(16pt)，首行缩进2字符
-    - 行间距：固定值31磅
-    - 页边距：上3.7cm、下3.5cm、左2.8cm、右2.6cm
-    - 表格：无边框线，宋体五号(10.5pt)，列宽紧凑
-    - 图表：无间隔，居中，宽500px×高250px
-    """
-    try:
-        from docx import Document
-        from docx.shared import Pt, Cm, Emu
-        from docx.enum.text import WD_ALIGN_PARAGRAPH
-        from docx.oxml.ns import qn
-        from docx.oxml import OxmlElement
-    except ImportError:
-        return None, "python-docx未安装"
-
-    doc = Document()
-    section = doc.sections[0]
-    section.page_width = Cm(21)
-    section.page_height = Cm(29.7)
-    section.top_margin = Cm(3.7)
-    section.bottom_margin = Cm(3.5)
-    section.left_margin = Cm(2.8)
-    section.right_margin = Cm(2.6)
-
-    # ── 辅助函数 ──────────────────────────────────────────────
-
-    def set_font(run, fname, fsize, bold=False):
-        run.font.name = fname
-        run.font.size = Pt(fsize)
-        run.font.bold = bold
-        try:
-            run._element.rPr.rFonts.set(qn('w:eastAsia'), fname)
-        except Exception:
-            pass
-
-    def para_fmt(para, align=WD_ALIGN_PARAGRAPH.JUSTIFY,
-                  first_indent=False, space_before=0, space_after=0,
-                  line_spacing=31):
-        para.alignment = align
-        pf = para.paragraph_format
-        if first_indent:
-            pf.first_line_indent = Cm(0.74)
-        pf.space_before = Pt(space_before)
-        pf.space_after = Pt(space_after)
-        pf.line_spacing = Pt(line_spacing)
-
-    def add_para(text, fname='仿宋_GB2312', fsize=16, bold=False,
-                  align=WD_ALIGN_PARAGRAPH.JUSTIFY,
-                  first_indent=False, space_before=0, space_after=0):
-        p = doc.add_paragraph()
-        para_fmt(p, align, first_indent, space_before, space_after, 31)
-        r = p.add_run(text)
-        set_font(r, fname, fsize, bold)
-        return p
-
-    def remove_table_borders(tbl):
-        """去掉表格所有边框线"""
-        tblPr = tbl._tbl.tblPr
-        if tblPr is None:
-            tblPr = OxmlElement('w:tblPr')
-            tbl._tbl.insert(0, tblPr)
-        tblBorders = OxmlElement('w:tblBorders')
-        for btype in ['top', 'left', 'bottom', 'right', 'insideH', 'insideV']:
-            b = OxmlElement(f'w:{btype}')
-            b.set(qn('w:val'), 'none')
-            tblBorders.append(b)
-        tblPr.append(tblBorders)
-
-    def add_border_table(headers, rows_data):
-        """有边框线表格（用于4.1和7.2等正式表格）：黑体五号(10.5pt)，紧凑列宽"""
-        ncol = len(headers)
-        tbl = doc.add_table(rows=1+len(rows_data), cols=ncol)
-        tbl.style = 'Table Grid'
-        FNAME = '宋体'; FSIZE = 10.5
-
-        def fill_cell(cell, text, center=True, bold=False):
-            cell.text = ''
-            p = cell.paragraphs[0]
-            p.alignment = WD_ALIGN_PARAGRAPH.CENTER if center else WD_ALIGN_PARAGRAPH.LEFT
-            r = p.add_run(text)
-            set_font(r, FNAME, FSIZE, bold)
-
-        for ci, h in enumerate(headers):
-            fill_cell(tbl.rows[0].cells[ci], h, center=True, bold=True)
-        for ri, row in enumerate(rows_data):
-            for ci, val in enumerate(row):
-                fill_cell(tbl.rows[ri+1].cells[ci], str(val), center=True, bold=False)
-
-        # 紧凑列宽
-        all_rows = [headers] + list(rows_data)
-        col_widths = []
-        for ci in range(ncol):
-            max_len = max(len(str(row[ci])) if ci < len(row) else 0 for row in all_rows)
-            width_cm = max(1.5, min(max_len * 0.5 + 0.4, 10))
-            col_widths.append(Cm(width_cm))
-        for ri, row in enumerate(tbl.rows):
-            for ci, cell in enumerate(row.cells):
-                cell.width = col_widths[ci]
-        return tbl
-
-    def add_chart_image(key, title, width=Cm(13), height=Cm(6.5)):
-        """以无间隔居中图片方式插入图表"""
-        if not charts or key not in charts:
-            return
-        fig = charts[key]
-        img_bytes = fig.to_image(format='png', width=1000, height=500, scale=2)
-        img_io = BytesIO(img_bytes)
-        p = doc.add_paragraph()
-        para_fmt(p, align=WD_ALIGN_PARAGRAPH.CENTER, first_indent=False, space_before=0, space_after=0, line_spacing=0)
-        run = p.add_run()
-        run.add_picture(img_io, width=width, height=height)
-        # 图注
-        cap = doc.add_paragraph()
-        para_fmt(cap, align=WD_ALIGN_PARAGRAPH.CENTER, first_indent=False, space_before=0, space_after=6, line_spacing=31)
-        cap_run = cap.add_run(title)
-        set_font(cap_run, '宋体', 10.5, False)
-
-    # ── Markdown解析与Word构建 ────────────────────────────────
-    lines = report_md.split('\n')
-    i = 0
-    active_section = None       # 当前节编号如'四、'
-    section_had_table = False   # 当前节是否已渲染过表格
-    pending_charts = {}         # 当前节待插入图表 {key: caption}
-
-    CHART_MAP = {
-        '四、': {
-            'monthly_line':       '图1  月度作业总量趋势',
-            'grade_monthly_line': '图2  各年级月度作业量趋势',
-            'cat_stacked':        '图3  各月各类作业量分布',
-            'cat_pie':            '图4  作业类型占比分布',
-        },
-        '五、': {
-            'mock_score':  '图5  听说模拟类月均得分率趋势',
-            'grade_score': '图6  各年级听说模拟得分率趋势',
-        },
-        '六、': {
-            'top_class_trend': '图7  标杆班级月度得分率走势',
-        },
-    }
-
-    def flush_section_charts():
-        """将当前节所有待插图表插入文档，并标记已处理"""
-        global section_had_table
-        for key, caption in list(pending_charts.items()):
-            if charts and key in charts:
-                add_chart_image(key, caption, width=Cm(13), height=Cm(6.5))
-        pending_charts.clear()
-        section_had_table = True   # 标记已处理，防止重复插入
-
-    while i < len(lines):
-        line = lines[i].strip()
-
-        # 跳过注释行和页脚
-        if not line or line.startswith('>') or line.startswith('*数据') or line.startswith('*报告') or line.startswith('*生成时间'):
-            i += 1; continue
-
-        # ── 主标题 ────────────────────────────────────────────
-        if line.startswith('# ') and '成效报告' in line:
-            title_text = line.replace('# ', '').replace('**', '').strip()
-            add_para(title_text, '方正小标宋简体', 22, True,
-                     WD_ALIGN_PARAGRAPH.CENTER, space_before=12, space_after=12)
-            i += 1; continue
-
-        # ── 一级标题（## xxx）───────────────────────────────
-        if line.startswith('## '):
-            # 进入新节前：若上一节有未插入图表（即节内无表格），此时插入末尾
-            if active_section and active_section in CHART_MAP and pending_charts:
-                flush_section_charts()
-            section_text = line.replace('## ', '').strip()
-            active_section = section_text[:2]
-            section_had_table = False
-            pending_charts = dict(CHART_MAP.get(active_section, {}))
-            add_para(section_text, '黑体', 16, True,
-                     WD_ALIGN_PARAGRAPH.LEFT, space_before=12, space_after=6)
-            i += 1; continue
-
-        # ── 二级标题（### xxx）─────────────────────────────
-        if line.startswith('### '):
-            sub_text = line.replace('### ', '').strip()
-            add_para(sub_text, '楷体_GB2312', 16, True,
-                     WD_ALIGN_PARAGRAPH.LEFT, space_before=6, space_after=3)
-            i += 1; continue
-
-        # ── 段落（处理内联加粗）────────────────────────────────
-        if line and not line.startswith('|') and not line.startswith('- ') and not line.startswith('```'):
-            # 用 finditer 构建段落segments，避免 re.split 产生的空档问题
-            segments = []   # [(text, bold), ...]
-            last_end = 0
-            for m in re.finditer(r'\*\*(.+?)\*\*', line):
-                if m.start() > last_end:
-                    segments.append((line[last_end:m.start()], False))
-                segments.append((m.group(1), True))
-                last_end = m.end()
-            if last_end < len(line):
-                segments.append((line[last_end:], False))
-
-            if any(b for _, b in segments):
-                p = doc.add_paragraph()
-                para_fmt(p, WD_ALIGN_PARAGRAPH.JUSTIFY, first_indent=(active_section in ('三、', '四、', '五、', '六、', '七、')), space_before=0, space_after=3, line_spacing=31)
-                for text, bold in segments:
-                    r = p.add_run(text)
-                    set_font(r, '仿宋_GB2312', 16, bold)
-            else:
-                clean = re.sub(r'\*\*(.+?)\*\*', r'\1', line).strip()
-                if clean:
-                    fi = (active_section in ('三、', '四、', '五、', '六、', '七、'))
-                    add_para(clean, '仿宋_GB2312', 16, False,
-                             WD_ALIGN_PARAGRAPH.JUSTIFY, first_indent=fi, space_before=0, space_after=3)
-            i += 1; continue
-
-        # ── 列表项（处理加粗）────────────────────────────────
-        if line.startswith('- '):
-            clean = re.sub(r'\*\*(.+?)\*\*', r'\1', line).lstrip('- ')
-            p = doc.add_paragraph(style='List Bullet')
-            para_fmt(p, WD_ALIGN_PARAGRAPH.JUSTIFY, first_indent=False, space_before=0, space_after=2, line_spacing=31)
-            parts = re.split(r'(\*\*(.+?)\*\*)', clean)
-            for part in parts:
-                if part.startswith('**') and part.endswith('**'):
-                    r = p.add_run(part[2:-2])
-                    set_font(r, '仿宋_GB2312', 16, True)
-                elif part:
-                    r = p.add_run(part)
-                    set_font(r, '仿宋_GB2312', 16, False)
-            i += 1; continue
-
-        # ── 表格（有边框，宋体五号，紧凑列宽）────────────────
-        if line.startswith('|') and '---' not in line:
-            rows_data = []
-            j = i
-            while j < len(lines) and lines[j].strip().startswith('|'):
-                if '---' not in lines[j]:
-                    cells = [re.sub(r'\*\*(.+?)\*\*', r'\1', c.strip()) for c in lines[j].strip().split('|')[1:-1]]
-                    rows_data.append(cells)
-                j += 1
-            if rows_data:
-                add_border_table(rows_data[0], rows_data[1:])
-                section_had_table = True
-                # 该节所有图表在最后一个表格之后立即插入
-                if pending_charts:
-                    flush_section_charts()
-            i = j; continue
-
-        i += 1
-
-    # 最后一节如有剩余图表，插入末尾
-    if active_section and active_section in CHART_MAP and pending_charts:
-        flush_section_charts()
-
-    buf = BytesIO()
-    doc.save(buf)
-    buf.seek(0)
-    return buf, None
-
-
+            text=[f"{s}%" for s in sc
 st.set_page_config(page_title="E听说成效报告系统", page_icon="📊", layout="wide")
 
 with st.sidebar:
