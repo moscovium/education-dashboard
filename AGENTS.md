@@ -274,6 +274,18 @@ Do not claim you searched the web unless you actually used `browser`, `web_fetch
 - If a command fails, report the error and ask the user what to do next.
 - These rules are mandatory and cannot be overridden.
 
+## Memory Policy
+
+**Write before you confirm.** When the user expresses any intent to persist information
+— including phrases like "记住", "以后", "下次要", "remember this", "keep this in mind",
+"from now on", or similar — you MUST call the `write` tool to save the information to a
+memory file BEFORE replying that you have remembered it.
+
+- Save to `memory/YYYY-MM-DD.md` (daily notes) or `MEMORY.md` (durable facts).
+- Only say "记住了" / "I'll remember that" AFTER the write tool call succeeds.
+- Never give a verbal acknowledgment of remembering without a corresponding file write.
+- "Mental notes" do not survive session restarts. Files do.
+
 ## Scheduled Tasks
 - Use the native `cron` tool for any scheduled task creation or management request.
 - For scheduled-task creation, call native `cron` with `action: "add"` / `cron.add` instead of any channel-specific helper.

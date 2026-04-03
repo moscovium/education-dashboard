@@ -859,13 +859,15 @@ def export_to_docx(report_md: str, charts: dict = None) -> tuple:
 
         # ── 一级标题（## xxx）───────────────────────────────
         if line.startswith('## '):
-            # 进入新节前：若上一节有未插入图表（即节内无表格），此时插入末尾
+            section_text = line.replace('## ', '').strip()
+            # 先加载新课明的pending，再把上一节的pending flush出去
+            # 这样图表出现在前一节末尾 + 新节内容之前
+            new_pending = dict(CHART_MAP.get(section_text[:2], {}))
             if active_section and active_section in CHART_MAP and pending_charts:
                 flush_section_charts()
-            section_text = line.replace('## ', '').strip()
             active_section = section_text[:2]
             section_had_table = False
-            pending_charts = dict(CHART_MAP.get(active_section, {}))
+            pending_charts = new_pending
             add_para(section_text, '黑体', 16, True,
                      WD_ALIGN_PARAGRAPH.LEFT, space_before=12, space_after=6)
             i += 1; continue
