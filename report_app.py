@@ -262,27 +262,8 @@ def generate_report_text(data):
         return "相关性弱"
 
     # ── 数据叙事辅助 ───────────────────────────────────────
-    # 找出有史以来最低月和最高月（用于V形回升描述）
-    def best_v_shape(grade_monthly):
-        """返回 (grade, low_month, low_val, last_month, last_val, gain) 或 None"""
-        sm = sorted(grade_monthly.items(), key=lambda x: x[0])
-        if len(sm) < 2:
-            return None
-        vals = [s for _, s in sm]
-        low_idx = vals.index(min(vals))
-        gain = vals[-1] - vals[low_idx]
-        return (grade, sm[low_idx][0], sm[low_idx][1], sm[-1][0], sm[-1][1], gain)
 
-    def fmt_pct(val):
-        return f"{val:.2f}%" if isinstance(val, float) else f"{val}%"
-
-    def cmp_arrow(val, ref):
-        """返回带箭头的比较字符串"""
-        diff = val - ref
-        if abs(diff) < 0.01:
-            return "→ 持平", ""
-        direction = "↑" if diff > 0 else "↓"
-        return f"{direction} {abs(diff):.1f}个百分点", "positive" if diff > 0 else "negative"
+    
 
     # ═══════════════════════════════════════════════════════════
     # 报告文字生成（generate_report_text）
@@ -370,8 +351,11 @@ def generate_report_text(data):
     L.append("\n")
     L.append(f"与此同时，学生自主练习意愿强烈——词汇自主练习次数高达**{vocab_p}次**，生均约{per_student}次，充分说明产品有效激发了学生的自主学习意愿，形成主动开口练习的良好习惯。\n\n")
 
+    # 动态找峰值月及增长趋势
+    peak_m = max(months, key=lambda m: data['monthly_hw'].get(m, 0)) if months else months[0] if months else ''
+    peak_cnt = data['monthly_hw'].get(peak_m, 0)
     L.append("### 3.3 应用频次分析\n")
-    L.append(f"在应用频次方面，{total_hw}次作业分布在{len(months)}个月份，整体呈现常态化稳步增长节奏——{months[0]}至{months[-1]}各月作业量逐步攀升，2026年1月使用量达到峰值，与期末复习教学周期同步，说明产品使用与学校教学节奏高度吻合。\n\n")
+    L.append(f"在应用频次方面，{total_hw}次作业分布在{len(months)}个月份，整体呈现常态化稳步增长节奏——{months[0] if months else ''}至{months[-1] if months else ''}期间，{peak_m}月作业量最高（{peak_cnt}次），与期末复习等教学节点同步，说明产品使用与学校教学节奏高度吻合。\n\n")
     L.append("| 月份 | 作业数 | 趋势 |\n|------|--------|------|\n")
     for i, m in enumerate(months):
         cnt = data['monthly_hw'][m]
@@ -519,7 +503,17 @@ def generate_report_text(data):
     top_score = top[0]["avg_score"] if top else 0
     L.append("### 6.1 主要亮点\n\n")
     L.append(f"**亮点一：激活率高，使用覆盖面广。** {data['classes']}个班级、{data['total_students']}名学生全面激活，注册使用覆盖率达100%，{mr}期间教师持续通过系统布置听说作业，作业完成率达{data['completion_rate']}%，形成稳定的常态化应用节奏，为教学减负增效奠定坚实基础。\n\n")
-    L.append(f"**亮点二：词汇自主练习激发主动学习意愿。** 全校词汇自主练习累计达{vocab_p}次，生均约{per_student}次，相关系数r={r_v:.4f}（{'中等正相关' if r_v >= 0.4 else '弱正相关'}），充分说明自主练习越多的学生得分表现越优异，产品已初步构建「主动练习→成绩提升」的正向循环。\n\n")
+    # 相关系数解读：根据强度说不同的话
+    if r_v >= 0.4:
+        corr_desc2 = "中等正相关"
+        corr_conclusion = "自主练习越多的学生，得分表现越优异"
+    elif r_v >= 0.2:
+        corr_desc2 = "弱正相关"
+        corr_conclusion = "持续高频练习对成绩的长期积累效应值得持续关注"
+    else:
+        corr_desc2 = "相关性弱"
+        corr_conclusion = "自主练习与得分的关联性尚待更多数据验证"
+    L.append(f"**亮点二：词汇自主练习激发主动学习意愿。** 全校词汇自主练习累计达{vocab_p}次，生均约{per_student}次，相关系数r={r_v:.4f}（{corr_desc2}），{corr_conclusion}，产品已初步构建「主动练习→成绩提升」的正向循环。\n\n")
     L.append(f"**亮点三：听说训练体系完善，科学备考路径清晰。** 「同步」课文朗读跟读占比{syn_pct}%（日常打基础）＋「专项」薄弱题型突破{sub_pct}%＋「模拟」实战冲刺{mon_pct}%，形成「日常打基础＋考前专项强化＋模拟实战」的完整备考闭环。\n\n")
     L.append(f"**亮点四：教师精准教学能力初步形成。** 教师依托产品多维度学情诊断数据开展精准讲评，调取拓展资源进行举一反三的变式训练；标杆班级{tc_name}平均得分率高达{top_score}%，展示高频训练与高分的正向关系，为全校提供可复制的经验。\n\n")
 
