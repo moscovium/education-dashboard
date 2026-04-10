@@ -72,6 +72,21 @@ function initElements() {
     elements.avgAssignments = document.getElementById('avgAssignments');
     elements.tableBody = document.getElementById('tableBody');
     elements.exportBtn = document.getElementById('exportBtn');
+    
+    // 高价值筛选元素
+    elements.highValueSection = document.getElementById('highValueSection');
+    elements.hvProvinceSelect = document.getElementById('hvProvinceSelect');
+    elements.hvCitySelect = document.getElementById('hvCitySelect');
+    elements.hvDistrictSelect = document.getElementById('hvDistrictSelect');
+    elements.hvGradeSelect = document.getElementById('hvGradeSelect');
+    elements.hvPayRateSelect = document.getElementById('hvPayRateSelect');
+    elements.hvAssignRateSelect = document.getElementById('hvAssignRateSelect');
+    elements.hvCompletionRateSelect = document.getElementById('hvCompletionRateSelect');
+    elements.hvTrialCountSelect = document.getElementById('hvTrialCountSelect');
+    elements.highValueTableBody = document.getElementById('highValueTableBody');
+    elements.highValueInfo = document.getElementById('highValueInfo');
+    elements.applyHighValueFilter = document.getElementById('applyHighValueFilter');
+    elements.resetHighValueFilter = document.getElementById('resetHighValueFilter');
 }
 
 // 数据库操作
@@ -235,6 +250,13 @@ function initHandlers() {
     elements.applyFilter.onclick = applyFilter;
     elements.resetFilter.onclick = resetFilter;
     elements.exportBtn.onclick = exportCSV;
+    
+    // 高价值筛选事件
+    elements.hvProvinceSelect.onchange = () => { cascadeHighValue('province'); };
+    elements.hvCitySelect.onchange = () => { cascadeHighValue('city'); };
+    elements.hvDistrictSelect.onchange = () => { cascadeHighValue('district'); };
+    elements.applyHighValueFilter.onclick = applyHighValueFilter;
+    elements.resetHighValueFilter.onclick = resetHighValueFilter;
 }
 
 // 上传文件 - 优化版：实时进度、详细错误、大文件支持
@@ -352,6 +374,11 @@ async function loadFileList() {
             } catch(e) { console.error(f.filename, e); }
         }
         updateAllSels();
+        // 有数据时立即显示高价值筛选区域（筛选项），统计仅在点击"应用筛选"时执行
+        if (AppState.cache.size > 0) {
+            updateHighValueSels();
+            elements.highValueSection.style.display = 'block';
+        }
     }
 }
 
@@ -548,6 +575,344 @@ function cascade(lvl) {
     elements.districtSelect.disabled = false;
     elements.schoolSelect.disabled = false;
     elements.gradeSelect.disabled = false;
+    
+    // 更新高价值筛选下拉选项
+    updateHighValueSels();
+}
+
+// 更新高价值筛选项 - 基于最后一周数据
+function updateHighValueSels() {
+    let allRecs = [];
+    AppState.cache.forEach(d => allRecs.push(...d));
+    
+    if (allRecs.length === 0) {
+        updateSel(elements.hvProvinceSelect, new Set());
+        updateSel(elements.hvCitySelect, new Set());
+        updateSel(elements.hvDistrictSelect, new Set());
+        updateSel(elements.hvGradeSelect, new Set());
+        return;
+    }
+    
+    // 获取最后一周的数据
+    const weekStarts = [...new Set(allRecs.map(r => r.weekStartDate))].sort();
+    const lastWeekStart = weekStarts[weekStarts.length - 1] || '';
+    const lastWeekRecs = allRecs.filter(r => r.weekStartDate === lastWeekStart);
+    
+    updateSel(elements.hvProvinceSelect, new Set(lastWeekRecs.map(r => r['省份']).filter(Boolean)));
+    updateSel(elements.hvCitySelect, new Set(lastWeekRecs.map(r => r['城市']).filter(Boolean)));
+    updateSel(elements.hvDistrictSelect, new Set(lastWeekRecs.map(r => r['区县']).filter(Boolean)));
+    updateSel(elements.hvGradeSelect, new Set(lastWeekRecs.map(r => r['年级']).filter(Boolean)));
+}
+
+// 高价值筛选级联
+function cascadeHighValue(lvl) {
+    let allRecs = [];
+    AppState.cache.forEach(d => allRecs.push(...d));
+    if (allRecs.length === 0) return;
+    
+    // 获取最后一周的数据
+    const weekStarts = [...new Set(allRecs.map(r => r.weekStartDate))].sort();
+    const lastWeekStart = weekStarts[weekStarts.length - 1] || '';
+    let recs = allRecs.filter(r => r.weekStartDate === lastWeekStart);
+    
+    const selProvince = elements.hvProvinceSelect.value;
+    const selCity = elements.hvCitySelect.value;
+    const selDistrict = elements.hvDistrictSelect.value;
+    const selGrade = elements.hvGradeSelect.value;
+    
+    if (selProvince) recs = recs.filter(r => r['省份'] === selProvince);
+    if (selCity) recs = recs.filter(r => r['城市'] === selCity);
+    if (selDistrict) recs = recs.filter(r => r['区县'] === selDistrict);
+    
+    // 省份下拉框
+    let provinceRecs = allRecs.filter(r => r.weekStartDate === lastWeekStart);
+    const provinces = [...new Set(provinceRecs.map(r => r['省份']).filter(Boolean))];
+    updateSel(elements.hvProvinceSelect, new Set(provinces));
+    elements.hvProvinceSelect.value = selProvince && provinces.includes(selProvince) ? selProvince : '';
+    
+    // 城市下拉框
+    let cityRecs = allRecs.filter(r => r.weekStartDate === lastWeekStart);
+    if (selProvince) cityRecs = cityRecs.filter(r => r['省份'] === selProvince);
+    const cities = [...new Set(cityRecs.map(r => r['城市']).filter(Boolean))];
+    updateSel(elements.hvCitySelect, new Set(cities));
+    elements.hvCitySelect.value = selCity && cities.includes(selCity) ? selCity : '';
+    
+    // 区县下拉框
+    let districtRecs = allRecs.filter(r => r.weekStartDate === lastWeekStart);
+    if (selProvince) districtRecs = districtRecs.filter(r => r['省份'] === selProvince);
+    if (selCity) districtRecs = districtRecs.filter(r => r['城市'] === selCity);
+    const districts = [...new Set(districtRecs.map(r => r['区县']).filter(Boolean))];
+    updateSel(elements.hvDistrictSelect, new Set(districts));
+    elements.hvDistrictSelect.value = selDistrict && districts.includes(selDistrict) ? selDistrict : '';
+    
+    // 年级下拉框
+    let gradeRecs = allRecs.filter(r => r.weekStartDate === lastWeekStart);
+    if (selProvince) gradeRecs = gradeRecs.filter(r => r['省份'] === selProvince);
+    if (selCity) gradeRecs = gradeRecs.filter(r => r['城市'] === selCity);
+    if (selDistrict) gradeRecs = gradeRecs.filter(r => r['区县'] === selDistrict);
+    const grades = [...new Set(gradeRecs.map(r => r['年级']).filter(Boolean))];
+    updateSel(elements.hvGradeSelect, new Set(grades));
+    elements.hvGradeSelect.value = selGrade && grades.includes(selGrade) ? selGrade : '';
+}
+
+// 计算年级指标并应用筛选
+function applyHighValueFilter() {
+    // 获取所有周的数据
+    let allRecs = [];
+    AppState.cache.forEach(d => allRecs.push(...d));
+    if (allRecs.length === 0) {
+        showMsg('⚠️ 暂无数据', 'warning');
+        return;
+    }
+    
+    const weekStarts = [...new Set(allRecs.map(r => r.weekStartDate))].sort();
+    
+    // 应用省市区年级筛选（使用所有周数据）
+    const selProvince = elements.hvProvinceSelect.value;
+    const selCity = elements.hvCitySelect.value;
+    const selDistrict = elements.hvDistrictSelect.value;
+    const selGrade = elements.hvGradeSelect.value;
+    
+    if (selProvince) allRecs = allRecs.filter(r => r['省份'] === selProvince);
+    if (selCity) allRecs = allRecs.filter(r => r['城市'] === selCity);
+    if (selDistrict) allRecs = allRecs.filter(r => r['区县'] === selDistrict);
+    if (selGrade) allRecs = allRecs.filter(r => r['年级'] === selGrade);
+    
+    // 获取所有周次并排序
+    const sortedWeeks = [...new Set(allRecs.map(r => r.weekStartDate))].sort();
+    
+    // 按学校+年级分组，计算指标（基于所有周汇总）
+    const gradeMap = new Map();
+    allRecs.forEach(r => {
+        const key = `${r['省份']}|${r['城市']}|${r['区县']}|${r['学校名称']}|${r['年级']}`;
+        if (!gradeMap.has(key)) {
+            gradeMap.set(key, {
+                province: r['省份'] || '',
+                city: r['城市'] || '',
+                district: r['区县'] || '',
+                school: r['学校名称'] || '',
+                grade: r['年级'] || '',
+                totalClassCount: 0,
+                totalStudentCount: 0,
+                totalPaidCount: 0,  // 未过期付费人数
+                totalTrialCount: 0,  // 未过期试用人数
+                totalStudents: 0,  // 总人数
+                weeklyData: new Map()  // 每周数据
+            });
+        }
+        const g = gradeMap.get(key);
+        const weekKey = r.weekStartDate;
+        
+        // 初始化周数据
+        if (!g.weeklyData.has(weekKey)) {
+            g.weeklyData.set(weekKey, {
+                classCount: 0,
+                studentCount: 0,
+                paidCount: 0,  // 未过期付费人数
+                trialCount: 0,  // 未过期试用人数
+                totalStudents: 0,
+                assignedClassCount: 0,
+                completionRates: []
+            });
+        }
+        const w = g.weeklyData.get(weekKey);
+        
+        // 累计该周数据
+        w.classCount++;
+        w.studentCount += +r['总学生数'] || 0;
+        w.paidCount += +r['未过期付费学生数'] || 0;
+        w.trialCount += +r['未过期试用学生数'] || 0;
+        w.totalStudents += +r['总学生数'] || 0;
+        
+        // 作业布置次数>=1的班级
+        if ((+r['布置作业次数'] || 0) >= 1) {
+            w.assignedClassCount++;
+        }
+        
+        // 收集作业完成率
+        const completionRate = +r['作业完成率'] || 0;
+        if (completionRate > 0) {
+            w.completionRates.push(completionRate * 100);
+        }
+        
+        // 累计总数
+        g.totalClassCount++;
+        g.totalStudentCount += +r['总学生数'] || 0;
+        g.totalPaidCount += +r['未过期付费学生数'] || 0;
+        g.totalTrialCount += +r['未过期试用学生数'] || 0;
+        g.totalStudents += +r['总学生数'] || 0;
+    });
+    
+    // 计算年级指标
+    const gradeMetrics = [];
+    gradeMap.forEach((g, key) => {
+        // 基于所有周汇总计算：年级付费率 = 未过期付费学生数 / 总学生数
+        const payRate = g.totalStudents > 0 ? (g.totalPaidCount / g.totalStudents) * 100 : 0;
+        
+        // 每周的布置率和完成率
+        const weeklyMetrics = [];
+        sortedWeeks.forEach(week => {
+            if (g.weeklyData.has(week)) {
+                const w = g.weeklyData.get(week);
+                const assignRate = w.classCount > 0 ? (w.assignedClassCount / w.classCount) * 100 : 0;
+                const avgCompletionRate = w.completionRates.length > 0 
+                    ? w.completionRates.reduce((a, b) => a + b, 0) / w.completionRates.length 
+                    : 0;
+                weeklyMetrics.push({
+                    week: week,
+                    assignRate: assignRate,
+                    avgCompletionRate: avgCompletionRate
+                });
+            }
+        });
+        
+        gradeMetrics.push({
+            province: g.province,
+            city: g.city,
+            district: g.district,
+            school: g.school,
+            grade: g.grade,
+            classCount: g.totalClassCount,
+            studentCount: g.totalStudentCount,
+            trialCount: g.totalTrialCount,
+            payRate: payRate,
+            weeklyMetrics: weeklyMetrics
+        });
+    });
+    
+    // 获取筛选条件
+    const payRateThreshold = parseFloat(elements.hvPayRateSelect.value) || 0;
+    const assignRateThreshold = parseFloat(elements.hvAssignRateSelect.value) || 0;
+    const completionRateThreshold = parseFloat(elements.hvCompletionRateSelect.value) || 0;
+    const trialCountThreshold = parseFloat(elements.hvTrialCountSelect.value) || 0;
+    
+    // 应用筛选 - 付费率为小于等于筛选
+    let filteredGrades = gradeMetrics.filter(g => {
+        if (payRateThreshold > 0 && g.payRate > payRateThreshold) return false;
+        // 布置率/完成率筛选基于所有周的平均值
+        if (assignRateThreshold > 0) {
+            const avgAssignRate = g.weeklyMetrics.length > 0 
+                ? g.weeklyMetrics.reduce((a, w) => a + w.assignRate, 0) / g.weeklyMetrics.length 
+                : 0;
+            if (avgAssignRate < assignRateThreshold) return false;
+        }
+        if (completionRateThreshold > 0) {
+            const avgCompletion = g.weeklyMetrics.length > 0 
+                ? g.weeklyMetrics.reduce((a, w) => a + w.avgCompletionRate, 0) / g.weeklyMetrics.length 
+                : 0;
+            if (avgCompletion < completionRateThreshold) return false;
+        }
+        if (trialCountThreshold > 0 && g.trialCount < trialCountThreshold) return false;
+        return true;
+    });
+    
+    // 显示结果
+    renderHighValueTable(filteredGrades, sortedWeeks);
+    
+    if (filteredGrades.length === 0) {
+        showMsg('⚠️ 筛选后无数据', 'warning');
+    } else {
+        showMsg(`✅ 找到 ${filteredGrades.length} 条高价值年级数据`, 'success');
+    }
+}
+
+function renderHighValueTable(grades, sortedWeeks) {
+    if (grades.length === 0) {
+        elements.highValueTableBody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:40px;color:#999;">请点击"应用筛选"查看结果</td></tr>';
+        document.getElementById('highValueTableHead').innerHTML = `
+            <tr>
+                <th>省份</th>
+                <th>城市</th>
+                <th>区县</th>
+                <th>学校</th>
+                <th>年级</th>
+                <th>班级数</th>
+                <th>学生总数</th>
+                <th>未过期试用人数</th>
+                <th>年级付费率</th>
+            </tr>`;
+        elements.highValueInfo.textContent = '';
+        elements.highValueSection.style.display = 'block';
+        return;
+    }
+    
+    // 按省份、城市、区县、学校、年级排序
+    grades.sort((a, b) => {
+        const pCmp = String(a.province).localeCompare(String(b.province), 'zh-CN');
+        if (pCmp !== 0) return pCmp;
+        const cCmp = String(a.city).localeCompare(String(b.city), 'zh-CN');
+        if (cCmp !== 0) return cCmp;
+        const dCmp = String(a.district).localeCompare(String(b.district), 'zh-CN');
+        if (dCmp !== 0) return dCmp;
+        const schCmp = String(a.school).localeCompare(String(b.school), 'zh-CN');
+        if (schCmp !== 0) return schCmp;
+        return String(a.grade).localeCompare(String(b.grade), 'zh-CN');
+    });
+    
+    // 生成动态表头（基于周次）
+    let theadHtml = `<tr>
+        <th rowspan="2">省份</th>
+        <th rowspan="2">城市</th>
+        <th rowspan="2">区县</th>
+        <th rowspan="2">学校</th>
+        <th rowspan="2">年级</th>
+        <th rowspan="2">班级数</th>
+        <th rowspan="2">学生总数</th>
+        <th rowspan="2">未过期试用人数</th>
+        <th rowspan="2">年级付费率</th>
+        <th colspan="${sortedWeeks.length * 2}" style="text-align:center;">作业布置率/平均完成率</th>
+    </tr><tr>`;
+    sortedWeeks.forEach(week => {
+        theadHtml += `<th colspan="2" style="font-size:11px;">${week}</th>`;
+    });
+    theadHtml += '</tr>';
+    document.getElementById('highValueTableHead').innerHTML = theadHtml;
+    
+    // 生成数据行
+    elements.highValueTableBody.innerHTML = grades.map(g => {
+        let cells = `
+            <td>${g.province}</td>
+            <td>${g.city}</td>
+            <td>${g.district}</td>
+            <td>${g.school}</td>
+            <td>${g.grade}</td>
+            <td style="text-align:center;">${g.classCount}</td>
+            <td style="text-align:center;">${g.studentCount.toLocaleString()}</td>
+            <td style="text-align:center;">${g.trialCount.toLocaleString()}</td>
+            <td style="text-align:center;font-weight:600;color:${g.payRate >= 30 ? '#10b981' : '#f59e0b'};">${g.payRate.toFixed(1)}%</td>`;
+        
+        // 每周的布置率和完成率
+        sortedWeeks.forEach(week => {
+            const weekData = g.weeklyMetrics.find(w => w.week === week);
+            if (weekData) {
+                cells += `<td style="text-align:center;font-size:11px;">${weekData.assignRate.toFixed(1)}%</td>`;
+                cells += `<td style="text-align:center;font-size:11px;color:${weekData.avgCompletionRate >= 70 ? '#10b981' : '#f59e0b'};">${weekData.avgCompletionRate.toFixed(1)}%</td>`;
+            } else {
+                cells += '<td style="text-align:center;color:#ccc;">-</td>';
+                cells += '<td style="text-align:center;color:#ccc;">-</td>';
+            }
+        });
+        
+        return '<tr>' + cells + '</tr>';
+    }).join('');
+    
+    const lastWeek = sortedWeeks.length > 0 ? sortedWeeks[sortedWeeks.length - 1] : '';
+    elements.highValueInfo.textContent = `共 ${grades.length} 条记录 | 数据来源：${sortedWeeks.length}周（${lastWeek}）`;
+    elements.highValueSection.style.display = 'block';
+}
+
+function resetHighValueFilter() {
+    elements.hvProvinceSelect.value = '';
+    elements.hvCitySelect.value = '';
+    elements.hvDistrictSelect.value = '';
+    elements.hvGradeSelect.value = '';
+    elements.hvPayRateSelect.value = '';
+    elements.hvAssignRateSelect.value = '';
+    elements.hvCompletionRateSelect.value = '';
+    elements.hvTrialCountSelect.value = '';
+    updateHighValueSels();
+    elements.highValueSection.style.display = 'none';
+    showMsg('✅ 已重置', 'success');
 }
 
 function getCascadeData() {
@@ -707,6 +1072,9 @@ function updateAllSels() {
     elements.districtSelect.disabled = false;
     elements.schoolSelect.disabled = false;
     elements.gradeSelect.disabled = false;
+    
+    // 更新高价值筛选项
+    updateHighValueSels();
 }
 
 // 渲染看板
@@ -715,6 +1083,7 @@ function renderDash() {
         elements.metricsSection.style.display = 'none';
         elements.chartsSection.style.display = 'none';
         elements.tableSection.style.display = 'none';
+        elements.highValueSection.style.display = 'none';
         elements.emptyState.style.display = 'block';
         return;
     }
@@ -722,6 +1091,9 @@ function renderDash() {
     elements.metricsSection.style.display = 'block';
     elements.chartsSection.style.display = 'block';
     elements.tableSection.style.display = 'block';
+    // 有数据时默认显示高价值筛选区域（仅显示筛选项，不自动统计）
+    elements.highValueSection.style.display = 'block';
+    updateHighValueSels();
     renderMet();
     renderCharts();
     renderTbl();

@@ -541,6 +541,141 @@
             </div>
         </section>
 
+        <!-- 高价值学校年级筛选 -->
+        <section class="high-value-section" id="highValueSection" style="display: none;">
+            <div class="section-header">
+                <h2 class="section-title">
+                    <span class="section-icon">⭐</span>
+                    高价值学校/年级
+                </h2>
+            </div>
+            
+            <!-- 高价值筛选条件 -->
+            <div class="high-value-filters">
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <label class="filter-label">
+                            <span class="label-icon">📍</span>
+                            省份
+                        </label>
+                        <select id="hvProvinceSelect" class="filter-select">
+                            <option value="">全部省份</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">
+                            <span class="label-icon">🏙️</span>
+                            城市
+                        </label>
+                        <select id="hvCitySelect" class="filter-select">
+                            <option value="">全部城市</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">
+                            <span class="label-icon">🏘️</span>
+                            区县
+                        </label>
+                        <select id="hvDistrictSelect" class="filter-select">
+                            <option value="">全部区县</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">
+                            <span class="label-icon">📚</span>
+                            年级
+                        </label>
+                        <select id="hvGradeSelect" class="filter-select">
+                            <option value="">全部年级</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <label class="filter-label">
+                            <span class="label-icon">💰</span>
+                            年级付费率
+                        </label>
+                        <select id="hvPayRateSelect" class="filter-select">
+                            <option value="">不限</option>
+                            <option value="60">≤60%</option>
+                            <option value="40">≤40%</option>
+                            <option value="20">≤20%</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">
+                            <span class="label-icon">📝</span>
+                            年级作业布置率
+                        </label>
+                        <select id="hvAssignRateSelect" class="filter-select">
+                            <option value="">不限</option>
+                            <option value="50">≥50%</option>
+                            <option value="80">≥80%</option>
+                            <option value="100">=100%</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">
+                            <span class="label-icon">✅</span>
+                            年级平均完成率
+                        </label>
+                        <select id="hvCompletionRateSelect" class="filter-select">
+                            <option value="">不限</option>
+                            <option value="30">≥30%</option>
+                            <option value="50">≥50%</option>
+                            <option value="70">≥70%</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">
+                            <span class="label-icon">👥</span>
+                            年级未过期试用人数
+                        </label>
+                        <select id="hvTrialCountSelect" class="filter-select">
+                            <option value="">不限</option>
+                            <option value="150">≥150人</option>
+                            <option value="300">≥300人</option>
+                            <option value="500">≥500人</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="filter-actions">
+                    <button id="applyHighValueFilter" class="btn btn-primary btn-small">
+                        <span class="btn-icon">🔍</span>
+                        应用筛选
+                    </button>
+                    <button id="resetHighValueFilter" class="btn btn-secondary btn-small">
+                        <span class="btn-icon">🔄</span>
+                        重置
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 高价值学校年级列表 -->
+            <div class="high-value-table-wrapper">
+                <table class="data-table" id="highValueTable">
+                    <thead id="highValueTableHead">
+                        <tr>
+                            <th>省份</th>
+                            <th>城市</th>
+                            <th>区县</th>
+                            <th>学校</th>
+                            <th>年级</th>
+                            <th>班级数</th>
+                            <th>学生总数</th>
+                            <th>未过期试用人数</th>
+                            <th>年级付费率</th>
+                            <th>作业布置率</th>
+                            <th>平均完成率</th>
+                        </tr>
+                    </thead>
+                    <tbody id="highValueTableBody"></tbody>
+                </table>
+            </div>
+            <div class="high-value-info" id="highValueInfo"></div>
+        </section>
+
         <!-- 空状态 -->
         <section class="empty-state" id="emptyState">
             <div class="empty-icon">📂</div>

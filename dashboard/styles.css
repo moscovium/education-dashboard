@@ -580,6 +580,58 @@ body {
     margin-bottom: 24px;
 }
 
+/* 高价值学校年级区域 */
+.high-value-section {
+    margin-bottom: 24px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    box-shadow: var(--shadow);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.high-value-filters {
+    margin-bottom: 20px;
+}
+
+.filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.filter-row .filter-group {
+    flex: 1;
+    min-width: 180px;
+}
+
+.filter-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.high-value-table-wrapper {
+    max-height: 500px;
+    overflow: auto;
+    background: white;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+}
+
+.high-value-info {
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    text-align: right;
+}
+
+.high-value-section .section-header {
+    margin-bottom: 16px;
+}
+
 .table-actions {
     display: flex;
     gap: 8px;
