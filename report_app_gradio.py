@@ -194,7 +194,7 @@ with gr.Blocks(title="E听说成效报告系统", theme=gr.themes.Soft()) as dem
                         )
 
 
-                    with gr.Accordion("📋 预期输出报告结构", open=False):
+                    with gr.Accordion("📋 预期输出报告结构", open=True):
                         gr.Markdown("""
 **基础报告（必含六章节）：**
 
@@ -217,18 +217,15 @@ with gr.Blocks(title="E听说成效报告系统", theme=gr.themes.Soft()) as dem
                 with gr.Column(scale=2):
                     class_file = gr.File(
                         label="📁 上传「班级数据总览.xlsx」",
-                        file_types=[".xlsx"],
-                        file_count=1
+                        file_types=[".xlsx"]
                     )
                     hw_file = gr.File(
                         label="📁 上传「作业明细.xlsx」",
-                        file_types=[".xlsx"],
-                        file_count=1
+                        file_types=[".xlsx"]
                     )
                     qt_file = gr.File(
                         label="📁 上传「听说模拟班级总体情况.xlsx」（可选上传）",
-                        file_types=[".xlsx"],
-                        file_count=1
+                        file_types=[".xlsx"]
                     )
                     analyze_btn = gr.Button("🔍 开始分析", variant="primary")
 
