@@ -12,6 +12,7 @@ import os
 from report_app_core import (
     parse_class_overview,
     parse_hw_details,
+    parse_question_type,
     analyze_data,
     generate_report_text,
     make_charts,
@@ -45,7 +46,7 @@ PROVIDERS = {
 }
 
 
-def process_files(class_file, hw_file, provider_name, api_key):
+def process_files(class_file, hw_file, qt_file, provider_name, api_key):
     """处理上传的文件，返回分析结果"""
     if class_file is None or hw_file is None:
         return None, None, None, "⚠️ 请同时上传两个Excel文件：班级数据总览 和 作业明细"
@@ -53,7 +54,8 @@ def process_files(class_file, hw_file, provider_name, api_key):
     try:
         class_df = parse_class_overview(class_file)
         hw_df = parse_hw_details(hw_file)
-        data = analyze_data(class_df, hw_df)
+        qt_df = parse_question_type(qt_file) if qt_file else None
+        data = analyze_data(class_df, hw_df, qt_df)
         report_text = generate_report_text(data)
         charts = make_charts(data)
 
@@ -63,7 +65,13 @@ def process_files(class_file, hw_file, provider_name, api_key):
             chart_htmls[key] = fig.to_html(full_html=False, include_plotlyjs='cdn')
 
         school = data.get('school_name', '未知学校')
-        summary = f"✅ 分析完成！\n\n学校：{school}\n班级：{data['classes']}个\n学生：{data['total_students']}人\n作业总数：{data['total_hw']}次\n作业完成率：{data['completion_rate']}%\n平均得分率：{data['score_rate_avg']}%"
+        qt_note = "（含听说模拟题型数据）" if data.get('has_question_type') else ""
+        summary = f"✅ 分析完成！{qt_note}\n\n学校：{school}\n班级：{data['classes']}个\n学生：{data['total_students']}人\n作业总数：{data['total_hw']}次\n作业完成率：{data['completion_rate']}%\n平均得分率：{data['score_rate_avg']}%"
+        if data.get('has_question_type'):
+            qt = data.get('qt_school', {})
+            if qt:
+                hardest = min(qt.items(), key=lambda x: x[1]['mean'])
+                summary += f"\n题型数据：共{list(qt.values())[0]['count']}条记录，最难题型：{hardest[0]}（均分{hardest[1]['mean']}%）"
 
         return report_text, chart_htmls, data, summary
     except Exception as e:
@@ -163,13 +171,15 @@ with gr.Blocks(title="E听说成效报告系统", theme=gr.themes.Soft()) as dem
                     **步骤：**
                     1. 上传 `班级数据总览.xlsx`
                     2. 上传 `作业明细.xlsx`
-                    3. 点击「开始分析」生成报告
-                    4. 切换到「报告预览」查看结果
-                    5. 在「对话调整」标签页与大模型对话修改报告
+                    3. （可选）上传 `听说模拟班级总体情况.xlsx`，获得题型深度分析
+                    4. 点击「开始分析」生成报告
+                    5. 切换到「报告预览」查看结果
+                    6. 在「对话调整」标签页与大模型对话修改报告
 
                     **文件要求：**
                     - 班级数据总览：含班级id、总学生数、布置作业次数、作业完成率等
                     - 作业明细：含作业路径、得分率、开始日期等
+                    - 听说模拟班级总体情况（可选）：含题型名称、班级、教师、平均分、得分率等
                     """)
                     with gr.Accordion("🔑 大模型API配置（可选）", open=False):
                         provider_dropdown = gr.Dropdown(
@@ -194,13 +204,18 @@ with gr.Blocks(title="E听说成效报告系统", theme=gr.themes.Soft()) as dem
                         file_types=[".xlsx"],
                         file_count=1
                     )
+                    qt_file = gr.File(
+                        label="📁 上传「听说模拟班级总体情况.xlsx」（可选上传）",
+                        file_types=[".xlsx"],
+                        file_count=1
+                    )
                     analyze_btn = gr.Button("🔍 开始分析", variant="primary")
 
                     status_output = gr.Textbox(label="状态", lines=3, interactive=False)
 
                     analyze_btn.click(
                         fn=process_files,
-                        inputs=[class_file, hw_file, provider_dropdown, api_key_input],
+                        inputs=[class_file, hw_file, qt_file, provider_dropdown, api_key_input],
                         outputs=[report_state, charts_state, data_state, status_output]
                     )
 

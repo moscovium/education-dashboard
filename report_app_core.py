@@ -32,13 +32,32 @@ def parse_hw_details(file_obj):
             rows.append(dict(zip(headers, row)))
     return pd.DataFrame(rows)
 
+def parse_question_type(file_obj):
+    """解析「听说模拟班级总体情况-题型」Excel"""
+    wb = openpyxl.load_workbook(file_obj, data_only=True)
+    ws = wb.active
+    rows = []
+    headers = [c.value for c in ws[1]]
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        if any(v is not None for v in row):
+            rows.append(dict(zip(headers, row)))
+    df = pd.DataFrame(rows)
+    # 统一列名：得分率转为小数→百分数
+    if '得分率' in df.columns:
+        df['得分率'] = pd.to_numeric(df['得分率'], errors='coerce').fillna(0)
+    # 年级/班级统一为字符串
+    for col in ['年级', '班级']:
+        if col in df.columns:
+            df[col] = df[col].astype(str).str.strip()
+    return df
+
 def _split_path(path):
     if pd.isna(path) or '-' not in str(path):
         return ('其他', '其他')
     parts = str(path).split('-')
     return parts[0], parts[1] if len(parts) > 1 else parts[0]
 
-def analyze_data(class_df, hw_df):
+def analyze_data(class_df, hw_df, qt_df=None):
     results = {}
     results['schools']    = int(class_df['学校名称'].nunique())
     results['classes']    = int(class_df['班级id'].nunique())
@@ -236,6 +255,94 @@ def analyze_data(class_df, hw_df):
 
     months = sorted(results.get('monthly_hw', {}).keys())
     results['month_range'] = f"{min(months)} 至 {max(months)}" if months else "N/A"
+
+    # ── 题型分析（来自「听说模拟班级总体情况」Excel）────────────
+    if qt_df is not None and not qt_df.empty and '题型名称' in qt_df.columns:
+        qt = qt_df.copy()
+        results['has_question_type'] = True
+
+        # ① 全校各题型平均得分率（难度排序）
+        qt_school = qt.groupby('题型名称')['得分率'].agg(['mean', 'std', 'count']).round(4)
+        results['qt_school'] = {
+            name: {'mean': round(v['mean']*100, 2), 'std': round(v['std']*100, 2), 'count': int(v['count'])}
+            for name, v in qt_school.to_dict('index').items()
+        }
+
+        # ② 班级 × 题型 得分率矩阵
+        if '班级' in qt.columns and '年级' in qt.columns:
+            ct = qt.groupby(['班级', '年级'])['得分率'].mean().round(4)
+            ct_dict = {}
+            for (c, g), v in ct.to_dict().items():
+                ct_dict[f"{c}班{g}"] = round(float(v)*100, 2)
+            results['qt_class'] = ct_dict
+
+        # ③ 年级 × 题型 得分率矩阵
+        if '年级' in qt.columns:
+            gt = qt.groupby(['年级', '题型名称'])['得分率'].mean().round(4)
+            results['qt_grade'] = {
+                str(g): {q: round(float(v)*100, 2) for q, v in d.items()}
+                for g, d in gt.groupby('年级').apply(
+                    lambda df: df.set_index('题型名称')['得分率'].to_dict()
+                ).to_dict().items()
+            }
+
+        # ④ 班级-题型 二维矩阵（横向各班对比，纵向各题型）
+        if '班级' in qt.columns and '年级' in qt.columns:
+            ct_matrix = qt.pivot_table(
+                index=['班级', '年级'], columns='题型名称', values='得分率', aggfunc='mean'
+            ).round(4)
+            results['qt_matrix'] = {
+                f"{c}班{g}": {q: round(float(ct_matrix.loc[(c, g), q])*100, 2)
+                               if q in ct_matrix.columns and (c, g) in ct_matrix.index else None
+                               for q in ct_matrix.columns}
+                for c, g in ct_matrix.index
+            }
+            # 离均差（相对各班均值的偏离，正=强项，负=弱项）
+            ct_mean = ct_matrix.mean(axis=1)
+            ct_dev = (ct_matrix.sub(ct_mean, axis=0)).round(4)
+            results['qt_deviation'] = {
+                f"{c}班{g}": {q: round(float(ct_dev.loc[(c, g), q])*100, 2)
+                               if q in ct_dev.columns and (c, g) in ct_dev.index else None
+                               for q in ct_dev.columns}
+                for c, g in ct_dev.index
+            }
+
+        # ⑤ 各班薄弱题型（得分率最低的题型）
+        if '班级' in qt.columns and '年级' in qt.columns:
+            ct_mean2 = ct_matrix.mean(axis=1)
+            ct_dev2 = ct_matrix.sub(ct_mean2, axis=0)
+            weak_qt = ct_dev2.idxmin(axis=1)
+            weak_score = ct_dev2.min(axis=1)
+            results['qt_weak'] = {
+                f"{c}班{g}": {'题型': weak_qt.loc[(c, g)], '离均差': round(float(weak_score.loc[(c, g)])*100, 2)}
+                for c, g in weak_qt.index
+            }
+
+        # ⑥ 教师 × 题型 得分率（教师效能分析）
+        if '教师' in qt.columns and '题型名称' in qt.columns:
+            tc_qt = qt.groupby(['教师', '题型名称'])['得分率'].mean().unstack(fill_value=0).round(4)
+            results['qt_teacher'] = {
+                str(t): {q: round(float(v)*100, 2) for q, v in row.items() if v > 0}
+                for t, row in tc_qt.iterrows()
+            }
+            # 教师综合得分率
+            tc_mean = qt.groupby('教师')['得分率'].mean().round(4).sort_values(ascending=False)
+            results['qt_teacher_rank'] = {
+                str(t): round(float(v)*100, 2) for t, v in tc_mean.to_dict().items()
+            }
+
+        # ⑦ 高分率/低分率（题型两极分化分析）
+        if '优秀率' in qt.columns and '低分率' in qt.columns:
+            qt_hr = qt.groupby('题型名称')[['优秀率', '低分率']].mean().round(4)
+            results['qt_hr_lr'] = {
+                q: {'优秀率': round(float(r['优秀率'])*100, 2),
+                    '低分率': round(float(r['低分率'])*100, 2)}
+                for q, r in qt_hr.to_dict('index').items()
+            }
+
+    else:
+        results['has_question_type'] = False
+
     return results
 
 def _build_province_policy(province, city):
@@ -454,8 +561,93 @@ def generate_report_text(data):
         L.append(f"| {m} | " + " | ".join(vals) + " |\n")
     L.append("\n")
 
+    # ── 4.2 题型得分分析（可选，依赖「听说模拟班级总体情况」Excel）──
+    if data.get('has_question_type'):
+        L.append("### 4.2 题型得分分析\n")
+        qt_school = data.get('qt_school', {})
+        if qt_school:
+            # 题型难度排序
+            sorted_qt = sorted(qt_school.items(), key=lambda x: x[1]['mean'])
+            hardest_qt  = sorted_qt[0][0]
+            mid_qt      = sorted_qt[1][0] if len(sorted_qt) > 1 else ''
+            easiest_qt  = sorted_qt[-1][0]
+            L.append(f"基于本周期听说模拟数据，共分析**{list(qt_school.values())[0]['count']}条**记录，涵盖情景反应、对话或短文朗读、篇章复述三大题型。全校各题型平均得分率如下：\n\n")
+            L.append("| 题型 | 平均得分率 | 难度定位 |\n|------|-----------|----------|\n")
+            qt_labels = {
+                '对话或短文朗读': '⭐ 基础题型（最易，得分率最高）',
+                '情景反应':       '⭐⭐ 中等难度，两极分化明显',
+                '篇章复述':       '⭐⭐⭐ 高难度，是拉开差距的核心题型',
+            }
+            for qt_name, info in sorted_qt:
+                label = qt_labels.get(qt_name, '')
+                L.append(f"| {qt_name} | {info['mean']}% | {label} |\n")
+            L.append("\n")
+            L.append(f"从全校横向对比来看，**{easiest_qt}**得分率最高（{qt_school[easiest_qt]['mean']}%），说明学生整体基础较扎实；**{hardest_qt}**得分率最低（{qt_school[hardest_qt]['mean']}%），低分率高达**{data.get('qt_hr_lr', {}).get(hardest_qt, {}).get('低分率', 'N/A')}%**，是全校学生共同面临的难点，也是备考冲刺阶段需要重点突破的题型。\n\n")
+
+        # 班级×题型矩阵
+        qt_matrix = data.get('qt_matrix', {})
+        qt_deviation = data.get('qt_deviation', {})
+        if qt_matrix:
+            L.append("**各班级题型得分率矩阵：**\n\n")
+            # 收集所有班级和题型
+            all_classes = sorted(set(k.split('班')[0] + '班' for k in qt_matrix.keys()))
+            qt_names = list(list(qt_matrix.values())[0].keys()) if qt_matrix else []
+            header = "| 班级 | " + " | ".join(qt_names) + " | 相对均值 |\n"
+            sep    = "|------|" + "|".join(["------"] * (len(qt_names) + 1)) + "\n"
+            L.append(header)
+            L.append(sep)
+            for cls_key in sorted(qt_matrix.keys(), key=lambda x: (x.split('班')[0], x)):
+                row_scores = qt_matrix[cls_key]
+                row_devs  = qt_deviation.get(cls_key, {})
+                vals = [f"{row_scores.get(q, '—')}%"]
+                for q in qt_names:
+                    v = row_scores.get(q)
+                    d = row_devs.get(q, 0)
+                    if v is not None:
+                        dev_str = f"(差{d:+.1f}%)" if d != 0 else ""
+                        vals.append(f"{v}%{dev_str}")
+                    else:
+                        vals.append("—")
+                L.append(f"| {cls_key} | " + " | ".join(vals) + " |\n")
+            L.append("\n")
+
+        # 各班薄弱题型
+        qt_weak = data.get('qt_weak', {})
+        if qt_weak:
+            L.append("**各班薄弱题型诊断：**\n\n")
+            # 按薄弱程度排序
+            weak_sorted = sorted(qt_weak.items(), key=lambda x: x[1]['离均差'])
+            weak_list = [f"- **{ck}**：**{v['题型']}**得分率最低，距班级均值{v['离均差']}个百分点"
+                         for ck, v in weak_sorted if v['离均差'] < 0]
+            if weak_list:
+                L.append("\n".join(weak_list) + "\n")
+                L.append("上述班级在薄弱题型上需要进行针对性强化训练，建议优先增加该题型的专项练习频次。\n\n")
+
+        # 教师效能
+        qt_teacher = data.get('qt_teacher_rank', {})
+        if qt_teacher:
+            L.append("**教师效能排名（综合各题型平均得分率）：**\n\n")
+            L.append("| 排名 | 教师 | 综合得分率 | 薄弱题型提示 |\n")
+            L.append("|------|------|-----------|------------|\n")
+            # 找教师对应的薄弱题型
+            qt_t_full = data.get('qt_teacher', {})
+            sorted_teachers = sorted(qt_teacher.items(), key=lambda x: -x[1])
+            for rank, (t, score) in enumerate(sorted_teachers[:8], 1):
+                t_scores = qt_t_full.get(t, {})
+                weak_t = min(t_scores.items(), key=lambda x: x[1]) if t_scores else ('', 0)
+                weak_str = f"{weak_t[0]}({weak_t[1]}%)" if weak_t[0] else '—'
+                L.append(f"| {rank} | {t} | {score}% | {weak_str} |\n")
+            L.append("\n")
+            best_t = sorted_teachers[0][0] if sorted_teachers else ''
+            worst_t = sorted_teachers[-1][0] if sorted_teachers else ''
+            if best_t and worst_t and best_t != worst_t:
+                best_score = sorted_teachers[0][1]
+                worst_score = sorted_teachers[-1][1]
+                diff = best_score - worst_score
+                L.append(f"教师间综合得分率极差达**{diff:.1f}个百分点**（{best_t}最高{best_score}% vs {worst_t}最低{worst_score}%），建议组织教师教研交流，分享优秀教师的训练策略。\n\n")
+
     if strong:
-        L.append("### 4.2 相关性分析\n")
+        L.append("### 4.4 相关性分析\n")
         L.append("以班级为单位，分析各类学习行为与作业得分率之间的相关性（Pearson相关系数）：\n\n")
         L.append("| 分析维度 | 相关系数 | 样本量 | 强度判定 | 结论 |\n")
         L.append("|---------|---------|--------|---------|------|\n")
@@ -482,7 +674,7 @@ def generate_report_text(data):
         L.append("\n")
 
     # ── 4.3 学生分层分析（基于实际听说模拟得分）────────────
-    L.append("### 4.3 学生分层发展分析\n")
+    L.append("### 4.4 学生分层发展分析\n")
     分层 = data.get('student分层')
     if 分层 and 分层['n_a'] + 分层['n_b'] + 分层['n_c'] >= 3:
         n_a, n_b, n_c = 分层['n_a'], 分层['n_b'], 分层['n_c']
@@ -595,6 +787,20 @@ def generate_report_text(data):
     # 亮点4：标杆班级
     if top and top[0]['avg_score'] >= 75:
         highlights.append(f"标杆班级示范效应显著：{tc_name}平均得分率{top[0]['avg_score']}%居全校前列，验证「高频训练→高分表现」的可行性路径")
+
+    # ── 题型数据增强亮点（可选）──────────────────────────────
+    if data.get('has_question_type'):
+        qt_school = data.get('qt_school', {})
+        qt_teacher = data.get('qt_teacher_rank', {})
+        if qt_school:
+            hardest = min(qt_school.items(), key=lambda x: x[1]['mean'])
+            easiest = max(qt_school.items(), key=lambda x: x[1]['mean'])
+            highlights.append(f"听说能力结构清晰：{easiest[0]}得分率最高（{easiest[1]['mean']}%），学生基础较扎实；{hardest[0]}为全校共同难点（{hardest[1]['mean']}%，低分率{data.get('qt_hr_lr', {}).get(hardest[0], {}).get('低分率', 'N/A')}%），是下一步专项突破的重点方向")
+        if qt_teacher:
+            best_t = max(qt_teacher.items(), key=lambda x: x[1])
+            worst_t = min(qt_teacher.items(), key=lambda x: x[1])
+            if best_t[0] != worst_t[0]:
+                highlights.append(f"教师效能差距蕴含提升空间：{best_t[0]}所带班级综合得分率{best_t[1]}%，领先{worst_t[0]}（{worst_t[1]}%）{best_t[1]-worst_t[1]:.1f}个百分点，为全校树立可参照的教学标杆")
 
     # ── 建议推导（与问题一一对应）────────────────────────────
     suggestions = []
