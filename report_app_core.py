@@ -461,7 +461,7 @@ def generate_report_text(data):
     L.append("## 三、应用情况分析\n")
 
     L.append("### 3.1 训练内容/栏目介绍\n")
-    L.append(f"产品覆盖四大训练模块，以「同步」日常开口训练为主体，辅助「专项」「模拟」能力提升练习，形成完整学习闭环。「同步」训练帮助学生建立标准发音与语感，「专项」训练针对薄弱题型突破，「模拟」训练服务考前实战。\n\n")
+    L.append(f"系统应用覆盖四类训练场景，以「同步」日常开口训练为主体，辅以「专项」「模拟」等训练形式，形成较为完整的听说教学支持体系。其中，「同步」训练侧重夯实发音基础与语感积累，「专项」训练侧重提升重点题型能力，「模拟」训练侧重服务阶段性检测与考前演练。\n\n")
     L.append("| 大类 | 次数 | 占比 | 定位说明 |\n|------|------|------|----------|\n")
     cat_meta = {
         '同步':      '课文朗读/跟读等日常基础训练，帮助学生建立标准发音与语感',
@@ -485,13 +485,13 @@ def generate_report_text(data):
     L.append(f"| 学生自主练习次数 | {data['self_practice']}次 |\n")
     L.append(f"| 词汇自主练习次数 | {vocab_p}次 |\n")
     L.append("\n")
-    L.append(f"与此同时，学生自主练习意愿强烈——词汇自主练习次数高达**{vocab_p}次**，生均约{per_student}次，充分说明产品有效激发了学生的自主学习意愿，形成主动开口练习的良好习惯。\n\n")
+    L.append(f"与此同时，学生自主练习保持一定活跃度，词汇自主练习次数累计达**{vocab_p}次**，生均约{per_student}次，表明学生在课堂训练之外已初步形成较为稳定的自主巩固习惯。\n\n")
 
     # 动态找峰值月及增长趋势
     peak_m = max(months, key=lambda m: data['monthly_hw'].get(m, 0)) if months else months[0] if months else ''
     peak_cnt = data['monthly_hw'].get(peak_m, 0)
     L.append("### 3.3 应用频次分析\n")
-    L.append(f"在应用频次方面，{total_hw}次作业分布在{len(months)}个月份，整体呈现常态化稳步增长节奏——{months[0] if months else ''}至{months[-1] if months else ''}期间，{peak_m}月作业量最高（{peak_cnt}次），与期末复习等教学节点同步，说明产品使用与学校教学节奏高度吻合。\n\n")
+    L.append(f"在应用频次方面，{total_hw}次作业分布于{len(months)}个月份，整体呈现常态化推进态势。{months[0] if months else ''}至{months[-1] if months else ''}期间，{peak_m}月作业量最高（{peak_cnt}次），与阶段复习安排基本一致，说明系统应用与学校教学节奏保持较好匹配。\n\n")
     L.append("| 月份 | 作业数 | 趋势 |\n|------|--------|------|\n")
     for i, m in enumerate(months):
         cnt = data['monthly_hw'][m]
@@ -578,15 +578,15 @@ def generate_report_text(data):
             L.append(f"基于本周期听说模拟数据，共分析**{list(qt_school.values())[0]['count']}条**记录，涵盖情景反应、对话或短文朗读、篇章复述三大题型。全校各题型平均得分率如下：\n\n")
             L.append("| 题型 | 平均得分率 | 难度定位 |\n|------|-----------|----------|\n")
             qt_labels = {
-                '对话或短文朗读': '⭐ 基础题型（最易，得分率最高）',
-                '情景反应':       '⭐⭐ 中等难度，两极分化明显',
-                '篇章复述':       '⭐⭐⭐ 高难度，是拉开差距的核心题型',
+                '对话或短文朗读': '基础题型，整体表现较好',
+                '情景反应':       '中等难度题型，表现存在一定差异',
+                '篇章复述':       '综合性较强题型，对能力要求较高',
             }
             for qt_name, info in sorted_qt:
                 label = qt_labels.get(qt_name, '')
                 L.append(f"| {qt_name} | {info['mean']}% | {label} |\n")
             L.append("\n")
-            L.append(f"从全校横向对比来看，**{easiest_qt}**得分率最高（{qt_school[easiest_qt]['mean']}%），说明学生整体基础较扎实；**{hardest_qt}**得分率最低（{qt_school[hardest_qt]['mean']}%），低分率高达**{data.get('qt_hr_lr', {}).get(hardest_qt, {}).get('低分率', 'N/A')}%**，是全校学生共同面临的难点，也是备考冲刺阶段需要重点突破的题型。\n\n")
+            L.append(f"从全校横向对比情况看，**{easiest_qt}**得分率最高（{qt_school[easiest_qt]['mean']}%），反映出学生在该题型上的整体掌握情况相对较好；**{hardest_qt}**得分率最低（{qt_school[hardest_qt]['mean']}%），低分率为**{data.get('qt_hr_lr', {}).get(hardest_qt, {}).get('低分率', 'N/A')}%**，应作为下一阶段专项教学与复习提升的重点关注题型。\n\n")
 
         # 各班薄弱题型（每年级最多展示2个班级，按偏差最大优先）
         qt_weak = data.get('qt_weak', {})
@@ -606,7 +606,7 @@ def generate_report_text(data):
 
             if weak_list:
                 L.append("\n".join(weak_list) + "\n")
-                L.append("以上班级按各年级内偏差最大的班级优先展示，每个年级最多展示2个班级。建议围绕对应薄弱题型开展专项强化训练。\n\n")
+                L.append("以上班级按照各年级内偏差程度由高到低遴选展示，每个年级最多展示2个班级。建议围绕对应薄弱题型制定针对性训练安排，提升教学改进的精准性。\n\n")
 
         # 教师效能
         qt_teacher = data.get('qt_teacher_rank', {})
@@ -629,7 +629,7 @@ def generate_report_text(data):
                 best_score = sorted_teachers[0][1]
                 worst_score = sorted_teachers[-1][1]
                 diff = best_score - worst_score
-                L.append(f"教师间综合得分率极差达**{diff:.1f}个百分点**（{best_t}最高{best_score}% vs {worst_t}最低{worst_score}%），建议组织教师教研交流，分享优秀教师的训练策略。\n\n")
+                L.append(f"教师所带班级综合得分率存在**{diff:.1f}个百分点**的差异（{best_t}所带班级最高{best_score}%，{worst_t}所带班级最低{worst_score}%），建议通过校本教研、课堂观摩与经验交流等方式，促进有效做法的校内共享。\n\n")
 
     if strong:
         L.append("### 4.3 相关性分析\n")
@@ -655,7 +655,7 @@ def generate_report_text(data):
         L.append("\n")
         L.append("**强相关发现：**\n")
         for lbl, r, n in strong:
-            L.append(f"- **{lbl}**与得分率呈中强正相关（r={r:.4f}，n={n}），{school}在自主学习行为建设上已初步形成正向循环——越主动练习的学生，得分表现越优异。\n")
+            L.append(f"- **{lbl}**与得分率呈中等及以上正相关（r={r:.4f}，n={n}），表明相关学习行为与学业表现之间具有较为明确的同向关系，可为后续教学管理与过程评价提供参考。\n")
         L.append("\n")
 
     # 五、典型案例
@@ -698,11 +698,11 @@ def generate_report_text(data):
 
     # 问题1：类别失衡
     if syn_pct >= 75:
-        issues.append(f"同步训练占比偏高（{syn_pct}%），专项突破和模拟实战训练量明显偏少，应用深度有待提升")
+        issues.append(f"同步训练占比偏高（{syn_pct}%），专项训练与模拟训练占比相对不足，训练结构仍有优化空间")
     if mon_pct < 10 and sub_pct < 10:
-        issues.append(f"专项（{sub_pct}%）和模拟（{mon_pct}%）训练总量偏低，备考实战强度不足")
+        issues.append(f"专项训练（{sub_pct}%）与模拟训练（{mon_pct}%）总体占比较低，阶段性巩固与实战演练力度有待加强")
     elif mon_pct < 10:
-        issues.append(f"模拟训练占比仅{mon_pct}%，考前实战强度不足，完整备考闭环尚未形成")
+        issues.append(f"模拟训练占比仅{mon_pct}%，阶段性检验与考前演练支撑相对不足，训练链条仍需进一步完善")
 
     # 问题2：班级间不均衡
     if grade_stats:
@@ -710,42 +710,42 @@ def generate_report_text(data):
         if rates and max(rates) - min(rates) > 20:
             worst_g = min(grade_stats, key=lambda g: grade_stats[g]['completion_rate'])
             best_g  = max(grade_stats, key=lambda g: grade_stats[g]['completion_rate'])
-            issues.append(f"年级间作业完成率差异显著：{best_g}最高{grade_stats[best_g]['completion_rate']}%，{worst_g}仅{grade_stats[worst_g]['completion_rate']}%，相差{max(rates)-min(rates):.0f}个百分点，班级应用极不均衡")
+            issues.append(f"年级间作业完成率存在较明显差异：{best_g}最高为{grade_stats[best_g]['completion_rate']}%，{worst_g}为{grade_stats[worst_g]['completion_rate']}%，相差{max(rates)-min(rates):.0f}个百分点，分层推进的均衡性仍需加强")
 
     # 问题3：自主练习薄弱
     if vocab_p < data['total_students'] * 2:
-        issues.append(f"词汇自主练习总量{vocab_p}次、生均仅{per_student}次，低于有效练习阈值，自主学习意愿激发不足")
+        issues.append(f"词汇自主练习总量为{vocab_p}次、生均{per_student}次，自主巩固训练频次仍有提升空间")
     if abs(r_v) < 0.2 and vocab_p > 0:
-        issues.append(f"词汇自主练习与得分相关性弱（r={r_v:.4f}），自主练习的实际提分效果有待验证")
+        issues.append(f"词汇自主练习与得分相关性较弱（r={r_v:.4f}），自主练习与学业表现之间的转化效应仍需进一步观察")
 
     # 问题4：整体完成率偏低
     if data['completion_rate'] < 70:
-        issues.append(f"作业平均完成率仅{data['completion_rate']}%，距理想水平（80%+）仍有差距，部分学生尚未建立稳定练习习惯")
+        issues.append(f"作业平均完成率为{data['completion_rate']}%，与较高质量落实要求相比仍有差距，学生持续性练习习惯仍需进一步培育")
 
     # ── 亮点提炼（从数据中找最大优势）───────────────────────
     highlights = []
 
     # 亮点1：覆盖率
-    highlights.append(f"激活率高，使用覆盖面广：{data['classes']}个班级、{data['total_students']}名学生全面激活，作业完成率均值{data['completion_rate']}%，常态化应用节奏已形成")
+    highlights.append(f"应用覆盖面较广：{data['classes']}个班级、{data['total_students']}名学生已纳入系统应用范围，作业完成率均值为{data['completion_rate']}%，常态化使用机制已基本建立")
 
     # 亮点2：最强相关指标
     corr_list = [('词汇自主练习', r_v, n_v), ('作业完成率', r_c, n_c), ('自主练习次数', r_s, n_s)]
     best_corr = max(corr_list, key=lambda x: abs(x[1]))
     bc_name, bc_r, bc_n = best_corr
     if abs(bc_r) >= 0.4:
-        highlights.append(f"正向关联清晰：{bc_name}与得分呈中等正相关（r={bc_r:.4f}，n={bc_n}个班级），产品「练得多→得分高」的正向循环已初步验证")
+        highlights.append(f"关键过程指标与结果指标关联较为明确：{bc_name}与得分呈中等正相关（r={bc_r:.4f}，n={bc_n}个班级），说明相关学习行为对学习成效具有一定支撑作用")
     elif abs(bc_r) >= 0.2:
-        highlights.append(f"自主练习持续积累：{bc_name}与得分呈弱正相关（r={bc_r:.4f}），高频练习对长期提分的积累效应值得持续关注")
+        highlights.append(f"自主练习积累呈现一定积极作用：{bc_name}与得分呈弱正相关（r={bc_r:.4f}），持续练习对能力提升的长期价值值得进一步跟踪")
 
     # 亮点3：训练体系
     if syn_pct + mon_pct + sub_pct >= 85:
-        highlights.append(f"训练体系完整：同步{syn_pct}%＋专项{sub_pct}%＋模拟{mon_pct}%，形成「日常打基础＋考前专项强化＋模拟实战冲刺」的备考闭环")
+        highlights.append(f"训练结构较为完整：同步训练占比{syn_pct}%，专项训练占比{sub_pct}%，模拟训练占比{mon_pct}%，能够较好支撑日常教学、专项提升与阶段检测的衔接")
     elif syn_pct >= 50:
-        highlights.append(f"日常训练扎实：同步训练占比{syn_pct}%，课文朗读跟读已深度融入课堂节奏，夯实发音与语感基础")
+        highlights.append(f"日常训练基础较为扎实：同步训练占比{syn_pct}%，朗读跟读等常规训练已较好融入课堂教学过程，有助于巩固发音基础与语感培养")
 
     # 亮点4：标杆班级
     if top and top[0]['avg_score'] >= 75:
-        highlights.append(f"标杆班级示范效应显著：{tc_name}平均得分率{top[0]['avg_score']}%居全校前列，验证「高频训练→高分表现」的可行性路径")
+        highlights.append(f"典型班级示范作用较为突出：{tc_name}平均得分率为{top[0]['avg_score']}%，位居全校前列，可为同年级教学改进提供参考样本")
 
     # ── 题型数据增强亮点（可选）──────────────────────────────
     if data.get('has_question_type'):
@@ -754,26 +754,26 @@ def generate_report_text(data):
         if qt_school:
             hardest = min(qt_school.items(), key=lambda x: x[1]['mean'])
             easiest = max(qt_school.items(), key=lambda x: x[1]['mean'])
-            highlights.append(f"听说能力结构清晰：{easiest[0]}得分率最高（{easiest[1]['mean']}%），学生基础较扎实；{hardest[0]}为全校共同难点（{hardest[1]['mean']}%，低分率{data.get('qt_hr_lr', {}).get(hardest[0], {}).get('低分率', 'N/A')}%），是下一步专项突破的重点方向")
+            highlights.append(f"题型表现差异较为清晰：{easiest[0]}得分率最高（{easiest[1]['mean']}%），整体表现相对稳定；{hardest[0]}得分率相对较低（{hardest[1]['mean']}%，低分率{data.get('qt_hr_lr', {}).get(hardest[0], {}).get('低分率', 'N/A')}%），可作为后续专项改进的重点方向")
         if qt_teacher:
             best_t = max(qt_teacher.items(), key=lambda x: x[1])
             worst_t = min(qt_teacher.items(), key=lambda x: x[1])
             if best_t[0] != worst_t[0]:
-                highlights.append(f"教师效能差距蕴含提升空间：{best_t[0]}所带班级综合得分率{best_t[1]}%，领先{worst_t[0]}（{worst_t[1]}%）{best_t[1]-worst_t[1]:.1f}个百分点，为全校树立可参照的教学标杆")
+                highlights.append(f"教师间教学结果存在一定差异：{best_t[0]}所带班级综合得分率为{best_t[1]}%，较{worst_t[0]}（{worst_t[1]}%）高{best_t[1]-worst_t[1]:.1f}个百分点，相关经验可纳入校本教研交流范畴")
 
     # ── 建议推导（与问题一一对应）────────────────────────────
     suggestions = []
     if any('同步' in iss for iss in issues) or any('实战' in iss for iss in issues):
-        suggestions.append(f"优化训练结构：适当提升专项和模拟训练频次（建议各占总量15%~20%），形成更完整的备考训练体系")
+        suggestions.append(f"优化训练结构：适度提升专项训练与模拟训练频次（建议各占总量15%~20%），进一步完善日常训练与阶段检测相结合的实施体系")
     if any('不均衡' in iss or '差异' in iss for iss in issues):
-        suggestions.append(f"缩小班级差距：重点关注完成率偏低班级，分析原因并制定针对性激励方案，推动各班级均衡发展")
+        suggestions.append(f"加强分层推进：重点关注完成率偏低班级，结合具体原因开展分类指导，推动年级内应用质量更加均衡")
     if any('自主' in iss for iss in issues):
-        suggestions.append(f"激发自主练习：设计「自主学习之星」等正向激励机制，提升词汇自主练习覆盖率，培养学生主动练习习惯")
+        suggestions.append(f"强化自主学习引导：通过过程性评价与正向激励相结合的方式，提升词汇自主练习覆盖率，逐步培育学生自主巩固习惯")
     if any('完成率' in iss for iss in issues):
-        suggestions.append(f"强化作业管理：建立作业完成率预警机制，对持续偏低班级开展原因诊断与定向帮扶")
+        suggestions.append(f"强化作业过程管理：建立作业完成率监测与预警机制，对持续偏低班级开展原因分析与定向改进")
     # 保底建议（必定有）
     if len(suggestions) == 0:
-        suggestions.append(f"深化数据应用：持续追踪学生分层得分变化，定期复盘教学策略，将数据驱动决策融入教研常态")
+        suggestions.append(f"深化数据应用：持续跟踪核心指标变化，定期复盘教学策略，将数据分析结果更好融入校本教研与教学改进过程")
 
     # ── 输出 6.1 主要亮点 ──────────────────────────────────
     L.append("### 6.1 主要亮点\n\n")
@@ -792,7 +792,7 @@ def generate_report_text(data):
     L.append("### 6.3 下阶段计划\n\n")
     for s in suggestions:
         L.append(f"- {s}\n")
-    L.append(f"- **听说专项提升**：适当增加听说模拟套卷训练频次，引导学生回听个人答题录音进行自我诊断与纠音练习\n\n")
+    L.append(f"- **听说专项提升**：适度增加听说模拟套卷训练频次，引导学生结合答题录音开展自我诊断与纠音练习，提升训练的针对性与实效性\n\n")
 
     return ''.join(L)
 
