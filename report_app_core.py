@@ -56,6 +56,9 @@ def _split_path(path):
     parts = str(path).split('-')
     return parts[0], parts[1] if len(parts) > 1 else parts[0]
 
+def _format_grade_class(grade, class_name):
+    return f"{str(grade)}{str(class_name)}班"
+
 def analyze_data(class_df, hw_df, qt_df=None):
     results = {}
     results['schools']    = int(class_df['学校名称'].nunique())
@@ -211,6 +214,7 @@ def analyze_data(class_df, hw_df, qt_df=None):
             'class_id':     cid,
             'class_name':   str(row['班级名称']),
             'grade':        str(row['年级']),
+            'display_name': _format_grade_class(row['年级'], row['班级名称']),
             'all_hw_count': int(row['all_hw_count']),
             'mock_count':   mc,
             'avg_score':    round(avg_s, 2),
@@ -219,7 +223,7 @@ def analyze_data(class_df, hw_df, qt_df=None):
 
     if top5_list:
         top_cid = top5_list[0]['class_id']
-        results['top_class_name']  = top5_list[0]['class_name']
+        results['top_class_name']  = top5_list[0]['display_name']
         results['top_class_grade'] = top5_list[0]['grade']
 
         top_all_m = hw_df[hw_df['班级id'].astype(str) == top_cid].groupby('月份').size()
@@ -272,7 +276,7 @@ def analyze_data(class_df, hw_df, qt_df=None):
             ct = qt.groupby(['班级', '年级'])['得分率'].mean().round(4)
             ct_dict = {}
             for (c, g), v in ct.to_dict().items():
-                ct_dict[f"{c}班{g}"] = round(float(v)*100, 2)
+                ct_dict[_format_grade_class(g, c)] = round(float(v)*100, 2)
             results['qt_class'] = ct_dict
 
         # ③ 年级 × 题型 得分率矩阵
@@ -292,7 +296,7 @@ def analyze_data(class_df, hw_df, qt_df=None):
                 index=['班级', '年级'], columns='题型名称', values='得分率', aggfunc='mean'
             ).round(4)
             results['qt_matrix'] = {
-                f"{c}班{g}": {q: round(float(ct_matrix.loc[(c, g), q])*100, 2)
+                _format_grade_class(g, c): {q: round(float(ct_matrix.loc[(c, g), q])*100, 2)
                                if q in ct_matrix.columns and (c, g) in ct_matrix.index else None
                                for q in ct_matrix.columns}
                 for c, g in ct_matrix.index
@@ -301,7 +305,7 @@ def analyze_data(class_df, hw_df, qt_df=None):
             ct_mean = ct_matrix.mean(axis=1)
             ct_dev = (ct_matrix.sub(ct_mean, axis=0)).round(4)
             results['qt_deviation'] = {
-                f"{c}班{g}": {q: round(float(ct_dev.loc[(c, g), q])*100, 2)
+                _format_grade_class(g, c): {q: round(float(ct_dev.loc[(c, g), q])*100, 2)
                                if q in ct_dev.columns and (c, g) in ct_dev.index else None
                                for q in ct_dev.columns}
                 for c, g in ct_dev.index
@@ -314,7 +318,7 @@ def analyze_data(class_df, hw_df, qt_df=None):
             weak_qt = ct_dev2.idxmin(axis=1)
             weak_score = ct_dev2.min(axis=1)
             results['qt_weak'] = {
-                f"{c}班{g}": {'题型': weak_qt.loc[(c, g)], '离均差': round(float(weak_score.loc[(c, g)])*100, 2)}
+                _format_grade_class(g, c): {'题型': weak_qt.loc[(c, g)], '离均差': round(float(weak_score.loc[(c, g)])*100, 2)}
                 for c, g in weak_qt.index
             }
 
@@ -584,44 +588,25 @@ def generate_report_text(data):
             L.append("\n")
             L.append(f"从全校横向对比来看，**{easiest_qt}**得分率最高（{qt_school[easiest_qt]['mean']}%），说明学生整体基础较扎实；**{hardest_qt}**得分率最低（{qt_school[hardest_qt]['mean']}%），低分率高达**{data.get('qt_hr_lr', {}).get(hardest_qt, {}).get('低分率', 'N/A')}%**，是全校学生共同面临的难点，也是备考冲刺阶段需要重点突破的题型。\n\n")
 
-        # 班级×题型矩阵
-        qt_matrix = data.get('qt_matrix', {})
-        qt_deviation = data.get('qt_deviation', {})
-        if qt_matrix:
-            L.append("**各班级题型得分率矩阵：**\n\n")
-            # 收集所有班级和题型
-            all_classes = sorted(set(k.split('班')[0] + '班' for k in qt_matrix.keys()))
-            qt_names = list(list(qt_matrix.values())[0].keys()) if qt_matrix else []
-            header = "| 班级 | " + " | ".join(qt_names) + " | 相对均值 |\n"
-            sep    = "|------|" + "|".join(["------"] * (len(qt_names) + 1)) + "\n"
-            L.append(header)
-            L.append(sep)
-            for cls_key in sorted(qt_matrix.keys(), key=lambda x: (x.split('班')[0], x)):
-                row_scores = qt_matrix[cls_key]
-                row_devs  = qt_deviation.get(cls_key, {})
-                vals = []
-                for q in qt_names:
-                    v = row_scores.get(q)
-                    d = row_devs.get(q, 0)
-                    if v is not None:
-                        dev_str = f"(差{d:+.1f}%)" if d != 0 else ""
-                        vals.append(f"{v}%{dev_str}")
-                    else:
-                        vals.append("—")
-                L.append(f"| {cls_key} | " + " | ".join(vals) + " |\n")
-            L.append("\n")
-
-        # 各班薄弱题型
+        # 各班薄弱题型（每年级最多展示2个班级，按偏差最大优先）
         qt_weak = data.get('qt_weak', {})
         if qt_weak:
             L.append("**各班薄弱题型诊断：**\n\n")
-            # 按薄弱程度排序
-            weak_sorted = sorted(qt_weak.items(), key=lambda x: x[1]['离均差'])
-            weak_list = [f"- **{ck}**：**{v['题型']}**得分率最低，距班级均值{v['离均差']}个百分点"
-                         for ck, v in weak_sorted if v['离均差'] < 0]
+            grade_groups = {}
+            for ck, v in qt_weak.items():
+                grade = ck.split('班')[0]
+                grade_groups.setdefault(grade, []).append((ck, v))
+
+            weak_list = []
+            for grade in sorted(grade_groups.keys()):
+                selected = sorted(grade_groups[grade], key=lambda x: x[1]['离均差'])[:2]
+                for ck, v in selected:
+                    if v['离均差'] < 0:
+                        weak_list.append(f"- **{ck}**：**{v['题型']}**得分率最低，距班级均值{v['离均差']}个百分点")
+
             if weak_list:
                 L.append("\n".join(weak_list) + "\n")
-                L.append("上述班级在薄弱题型上需要进行针对性强化训练，建议优先增加该题型的专项练习频次。\n\n")
+                L.append("以上班级按各年级内偏差最大的班级优先展示，每个年级最多展示2个班级。建议围绕对应薄弱题型开展专项强化训练。\n\n")
 
         # 教师效能
         qt_teacher = data.get('qt_teacher_rank', {})
@@ -647,7 +632,7 @@ def generate_report_text(data):
                 L.append(f"教师间综合得分率极差达**{diff:.1f}个百分点**（{best_t}最高{best_score}% vs {worst_t}最低{worst_score}%），建议组织教师教研交流，分享优秀教师的训练策略。\n\n")
 
     if strong:
-        L.append("### 4.4 相关性分析\n")
+        L.append("### 4.3 相关性分析\n")
         L.append("以班级为单位，分析各类学习行为与作业得分率之间的相关性（Pearson相关系数）：\n\n")
         L.append("| 分析维度 | 相关系数 | 样本量 | 强度判定 | 结论 |\n")
         L.append("|---------|---------|--------|---------|------|\n")
@@ -673,37 +658,11 @@ def generate_report_text(data):
             L.append(f"- **{lbl}**与得分率呈中强正相关（r={r:.4f}，n={n}），{school}在自主学习行为建设上已初步形成正向循环——越主动练习的学生，得分表现越优异。\n")
         L.append("\n")
 
-    # ── 4.3 学生分层分析（基于实际听说模拟得分）────────────
-    L.append("### 4.4 学生分层发展分析\n")
-    分层 = data.get('student分层')
-    if 分层 and 分层['n_a'] + 分层['n_b'] + 分层['n_c'] >= 3:
-        n_a, n_b, n_c = 分层['n_a'], 分层['n_b'], 分层['n_c']
-        a_avg, b_avg, c_avg = 分层['avg_a'], 分层['avg_b'], 分层['avg_c']
-        pct_a, pct_b, pct_c = 分层['pct_a'], 分层['pct_b'], 分层['pct_c']
-        score_gap = 分层['gap']
-
-        L.append(f"基于本周期听说模拟得分数据，将学生按得分率从高到低排列，前{int(round(pct_a))}%划为A类（学优生），中间{int(round(pct_b))}%为B类（中等生），后{int(round(pct_c))}%为C类（待提升学生）。各层分布与表现如下：\n\n")
-        L.append("| 层级 | 定位 | 学生数 | 占比 | 模拟平均得分率 |\n")
-        L.append("|------|------|--------|------|---------------|\n")
-        L.append(f"| **A类** | 学优生 | {n_a}人 | {pct_a}% | {a_avg}% |\n")
-        L.append(f"| **B类** | 中等生 | {n_b}人 | {pct_b}% | {b_avg}% |\n")
-        L.append(f"| **C类** | 待提升学生 | {n_c}人 | {pct_c}% | {c_avg}% |\n")
-        L.append("\n")
-        L.append(f"从分层数据来看，A类学优生与C类待提升学生的模拟得分率极差为**{score_gap}个百分点**，反映出学生间基础与训练效果存在明显差异。与此同时，B类中等生规模最大（{n_b}人，占{pct_b}%），是提分潜力最大的群体，也是教师分层关注的关键对象。\n\n")
-        L.append("**分层教学建议：**\n\n")
-        L.append(f"- **A类学优生（{n_a}人，均分{a_avg}%）**：该层学生得分领先，建议提供进阶拓展资源，如高难度听说专项训练、真实语境口语挑战等，满足其拔尖需求，防止[天花板效应]\n")
-        L.append(f"- **B类中等生（{n_b}人，均分{b_avg}%）**：该层人数最多、提分空间最大，建议保持同步训练频次，同时针对性增加模拟实战训练，以考促学、稳步跨越\n")
-        L.append(f"- **C类待提升学生（{n_c}人，均分{c_avg}%）**：建议重点关注作业完成率，可通过降低任务难度起点、分层任务设计，确保其「跳一跳够得着」，同时关注基础发音与语感的建立\n\n")
-    elif 分层:
-        L.append("本周期内学生听说模拟数据量不足，暂无法进行有效的分层分析。\n\n")
-    else:
-        L.append("本周期内未获取到学生级别听说模拟得分数据，无法开展分层分析。\n\n")
-
     # 五、典型案例
     L.append("## 五、典型班级分析\n")
     if top:
         top0 = top[0]
-        L.append(f"以**{tc_name}（{tc_grade}）**作为标杆班级（数据周期内作业总量全校第一）：\n\n")
+        L.append(f"以**{tc_name}**作为标杆班级（数据周期内作业总量全校第一）：\n\n")
         L.append(f"- 该班共完成**{top0['all_hw_count']}次**作业（所有类目），其中听说模拟**{top0['mock_count']}次**\n")
         L.append(f"- 听说模拟平均得分率高达**{top0['avg_score']}%**，居全校前列\n\n")
 
@@ -724,10 +683,10 @@ def generate_report_text(data):
             L.append("\n")
 
         L.append("**全校TOP5班级（按总作业量排名）：**\n\n")
-        L.append("| 排名 | 班级 | 年级 | 总作业次数 | 听说模拟次数 | 平均得分率 |\n")
-        L.append("|------|------|------|----------|------------|--------|\n")
+        L.append("| 排名 | 班级 | 总作业次数 | 听说模拟次数 | 平均得分率 |\n")
+        L.append("|------|------|----------|------------|--------|\n")
         for i, c in enumerate(top, 1):
-            L.append(f"| {i} | {c['class_name']} | {c['grade']} | {c['all_hw_count']}次 | {c['mock_count']}次 | {c['avg_score']}% |\n")
+            L.append(f"| {i} | {c['display_name']} | {c['all_hw_count']}次 | {c['mock_count']}次 | {c['avg_score']}% |\n")
         L.append("\n")
 
     # 六、总结与建议
