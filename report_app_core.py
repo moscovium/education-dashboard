@@ -1069,7 +1069,14 @@ def export_to_docx(report_md: str, charts: dict = None) -> tuple:
         if not charts or key not in charts:
             return
         fig = charts[key]
-        img_bytes = fig.to_image(format='png', width=1000, height=500, scale=2)
+        try:
+            img_bytes = fig.to_image(format='png', width=1000, height=500, scale=2)
+        except Exception:
+            note = doc.add_paragraph()
+            para_fmt(note, align=WD_ALIGN_PARAGRAPH.CENTER, first_indent=False, space_before=0, space_after=6, line_spacing=24)
+            note_run = note.add_run(f"【{title}未导出：当前环境缺少图表导出依赖 kaleido】")
+            set_font(note_run, '宋体', 10.5, False)
+            return
         img_io = BytesIO(img_bytes)
         p = doc.add_paragraph()
         para_fmt(p, align=WD_ALIGN_PARAGRAPH.CENTER, first_indent=False, space_before=0, space_after=0, line_spacing=0)
