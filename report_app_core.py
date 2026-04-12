@@ -1,7 +1,6 @@
 """
 E听说 成效报告对话系统 v2.0
 """
-import openai
 import pandas as pd
 import openpyxl
 import plotly.graph_objects as go
