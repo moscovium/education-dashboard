@@ -599,7 +599,7 @@ def generate_report_text(data):
             for cls_key in sorted(qt_matrix.keys(), key=lambda x: (x.split('班')[0], x)):
                 row_scores = qt_matrix[cls_key]
                 row_devs  = qt_deviation.get(cls_key, {})
-                vals = [f"{row_scores.get(q, '—')}%"]
+                vals = []
                 for q in qt_names:
                     v = row_scores.get(q)
                     d = row_devs.get(q, 0)

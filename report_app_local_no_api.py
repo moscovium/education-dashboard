@@ -46,7 +46,9 @@ with col2:
 with col3:
     qt_file = st.file_uploader("📁 可选上传「题型统计.xlsx」", type=["xlsx"], key="qt_file")
 
-if class_file and hw_file:
+generate_clicked = st.button("🚀 生成报告", type="primary", disabled=not (class_file and hw_file))
+
+if class_file and hw_file and generate_clicked:
     with st.spinner("正在分析数据，请稍候..."):
         try:
             class_df = parse_class_overview(class_file)
