@@ -278,12 +278,13 @@ def analyze_data(class_df, hw_df, qt_df=None):
         # ③ 年级 × 题型 得分率矩阵
         if '年级' in qt.columns:
             gt = qt.groupby(['年级', '题型名称'])['得分率'].mean().round(4)
-            results['qt_grade'] = {
-                str(g): {q: round(float(v)*100, 2) for q, v in d.items()}
-                for g, d in gt.groupby('年级').apply(
-                    lambda df: df.set_index('题型名称')['得分率'].to_dict()
-                ).to_dict().items()
-            }
+            gt_dict = {}
+            for (grade, qtype), value in gt.to_dict().items():
+                g = str(grade)
+                if g not in gt_dict:
+                    gt_dict[g] = {}
+                gt_dict[g][qtype] = round(float(value) * 100, 2)
+            results['qt_grade'] = gt_dict
 
         # ④ 班级-题型 二维矩阵（横向各班对比，纵向各题型）
         if '班级' in qt.columns and '年级' in qt.columns:
