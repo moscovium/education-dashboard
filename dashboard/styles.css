@@ -628,6 +628,28 @@ body {
     text-align: right;
 }
 
+/* 学校定义标签样式 */
+.school-category-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.school-category-badge.paid {
+    background: #d1fae5;
+    color: #065f46;
+}
+.school-category-badge.needs-improvement {
+    background: #fef3c7;
+    color: #92400e;
+}
+.school-category-badge.trial {
+    background: #f3f4f6;
+    color: #374151;
+}
+
 .high-value-section .section-header {
     margin-bottom: 16px;
 }

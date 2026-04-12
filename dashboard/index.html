@@ -639,6 +639,18 @@
                             <option value="500">≥500人</option>
                         </select>
                     </div>
+                    <div class="filter-group">
+                        <label class="filter-label">
+                            <span class="label-icon">🏷️</span>
+                            学校定义
+                        </label>
+                        <select id="hvSchoolCategorySelect" class="filter-select">
+                            <option value="">不限</option>
+                            <option value="付费校">付费校</option>
+                            <option value="付费率需提升校">付费率需提升校</option>
+                            <option value="试用校">试用校</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="filter-actions">
                     <button id="applyHighValueFilter" class="btn btn-primary btn-small">
@@ -661,13 +673,12 @@
                             <th>城市</th>
                             <th>区县</th>
                             <th>学校</th>
+                            <th>学校定义</th>
                             <th>年级</th>
                             <th>班级数</th>
                             <th>学生总数</th>
                             <th>未过期试用人数</th>
                             <th>年级付费率</th>
-                            <th>作业布置率</th>
-                            <th>平均完成率</th>
                         </tr>
                     </thead>
                     <tbody id="highValueTableBody"></tbody>

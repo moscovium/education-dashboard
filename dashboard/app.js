@@ -83,6 +83,7 @@ function initElements() {
     elements.hvAssignRateSelect = document.getElementById('hvAssignRateSelect');
     elements.hvCompletionRateSelect = document.getElementById('hvCompletionRateSelect');
     elements.hvTrialCountSelect = document.getElementById('hvTrialCountSelect');
+    elements.hvSchoolCategorySelect = document.getElementById('hvSchoolCategorySelect');
     elements.highValueTableBody = document.getElementById('highValueTableBody');
     elements.highValueInfo = document.getElementById('highValueInfo');
     elements.applyHighValueFilter = document.getElementById('applyHighValueFilter');
@@ -779,12 +780,38 @@ function applyHighValueFilter() {
             weeklyMetrics: weeklyMetrics
         });
     });
+
+    // ── 第二步：按学校聚合，取年级付费率最大值，得出学校定义 ──
+    const schoolMaxPayRate = new Map(); // schoolKey → maxPayRate
+    gradeMetrics.forEach(g => {
+        const key = `${g.province}|${g.city}|${g.district}|${g.school}`;
+        const cur = schoolMaxPayRate.get(key);
+        if (cur === undefined || g.payRate > cur) {
+            schoolMaxPayRate.set(key, g.payRate);
+        }
+    });
+
+    // 学校定义函数
+    function getSchoolCategory(maxRate) {
+        if (maxRate > 60) return '付费校';
+        if (maxRate >= 10) return '付费率需提升校';
+        return '试用校';
+    }
+
+    // 给每个年级行挂上学校定义
+    gradeMetrics.forEach(g => {
+        const key = `${g.province}|${g.city}|${g.district}|${g.school}`;
+        const maxRate = schoolMaxPayRate.get(key) || 0;
+        g.schoolCategory = getSchoolCategory(maxRate);
+        g.schoolMaxPayRate = maxRate;
+    });
     
     // 获取筛选条件
     const payRateThreshold = parseFloat(elements.hvPayRateSelect.value) || 0;
     const assignRateThreshold = parseFloat(elements.hvAssignRateSelect.value) || 0;
     const completionRateThreshold = parseFloat(elements.hvCompletionRateSelect.value) || 0;
     const trialCountThreshold = parseFloat(elements.hvTrialCountSelect.value) || 0;
+    const schoolCategoryFilter = elements.hvSchoolCategorySelect.value;
     
     // 应用筛选 - 付费率为小于等于筛选
     let filteredGrades = gradeMetrics.filter(g => {
@@ -803,6 +830,7 @@ function applyHighValueFilter() {
             if (avgCompletion < completionRateThreshold) return false;
         }
         if (trialCountThreshold > 0 && g.trialCount < trialCountThreshold) return false;
+        if (schoolCategoryFilter && g.schoolCategory !== schoolCategoryFilter) return false;
         return true;
     });
     
@@ -818,13 +846,14 @@ function applyHighValueFilter() {
 
 function renderHighValueTable(grades, sortedWeeks) {
     if (grades.length === 0) {
-        elements.highValueTableBody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:40px;color:#999;">请点击"应用筛选"查看结果</td></tr>';
+        elements.highValueTableBody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:40px;color:#999;">请点击"应用筛选"查看结果</td></tr>';
         document.getElementById('highValueTableHead').innerHTML = `
             <tr>
                 <th>省份</th>
                 <th>城市</th>
                 <th>区县</th>
                 <th>学校</th>
+                <th>学校定义</th>
                 <th>年级</th>
                 <th>班级数</th>
                 <th>学生总数</th>
@@ -855,6 +884,7 @@ function renderHighValueTable(grades, sortedWeeks) {
         <th rowspan="2">城市</th>
         <th rowspan="2">区县</th>
         <th rowspan="2">学校</th>
+        <th rowspan="2">学校定义</th>
         <th rowspan="2">年级</th>
         <th rowspan="2">班级数</th>
         <th rowspan="2">学生总数</th>
@@ -875,6 +905,7 @@ function renderHighValueTable(grades, sortedWeeks) {
             <td>${g.city}</td>
             <td>${g.district}</td>
             <td>${g.school}</td>
+            <td style="text-align:center;font-weight:600;color:${g.schoolCategory === '付费校' ? '#10b981' : g.schoolCategory === '付费率需提升校' ? '#f59e0b' : '#6b7280'};">${g.schoolCategory}</td>
             <td>${g.grade}</td>
             <td style="text-align:center;">${g.classCount}</td>
             <td style="text-align:center;">${g.studentCount.toLocaleString()}</td>
@@ -910,6 +941,7 @@ function resetHighValueFilter() {
     elements.hvAssignRateSelect.value = '';
     elements.hvCompletionRateSelect.value = '';
     elements.hvTrialCountSelect.value = '';
+    elements.hvSchoolCategorySelect.value = '';
     updateHighValueSels();
     elements.highValueSection.style.display = 'none';
     showMsg('✅ 已重置', 'success');
