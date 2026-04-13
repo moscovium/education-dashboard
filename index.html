@@ -697,7 +697,26 @@
         </section>
     </div>
 
-    <script>window.__ROOT_DEPLOY_MARKER__='root-20260413e';</script>
-    <script src="app.js?v=20260413e"></script>
+    <script>
+        window.__ROOT_DEPLOY_MARKER__='root-20260413f';
+        document.addEventListener('DOMContentLoaded', function () {
+            var input = document.getElementById('fileInput');
+            var debugBar = document.getElementById('debugBar');
+            if (debugBar) debugBar.textContent = '页面版本占位：root-20260413f';
+            if (input) {
+                input.addEventListener('change', function (e) {
+                    var files = Array.from((e.target && e.target.files) || []);
+                    if (debugBar) {
+                        debugBar.textContent = files.length
+                            ? '原生 change 已触发：' + files.map(function (f) { return f.name; }).join(' | ')
+                            : '原生 change 已触发，但未读取到文件';
+                    }
+                }, true);
+            } else if (debugBar) {
+                debugBar.textContent = '未找到 fileInput';
+            }
+        });
+    </script>
+    <script src="app.js?v=20260413f"></script>
 </body>
 </html>
