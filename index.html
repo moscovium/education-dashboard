@@ -243,6 +243,7 @@
                     教育数据看板
                 </h1>
                 <p class="dashboard-subtitle">转化率与作业完成情况监测 - 基于班级 ID 关联</p>
+                <div id="debugBar" style="margin-top:8px;font-size:12px;color:#475569;display:flex;gap:12px;flex-wrap:wrap;"></div>
             </div>
         </header>
 
@@ -256,7 +257,7 @@
             </div>
             
             <div style="text-align: center; padding: 20px 0;">
-                <input type="file" id="fileInput" accept=".xlsx,.xls" style="display: none;">
+                <input type="file" id="fileInput" accept=".xlsx,.xls" multiple style="display: none;">
                 <button type="button" id="uploadBtn" class="btn btn-primary" style="font-size: 16px; padding: 16px 32px;">
                     📁 选择 Excel 文件上传
                 </button>
@@ -696,6 +697,6 @@
         </section>
     </div>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=20260413d"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-// 教育数据看板 v2.2 - IndexedDB 持久化优化版
+// 教育数据看板 v2.2.2 - 周次渲染兼容修复版
 // 核心优化：大文件分片存储、上传进度实时更新、存储配额检查
 
 const DB_CONFIG = { name: 'EducationDataDB', version: 1, store: 'files' };
@@ -6,6 +6,24 @@ const MAX_STORAGE_MB = 500; // 最大存储限制（MB）
 let db = null;
 const AppState = { files: [], filteredData: [], cache: new Map(), provinces: new Set(), cities: new Set(), districts: new Set(), schools: new Set(), grades: new Set() };
 const elements = {};
+const APP_VERSION = 'v2.2.4-localfirst-20260413d';
+const getClassId = (r = {}) => r['班级 id'] || r['班级ID'] || r['班级id'] || r['班级'] || r['classId'] || r['class_id'] || '';
+const buildWeekMetaMap = (groupMap) => {
+    const weekMetaMap = new Map();
+    groupMap.forEach(g => {
+        g.weeks.forEach((w, k) => {
+            if (!weekMetaMap.has(k)) weekMetaMap.set(k, w);
+        });
+    });
+    return weekMetaMap;
+};
+const sortWeekKeys = (weekMetaMap) => [...weekMetaMap.keys()].sort((a, b) => {
+    const wa = weekMetaMap.get(a);
+    const wb = weekMetaMap.get(b);
+    const aTime = wa?.startDate ? dayjs(wa.startDate).valueOf() : 0;
+    const bTime = wb?.startDate ? dayjs(wb.startDate).valueOf() : 0;
+    return aTime - bTime;
+});
 
 // 初始化数据库
 function initDB() {
@@ -145,8 +163,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     initElements();
     try {
         await initDB();
-        console.log('✅ 数据库初始化成功');
-        updateStatus('✅ 已连接', true);
+        console.log('✅ 数据库初始化成功', APP_VERSION);
+        window.__APP_VERSION__ = APP_VERSION;
+        if (location.protocol === 'file:') {
+            showMsg('⚠️ 请不要直接双击 HTML 打开\n请通过本地服务器访问：http://127.0.0.1:8123/dashboard/index.html', 'warning');
+        }
+        updateStatus(`✅ 已连接 ${APP_VERSION}`, true);
         // 检查存储配额
         const quota = await checkStorageQuota();
         if (quota) {
@@ -167,14 +189,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 function updateStatus(text, ok) {
     const el = document.getElementById('storageStatus');
     if (el) { el.textContent = text; el.className = ok ? 'connected' : ''; }
+    const debugBar = document.getElementById('debugBar');
+    if (debugBar) {
+        debugBar.innerHTML = `<span>版本：${APP_VERSION}</span><span>状态：${text}</span><span>文件数：${AppState.files.length}</span>`;
+    }
 }
 
 // 事件处理 - 修改：省份等筛选独立于时间段，不再级联禁用
 function initHandlers() {
     elements.uploadBtn.onclick = (e) => { e.preventDefault(); elements.fileInput.click(); };
-    elements.fileInput.onchange = (e) => { if (e.target.files[0]) handleUpload(e.target.files[0]); elements.fileInput.value = ''; };
+    elements.fileInput.onchange = async (e) => {
+        const files = [...(e.target.files || [])];
+        if (files.length) await handleUploadBatch(files);
+        elements.fileInput.value = '';
+    };
     document.ondragover = (e) => e.preventDefault();
-    document.ondrop = (e) => { e.preventDefault(); if (e.dataTransfer.files[0]) handleUpload(e.dataTransfer.files[0]); };
+    document.ondrop = async (e) => {
+        e.preventDefault();
+        const files = [...(e.dataTransfer.files || [])].filter(f => /\.(xlsx|xls)$/i.test(f.name));
+        if (files.length) await handleUploadBatch(files);
+    };
     
     if (elements.clearAllBtn) elements.clearAllBtn.onclick = async () => {
         if (await showConfirm('确定清空所有数据？\n删除后无法恢复。')) {
@@ -258,6 +292,17 @@ function initHandlers() {
     elements.hvDistrictSelect.onchange = () => { cascadeHighValue('district'); };
     elements.applyHighValueFilter.onclick = applyHighValueFilter;
     elements.resetHighValueFilter.onclick = resetHighValueFilter;
+}
+
+// 批量上传入口
+async function handleUploadBatch(files) {
+    const items = [...files].filter(Boolean);
+    if (!items.length) return;
+    for (const file of items) {
+        await handleUpload(file);
+    }
+    renderWeeks();
+    updateAllSels();
 }
 
 // 上传文件 - 优化版：实时进度、详细错误、大文件支持
@@ -464,9 +509,10 @@ function getWeekLabel(ds) {
 function setDefaultDate() {
     // 根据已上传文件设置默认日期范围
     if (AppState.files && AppState.files.length > 0) {
-        const dates = AppState.files.map(f => f.dateInfo.startDate).sort();
-        const minDate = dates[0];
-        const maxDate = dates[dates.length - 1];
+        const startDates = AppState.files.map(f => f.dateInfo.startDate).sort();
+        const endDates = AppState.files.map(f => f.dateInfo.endDate).sort();
+        const minDate = startDates[0];
+        const maxDate = endDates[endDates.length - 1];
         
         if (minDate && maxDate) {
             elements.startDate.value = minDate;
@@ -1139,8 +1185,6 @@ function renderMet() {
     const avgC = AppState.filteredData.length ? (tc / AppState.filteredData.length).toFixed(1) : 0;
     const avgV = AppState.filteredData.length ? (tv / AppState.filteredData.length).toFixed(1) : 0;
     // 覆盖班级：筛选项下班级总数（按班级ID去重）- 基于实际筛选结果
-    // 尝试多种可能的班级ID列名
-    const getClassId = (r) => r['班级 id'] || r['班级ID'] || r['班级'] || r['班级id'] || r['classId'] || r['class_id'] || '';
     const cls = new Set(AppState.filteredData.map(r => getClassId(r)).filter(Boolean));
     const clsCount = cls.size;
     const stu = AppState.filteredData.reduce((s, r) => s + (+r['总学生数'] || 0), 0);
@@ -1154,8 +1198,8 @@ function renderMet() {
         clsCount: clsCount,
         ta: ta,
         avgAssignments: avgAssignments,
-        first3Records: AppState.filteredData.slice(0, 3).map(r => ({班级ID: r['班级 id'], 学校: r['学校名称'], 班级IDType: typeof r['班级 id']})),
-        allClassIds: AppState.filteredData.map(r => r['班级 id']).filter(Boolean).slice(0, 10)
+        first3Records: AppState.filteredData.slice(0, 3).map(r => ({班级ID: getClassId(r), 学校: r['学校名称'], 班级IDType: typeof getClassId(r)})),
+        allClassIds: AppState.filteredData.map(r => getClassId(r)).filter(Boolean).slice(0, 10)
     };
     console.log('renderMet Debug:', window._debugMet);
     
@@ -1340,16 +1384,18 @@ let totalRows = 0;
 
 function renderTbl(page = 1) {
     const theadEl = document.querySelector('#dataTable > thead');
-    if (!AppState.filteredData.length) {
-        theadEl.innerHTML = '';
-        elements.tableBody.innerHTML = '<tr><td colspan="20" style="text-align:center;padding:40px;color:#999;">暂无数据，请先上传并筛选</td></tr>';
-        return;
-    }
-    
-    // 按学校、年级、班级分组，合并多周数据
-    const groupMap = new Map();
+    try {
+        if (!AppState.filteredData.length) {
+            theadEl.innerHTML = '';
+            elements.tableBody.innerHTML = '<tr><td colspan="20" style="text-align:center;padding:40px;color:#999;">暂无数据，请先上传并筛选</td></tr>';
+            return;
+        }
+        
+        // 按学校、年级、班级分组，合并多周数据
+        const groupMap = new Map();
     AppState.filteredData.forEach(r => {
-        const key = `${r['省份']||''}|${r['城市']||''}|${r['区县']||''}|${r['学校名称']||''}|${r['年级']||''}|${r['班级名称']||''}|${r['班级 id']||''}`;
+        const classId = getClassId(r);
+        const key = `${r['省份']||''}|${r['城市']||''}|${r['区县']||''}|${r['学校名称']||''}|${r['年级']||''}|${r['班级名称']||''}|${classId}`;
         if (!groupMap.has(key)) {
             groupMap.set(key, {
                 province: r['省份'] || '-',
@@ -1358,7 +1404,7 @@ function renderTbl(page = 1) {
                 school: r['学校名称'] || '-',
                 grade: r['年级'] || '-',
                 className: r['班级名称'] || '-',
-                classId: r['班级 id'] || '-',
+                classId: classId || '-',
                 weeks: new Map()
             });
         }
@@ -1393,13 +1439,8 @@ function renderTbl(page = 1) {
     });
     
     // 获取所有周次（按时间排序）
-    const allWeeks = new Set();
-    groupMap.forEach(g => g.weeks.forEach((_, k) => allWeeks.add(k)));
-    const sortedWeeks = [...allWeeks].sort((a, b) => {
-        const wa = groupMap.values().next().value.weeks.get(a);
-        const wb = groupMap.values().next().value.weeks.get(b);
-        return dayjs(wa.startDate).isBefore(dayjs(wb.startDate)) ? -1 : 1;
-    });
+    const weekMetaMap = buildWeekMetaMap(groupMap);
+    const sortedWeeks = sortWeekKeys(weekMetaMap);
     
     // 生成表头
     let theadHtml = '<tr>';
@@ -1411,7 +1452,7 @@ function renderTbl(page = 1) {
     theadHtml += '<th rowspan="2" style="min-width:100px;">班级</th>';
     
     sortedWeeks.forEach(week => {
-        const w = groupMap.values().next().value.weeks.get(week);
+        const w = weekMetaMap.get(week) || { display: week };
         theadHtml += `<th colspan="2" style="text-align:center;background:#f8fafc;">${w.display}</th>`;
     });
     
@@ -1485,6 +1526,19 @@ function renderTbl(page = 1) {
     
     // 渲染分页
     renderPagination(totalPages, currentPage, totalRows, startIdx + 1, endIdx);
+    } catch (err) {
+        console.error('renderTbl failed', err, {
+            version: APP_VERSION,
+            filteredCount: AppState.filteredData?.length,
+            sample: AppState.filteredData?.slice?.(0, 3)
+        });
+        const debugBar = document.getElementById('debugBar');
+        if (debugBar) {
+            debugBar.innerHTML = `<span>版本：${APP_VERSION}</span><span style="color:#dc2626;">明细表报错：${err.message}</span><span>数据量：${AppState.filteredData?.length || 0}</span>`;
+        }
+        theadEl.innerHTML = '';
+        elements.tableBody.innerHTML = `<tr><td colspan="20" style="text-align:center;padding:40px;color:#dc2626;">班级数据明细渲染失败：${err.message}</td></tr>`;
+    }
 }
 
 function renderPagination(totalPages, currentPage, totalRows, startRow, endRow) {
@@ -1557,7 +1611,8 @@ function exportCSV() {
     // 按学校、年级、班级分组
     const groupMap = new Map();
     AppState.filteredData.forEach(r => {
-        const key = `${r['省份']||''}|${r['城市']||''}|${r['区县']||''}|${r['学校名称']||''}|${r['年级']||''}|${r['班级名称']||''}|${r['班级 id']||''}`;
+        const classId = getClassId(r);
+        const key = `${r['省份']||''}|${r['城市']||''}|${r['区县']||''}|${r['学校名称']||''}|${r['年级']||''}|${r['班级名称']||''}|${classId}`;
         if (!groupMap.has(key)) {
             groupMap.set(key, {
                 province: r['省份'] || '-',
@@ -1566,7 +1621,7 @@ function exportCSV() {
                 school: r['学校名称'] || '-',
                 grade: r['年级'] || '-',
                 className: r['班级名称'] || '-',
-                classId: r['班级 id'] || '-',
+                classId: classId || '-',
                 weeks: new Map()
             });
         }
@@ -1601,18 +1656,14 @@ function exportCSV() {
     });
     
     // 获取所有周次
-    const allWeeks = new Set();
-    groupMap.forEach(g => g.weeks.forEach((_, k) => allWeeks.add(k)));
-    const sortedWeeks = [...allWeeks].sort((a, b) => {
-        const wa = groupMap.values().next().value.weeks.get(a);
-        const wb = groupMap.values().next().value.weeks.get(b);
-        return dayjs(wa.startDate).isBefore(dayjs(wb.startDate)) ? -1 : 1;
+    const weekMetaMap = buildWeekMetaMap(groupMap);
+    const sortedWeeks = sortWeekKeys(weekMetaMap);
     });
     
     // 生成 CSV 表头
     let headers = ['省份', '城市', '区县', '学校', '年级', '班级'];
     sortedWeeks.forEach(week => {
-        const w = groupMap.values().next().value.weeks.get(week);
+        const w = weekMetaMap.get(week) || { display: week };
         headers.push(`${w.display}_布置次数`, `${w.display}_完成率`);
     });
     headers.push('未过期付费学生数', '未过期试用学生数', '转化率');
