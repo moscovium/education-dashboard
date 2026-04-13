@@ -6,6 +6,7 @@ const MAX_STORAGE_MB = 500; // 最大存储限制（MB）
 let db = null;
 const AppState = { files: [], filteredData: [], cache: new Map(), provinces: new Set(), cities: new Set(), districts: new Set(), schools: new Set(), grades: new Set() };
 const elements = {};
+const getClassId = (r = {}) => r['班级 id'] || r['班级ID'] || r['班级id'] || r['班级'] || r['classId'] || r['class_id'] || '';
 
 // 初始化数据库
 function initDB() {
@@ -1139,8 +1140,6 @@ function renderMet() {
     const avgC = AppState.filteredData.length ? (tc / AppState.filteredData.length).toFixed(1) : 0;
     const avgV = AppState.filteredData.length ? (tv / AppState.filteredData.length).toFixed(1) : 0;
     // 覆盖班级：筛选项下班级总数（按班级ID去重）- 基于实际筛选结果
-    // 尝试多种可能的班级ID列名
-    const getClassId = (r) => r['班级 id'] || r['班级ID'] || r['班级'] || r['班级id'] || r['classId'] || r['class_id'] || '';
     const cls = new Set(AppState.filteredData.map(r => getClassId(r)).filter(Boolean));
     const clsCount = cls.size;
     const stu = AppState.filteredData.reduce((s, r) => s + (+r['总学生数'] || 0), 0);
@@ -1154,8 +1153,8 @@ function renderMet() {
         clsCount: clsCount,
         ta: ta,
         avgAssignments: avgAssignments,
-        first3Records: AppState.filteredData.slice(0, 3).map(r => ({班级ID: r['班级 id'], 学校: r['学校名称'], 班级IDType: typeof r['班级 id']})),
-        allClassIds: AppState.filteredData.map(r => r['班级 id']).filter(Boolean).slice(0, 10)
+        first3Records: AppState.filteredData.slice(0, 3).map(r => ({班级ID: getClassId(r), 学校: r['学校名称'], 班级IDType: typeof getClassId(r)})),
+        allClassIds: AppState.filteredData.map(r => getClassId(r)).filter(Boolean).slice(0, 10)
     };
     console.log('renderMet Debug:', window._debugMet);
     
@@ -1349,7 +1348,8 @@ function renderTbl(page = 1) {
     // 按学校、年级、班级分组，合并多周数据
     const groupMap = new Map();
     AppState.filteredData.forEach(r => {
-        const key = `${r['省份']||''}|${r['城市']||''}|${r['区县']||''}|${r['学校名称']||''}|${r['年级']||''}|${r['班级名称']||''}|${r['班级 id']||''}`;
+        const classId = getClassId(r);
+        const key = `${r['省份']||''}|${r['城市']||''}|${r['区县']||''}|${r['学校名称']||''}|${r['年级']||''}|${r['班级名称']||''}|${classId}`;
         if (!groupMap.has(key)) {
             groupMap.set(key, {
                 province: r['省份'] || '-',
@@ -1358,7 +1358,7 @@ function renderTbl(page = 1) {
                 school: r['学校名称'] || '-',
                 grade: r['年级'] || '-',
                 className: r['班级名称'] || '-',
-                classId: r['班级 id'] || '-',
+                classId: classId || '-',
                 weeks: new Map()
             });
         }
@@ -1557,7 +1557,8 @@ function exportCSV() {
     // 按学校、年级、班级分组
     const groupMap = new Map();
     AppState.filteredData.forEach(r => {
-        const key = `${r['省份']||''}|${r['城市']||''}|${r['区县']||''}|${r['学校名称']||''}|${r['年级']||''}|${r['班级名称']||''}|${r['班级 id']||''}`;
+        const classId = getClassId(r);
+        const key = `${r['省份']||''}|${r['城市']||''}|${r['区县']||''}|${r['学校名称']||''}|${r['年级']||''}|${r['班级名称']||''}|${classId}`;
         if (!groupMap.has(key)) {
             groupMap.set(key, {
                 province: r['省份'] || '-',
@@ -1566,7 +1567,7 @@ function exportCSV() {
                 school: r['学校名称'] || '-',
                 grade: r['年级'] || '-',
                 className: r['班级名称'] || '-',
-                classId: r['班级 id'] || '-',
+                classId: classId || '-',
                 weeks: new Map()
             });
         }
