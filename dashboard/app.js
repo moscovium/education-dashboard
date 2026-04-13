@@ -6,7 +6,7 @@ const MAX_STORAGE_MB = 500; // 最大存储限制（MB）
 let db = null;
 const AppState = { files: [], filteredData: [], cache: new Map(), provinces: new Set(), cities: new Set(), districts: new Set(), schools: new Set(), grades: new Set() };
 const elements = {};
-const APP_VERSION = 'v2.2.4-localfirst-20260413d';
+const APP_VERSION = 'v2.2.8-root-20260414a';
 const getClassId = (r = {}) => r['班级 id'] || r['班级ID'] || r['班级id'] || r['班级'] || r['classId'] || r['class_id'] || '';
 const buildWeekMetaMap = (groupMap) => {
     const weekMetaMap = new Map();
@@ -111,11 +111,16 @@ function initElements() {
 // 数据库操作
 function saveFile(record, blob) {
     return new Promise((resolve, reject) => {
-        const tx = db.transaction([DB_CONFIG.store], 'readwrite');
-        const store = tx.objectStore(DB_CONFIG.store);
-        store.put({ ...record, data: blob, uploadDate: new Date().toISOString() });
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
+        try {
+            const tx = db.transaction([DB_CONFIG.store], 'readwrite');
+            const store = tx.objectStore(DB_CONFIG.store);
+            store.put({ ...record, data: blob, uploadDate: new Date().toISOString() });
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error || new Error('IndexedDB 写入失败'));
+            tx.onabort = () => reject(tx.error || new Error('IndexedDB 事务中止'));
+        } catch (err) {
+            reject(err);
+        }
     });
 }
 
@@ -197,12 +202,14 @@ function updateStatus(text, ok) {
 
 // 事件处理 - 修改：省份等筛选独立于时间段，不再级联禁用
 function initHandlers() {
-    elements.uploadBtn.onclick = (e) => { e.preventDefault(); elements.fileInput.click(); };
-    elements.fileInput.onchange = async (e) => {
-        const files = [...(e.target.files || [])];
-        if (files.length) await handleUploadBatch(files);
-        elements.fileInput.value = '';
-    };
+    if (elements.uploadBtn && elements.fileInput) {
+        elements.uploadBtn.onclick = (e) => { e.preventDefault(); elements.fileInput.click(); };
+        elements.fileInput.onchange = async (e) => {
+            const files = [...(e.target.files || [])];
+            if (files.length) await handleUploadBatch(files);
+            elements.fileInput.value = '';
+        };
+    }
     document.ondragover = (e) => e.preventDefault();
     document.ondrop = async (e) => {
         e.preventDefault();
@@ -271,33 +278,35 @@ function initHandlers() {
     }
     
     // 省份等筛选独立，不立即触发筛选，仅更新下级选项
-    elements.provinceSelect.onchange = () => { cascade('province'); };
-    elements.citySelect.onchange = () => { cascade('city'); };
-    elements.districtSelect.onchange = () => { cascade('district'); };
-    elements.schoolSelect.onchange = () => { cascade('school'); };
-    elements.gradeSelect.onchange = () => { cascade('grade'); };
+    if (elements.provinceSelect) elements.provinceSelect.onchange = () => { cascade('province'); };
+    if (elements.citySelect) elements.citySelect.onchange = () => { cascade('city'); };
+    if (elements.districtSelect) elements.districtSelect.onchange = () => { cascade('district'); };
+    if (elements.schoolSelect) elements.schoolSelect.onchange = () => { cascade('school'); };
+    if (elements.gradeSelect) elements.gradeSelect.onchange = () => { cascade('grade'); };
     // 学校模糊搜索（条件筛选区域的搜索框）
     const schoolFilterInput = document.getElementById('schoolFilterInput');
     if (schoolFilterInput) {
         schoolFilterInput.oninput = () => filterSchoolOptions(schoolFilterInput.value);
     }
     
-    elements.applyFilter.onclick = applyFilter;
-    elements.resetFilter.onclick = resetFilter;
-    elements.exportBtn.onclick = exportCSV;
+    if (elements.applyFilter) elements.applyFilter.onclick = applyFilter;
+    if (elements.resetFilter) elements.resetFilter.onclick = resetFilter;
+    if (elements.exportBtn) elements.exportBtn.onclick = exportCSV;
     
     // 高价值筛选事件
-    elements.hvProvinceSelect.onchange = () => { cascadeHighValue('province'); };
-    elements.hvCitySelect.onchange = () => { cascadeHighValue('city'); };
-    elements.hvDistrictSelect.onchange = () => { cascadeHighValue('district'); };
-    elements.applyHighValueFilter.onclick = applyHighValueFilter;
-    elements.resetHighValueFilter.onclick = resetHighValueFilter;
+    if (elements.hvProvinceSelect) elements.hvProvinceSelect.onchange = () => { cascadeHighValue('province'); };
+    if (elements.hvCitySelect) elements.hvCitySelect.onchange = () => { cascadeHighValue('city'); };
+    if (elements.hvDistrictSelect) elements.hvDistrictSelect.onchange = () => { cascadeHighValue('district'); };
+    if (elements.applyHighValueFilter) elements.applyHighValueFilter.onclick = applyHighValueFilter;
+    if (elements.resetHighValueFilter) elements.resetHighValueFilter.onclick = resetHighValueFilter;
 }
 
 // 批量上传入口
 async function handleUploadBatch(files) {
     const items = [...files].filter(Boolean);
     if (!items.length) return;
+    const debugBar = document.getElementById('debugBar');
+    if (debugBar) debugBar.innerHTML = `<span>版本：${APP_VERSION}</span><span>准备上传：${items.length} 个文件</span>`;
     for (const file of items) {
         await handleUpload(file);
     }
@@ -307,9 +316,19 @@ async function handleUploadBatch(files) {
 
 // 上传文件 - 优化版：实时进度、详细错误、大文件支持
 async function handleUpload(file) {
+    const debugBar = document.getElementById('debugBar');
+    if (debugBar) debugBar.innerHTML = `<span>版本：${APP_VERSION}</span><span>处理中：${file.name}</span><span>大小：${(file.size / 1024 / 1024).toFixed(2)}MB</span>`;
     const dateInfo = parseName(file.name);
-    if (!dateInfo) { showMsg('❌ 格式错误\n使用：20260316-20260322_xxx.xlsx', 'error'); return; }
-    if (AppState.files.find(f => f.filename === file.name)) { showMsg('⚠️ 已上传', 'warning'); return; }
+    if (!dateInfo) {
+        if (debugBar) debugBar.innerHTML = `<span>版本：${APP_VERSION}</span><span style="color:#dc2626;">文件名不符合规则：${file.name}</span>`;
+        showMsg('❌ 格式错误\n使用：20260316-20260322_xxx.xlsx', 'error');
+        return;
+    }
+    if (AppState.files.find(f => f.filename === file.name)) {
+        if (debugBar) debugBar.innerHTML = `<span>版本：${APP_VERSION}</span><span>已存在：${file.name}</span>`;
+        showMsg('⚠️ 已上传', 'warning');
+        return;
+    }
     
     const sizeMB = (file.size / 1024 / 1024).toFixed(2);
     const sizeNum = parseFloat(sizeMB);
@@ -361,6 +380,7 @@ async function handleUpload(file) {
         AppState.files.push({ id: Date.now().toString(), filename: file.name, dateInfo, fileSize: file.size, status: 'ready' });
         const elapsed = ((Date.now() - progStart) / 1000).toFixed(1);
         hideProgress();
+        if (debugBar) debugBar.innerHTML = `<span>版本：${APP_VERSION}</span><span>上传成功：${file.name}</span><span>累计：${AppState.files.length} 周</span>`;
         showMsg(`✅ 保存成功\n${sizeMB} MB | ${elapsed}秒`, 'success');
         renderWeeks();
         
@@ -373,6 +393,7 @@ async function handleUpload(file) {
     } catch (e) {
         hideProgress();
         console.error('上传失败:', e);
+        if (debugBar) debugBar.innerHTML = `<span>版本：${APP_VERSION}</span><span style="color:#dc2626;">上传失败：${file.name}</span><span>${e.message}</span>`;
         showMsg(`❌ 上传失败：${e.message}\n请检查：\n1. 文件格式是否正确\n2. 存储空间是否足够\n3. 浏览器是否支持大文件存储`, 'error');
     }
 }
@@ -1608,7 +1629,6 @@ function exportCSV() {
         return;
     }
     
-    // 按学校、年级、班级分组
     const groupMap = new Map();
     AppState.filteredData.forEach(r => {
         const classId = getClassId(r);
@@ -1637,8 +1657,9 @@ function exportCSV() {
                 count: 0,
                 paidCount: +r['未过期付费学生数'] || 0,
                 trialCount: +r['未过期试用学生数'] || 0,
-                conversionSum: (+r['转化率'] || 0) * 100,
-                conversionCount: (+r['转化率'] || 0) > 0 ? 1 : 0
+                conversionSum: 0,
+                conversionCount: 0,
+                conversionRate: 0
             });
         }
         const w = g.weeks.get(weekKey);
@@ -1646,29 +1667,25 @@ function exportCSV() {
         w.completionSum += (+r['作业完成率'] || 0) * 100;
         if ((+r['转化率'] || 0) > 0) {
             w.conversionSum += (+r['转化率'] || 0) * 100;
-            w.conversionCount++;
+            w.conversionCount += 1;
         }
-        w.count++;
-        w.completionRate = w.count ? (w.completionSum / w.count).toFixed(1) : 0;
-        w.conversionRate = w.conversionCount ? (w.conversionSum / w.conversionCount).toFixed(1) : 0;
+        w.count += 1;
+        w.completionRate = w.count ? (w.completionSum / w.count).toFixed(1) : '0.0';
+        w.conversionRate = w.conversionCount ? (w.conversionSum / w.conversionCount).toFixed(1) : '0.0';
         w.paidCount = +r['未过期付费学生数'] || 0;
         w.trialCount = +r['未过期试用学生数'] || 0;
     });
     
-    // 获取所有周次
     const weekMetaMap = buildWeekMetaMap(groupMap);
     const sortedWeeks = sortWeekKeys(weekMetaMap);
-    });
     
-    // 生成 CSV 表头
-    let headers = ['省份', '城市', '区县', '学校', '年级', '班级'];
+    const headers = ['省份', '城市', '区县', '学校', '年级', '班级'];
     sortedWeeks.forEach(week => {
         const w = weekMetaMap.get(week) || { display: week };
         headers.push(`${w.display}_布置次数`, `${w.display}_完成率`);
     });
     headers.push('未过期付费学生数', '未过期试用学生数', '转化率');
     
-    // 生成 CSV 数据
     const rows = [headers.join(',')];
     const sortedGroups = [...groupMap.values()].sort((a, b) => {
         const pCmp = String(a.province).localeCompare(String(b.province), 'zh-CN');
@@ -1692,8 +1709,8 @@ function exportCSV() {
                 row.push('-', '-');
             }
         });
-        const lastWeek = g.weeks.get(sortedWeeks[sortedWeeks.length - 1]);
-        row.push((lastWeek?.paidCount || 0).toString(), (lastWeek?.trialCount || 0).toString(), (lastWeek?.conversionRate || '--') + '%');
+        const lastWeek = sortedWeeks.length ? g.weeks.get(sortedWeeks[sortedWeeks.length - 1]) : null;
+        row.push((lastWeek?.paidCount || 0).toString(), (lastWeek?.trialCount || 0).toString(), `${lastWeek?.conversionRate || '0.0'}%`);
         rows.push(row.join(','));
     });
     

@@ -243,7 +243,7 @@
                     教育数据看板
                 </h1>
                 <p class="dashboard-subtitle">转化率与作业完成情况监测 - 基于班级 ID 关联</p>
-                <div id="debugBar" style="margin-top:8px;font-size:12px;color:#475569;display:flex;gap:12px;flex-wrap:wrap;"></div>
+                <div id="debugBar" style="margin-top:8px;font-size:12px;color:#475569;display:flex;gap:12px;flex-wrap:wrap;">页面版本占位：root-20260414a</div>
             </div>
         </header>
 
@@ -258,9 +258,9 @@
             
             <div style="text-align: center; padding: 20px 0;">
                 <input type="file" id="fileInput" accept=".xlsx,.xls" multiple style="display: none;">
-                <button type="button" id="uploadBtn" class="btn btn-primary" style="font-size: 16px; padding: 16px 32px;">
+                <label for="fileInput" id="uploadBtn" class="btn btn-primary" style="font-size: 16px; padding: 16px 32px; display: inline-block; cursor: pointer;">
                     📁 选择 Excel 文件上传
-                </button>
+                </label>
                 <p style="margin-top: 16px; color: #666; font-size: 13px;">
                     支持格式：20260316-20260322_作业数据.xlsx<br>
                     或将文件拖拽到此页面任意位置
@@ -697,6 +697,26 @@
         </section>
     </div>
 
-    <script src="app.js?v=20260413d"></script>
+    <script>
+        window.__ROOT_DEPLOY_MARKER__='root-20260414a';
+        document.addEventListener('DOMContentLoaded', function () {
+            var input = document.getElementById('fileInput');
+            var debugBar = document.getElementById('debugBar');
+            if (debugBar) debugBar.textContent = '页面版本占位：root-20260414a';
+            if (input) {
+                input.addEventListener('change', function (e) {
+                    var files = Array.from((e.target && e.target.files) || []);
+                    if (debugBar) {
+                        debugBar.textContent = files.length
+                            ? '原生 change 已触发：' + files.map(function (f) { return f.name; }).join(' | ')
+                            : '原生 change 已触发，但未读取到文件';
+                    }
+                }, true);
+            } else if (debugBar) {
+                debugBar.textContent = '未找到 fileInput';
+            }
+        });
+    </script>
+    <script src="app.js?v=20260414a"></script>
 </body>
 </html>
