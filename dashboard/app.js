@@ -165,6 +165,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         await initDB();
         console.log('✅ 数据库初始化成功', APP_VERSION);
         window.__APP_VERSION__ = APP_VERSION;
+        if (location.protocol === 'file:') {
+            showMsg('⚠️ 请不要直接双击 HTML 打开\n请通过本地服务器访问：http://127.0.0.1:8123/dashboard/index.html', 'warning');
+        }
         updateStatus(`✅ 已连接 ${APP_VERSION}`, true);
         // 检查存储配额
         const quota = await checkStorageQuota();
