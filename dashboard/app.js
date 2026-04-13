@@ -1,4 +1,4 @@
-// 教育数据看板 v2.2 - IndexedDB 持久化优化版
+// 教育数据看板 v2.2.2 - 周次渲染兼容修复版
 // 核心优化：大文件分片存储、上传进度实时更新、存储配额检查
 
 const DB_CONFIG = { name: 'EducationDataDB', version: 1, store: 'files' };
@@ -6,7 +6,24 @@ const MAX_STORAGE_MB = 500; // 最大存储限制（MB）
 let db = null;
 const AppState = { files: [], filteredData: [], cache: new Map(), provinces: new Set(), cities: new Set(), districts: new Set(), schools: new Set(), grades: new Set() };
 const elements = {};
+const APP_VERSION = 'v2.2.2-20260413b';
 const getClassId = (r = {}) => r['班级 id'] || r['班级ID'] || r['班级id'] || r['班级'] || r['classId'] || r['class_id'] || '';
+const buildWeekMetaMap = (groupMap) => {
+    const weekMetaMap = new Map();
+    groupMap.forEach(g => {
+        g.weeks.forEach((w, k) => {
+            if (!weekMetaMap.has(k)) weekMetaMap.set(k, w);
+        });
+    });
+    return weekMetaMap;
+};
+const sortWeekKeys = (weekMetaMap) => [...weekMetaMap.keys()].sort((a, b) => {
+    const wa = weekMetaMap.get(a);
+    const wb = weekMetaMap.get(b);
+    const aTime = wa?.startDate ? dayjs(wa.startDate).valueOf() : 0;
+    const bTime = wb?.startDate ? dayjs(wb.startDate).valueOf() : 0;
+    return aTime - bTime;
+});
 
 // 初始化数据库
 function initDB() {
@@ -146,8 +163,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     initElements();
     try {
         await initDB();
-        console.log('✅ 数据库初始化成功');
-        updateStatus('✅ 已连接', true);
+        console.log('✅ 数据库初始化成功', APP_VERSION);
+        window.__APP_VERSION__ = APP_VERSION;
+        updateStatus(`✅ 已连接 ${APP_VERSION}`, true);
         // 检查存储配额
         const quota = await checkStorageQuota();
         if (quota) {
@@ -1393,17 +1411,8 @@ function renderTbl(page = 1) {
     });
     
     // 获取所有周次（按时间排序）
-    const weekMetaMap = new Map();
-    groupMap.forEach(g => {
-        g.weeks.forEach((w, k) => {
-            if (!weekMetaMap.has(k)) weekMetaMap.set(k, w);
-        });
-    });
-    const sortedWeeks = [...weekMetaMap.keys()].sort((a, b) => {
-        const wa = weekMetaMap.get(a);
-        const wb = weekMetaMap.get(b);
-        return dayjs(wa.startDate).valueOf() - dayjs(wb.startDate).valueOf();
-    });
+    const weekMetaMap = buildWeekMetaMap(groupMap);
+    const sortedWeeks = sortWeekKeys(weekMetaMap);
     
     // 生成表头
     let theadHtml = '<tr>';
@@ -1415,7 +1424,7 @@ function renderTbl(page = 1) {
     theadHtml += '<th rowspan="2" style="min-width:100px;">班级</th>';
     
     sortedWeeks.forEach(week => {
-        const w = weekMetaMap.get(week);
+        const w = weekMetaMap.get(week) || { display: week };
         theadHtml += `<th colspan="2" style="text-align:center;background:#f8fafc;">${w.display}</th>`;
     });
     
@@ -1606,22 +1615,14 @@ function exportCSV() {
     });
     
     // 获取所有周次
-    const weekMetaMap = new Map();
-    groupMap.forEach(g => {
-        g.weeks.forEach((w, k) => {
-            if (!weekMetaMap.has(k)) weekMetaMap.set(k, w);
-        });
-    });
-    const sortedWeeks = [...weekMetaMap.keys()].sort((a, b) => {
-        const wa = weekMetaMap.get(a);
-        const wb = weekMetaMap.get(b);
-        return dayjs(wa.startDate).valueOf() - dayjs(wb.startDate).valueOf();
+    const weekMetaMap = buildWeekMetaMap(groupMap);
+    const sortedWeeks = sortWeekKeys(weekMetaMap);
     });
     
     // 生成 CSV 表头
     let headers = ['省份', '城市', '区县', '学校', '年级', '班级'];
     sortedWeeks.forEach(week => {
-        const w = weekMetaMap.get(week);
+        const w = weekMetaMap.get(week) || { display: week };
         headers.push(`${w.display}_布置次数`, `${w.display}_完成率`);
     });
     headers.push('未过期付费学生数', '未过期试用学生数', '转化率');
