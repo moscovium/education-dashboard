@@ -6,7 +6,7 @@ const MAX_STORAGE_MB = 500; // 最大存储限制（MB）
 let db = null;
 const AppState = { files: [], filteredData: [], cache: new Map(), provinces: new Set(), cities: new Set(), districts: new Set(), schools: new Set(), grades: new Set() };
 const elements = {};
-const APP_VERSION = 'v2.2.3-20260413c';
+const APP_VERSION = 'v2.2.4-localfirst-20260413d';
 const getClassId = (r = {}) => r['班级 id'] || r['班级ID'] || r['班级id'] || r['班级'] || r['classId'] || r['class_id'] || '';
 const buildWeekMetaMap = (groupMap) => {
     const weekMetaMap = new Map();
@@ -195,9 +195,17 @@ function updateStatus(text, ok) {
 // 事件处理 - 修改：省份等筛选独立于时间段，不再级联禁用
 function initHandlers() {
     elements.uploadBtn.onclick = (e) => { e.preventDefault(); elements.fileInput.click(); };
-    elements.fileInput.onchange = (e) => { if (e.target.files[0]) handleUpload(e.target.files[0]); elements.fileInput.value = ''; };
+    elements.fileInput.onchange = async (e) => {
+        const files = [...(e.target.files || [])];
+        if (files.length) await handleUploadBatch(files);
+        elements.fileInput.value = '';
+    };
     document.ondragover = (e) => e.preventDefault();
-    document.ondrop = (e) => { e.preventDefault(); if (e.dataTransfer.files[0]) handleUpload(e.dataTransfer.files[0]); };
+    document.ondrop = async (e) => {
+        e.preventDefault();
+        const files = [...(e.dataTransfer.files || [])].filter(f => /\.(xlsx|xls)$/i.test(f.name));
+        if (files.length) await handleUploadBatch(files);
+    };
     
     if (elements.clearAllBtn) elements.clearAllBtn.onclick = async () => {
         if (await showConfirm('确定清空所有数据？\n删除后无法恢复。')) {
@@ -281,6 +289,17 @@ function initHandlers() {
     elements.hvDistrictSelect.onchange = () => { cascadeHighValue('district'); };
     elements.applyHighValueFilter.onclick = applyHighValueFilter;
     elements.resetHighValueFilter.onclick = resetHighValueFilter;
+}
+
+// 批量上传入口
+async function handleUploadBatch(files) {
+    const items = [...files].filter(Boolean);
+    if (!items.length) return;
+    for (const file of items) {
+        await handleUpload(file);
+    }
+    renderWeeks();
+    updateAllSels();
 }
 
 // 上传文件 - 优化版：实时进度、详细错误、大文件支持
@@ -487,9 +506,10 @@ function getWeekLabel(ds) {
 function setDefaultDate() {
     // 根据已上传文件设置默认日期范围
     if (AppState.files && AppState.files.length > 0) {
-        const dates = AppState.files.map(f => f.dateInfo.startDate).sort();
-        const minDate = dates[0];
-        const maxDate = dates[dates.length - 1];
+        const startDates = AppState.files.map(f => f.dateInfo.startDate).sort();
+        const endDates = AppState.files.map(f => f.dateInfo.endDate).sort();
+        const minDate = startDates[0];
+        const maxDate = endDates[endDates.length - 1];
         
         if (minDate && maxDate) {
             elements.startDate.value = minDate;
