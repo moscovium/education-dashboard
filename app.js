@@ -6,7 +6,7 @@ const MAX_STORAGE_MB = 500; // 最大存储限制（MB）
 let db = null;
 const AppState = { files: [], filteredData: [], cache: new Map(), provinces: new Set(), cities: new Set(), districts: new Set(), schools: new Set(), grades: new Set() };
 const elements = {};
-const APP_VERSION = 'v2.2.7-root-20260413g';
+const APP_VERSION = 'v2.2.8-root-20260414a';
 const getClassId = (r = {}) => r['班级 id'] || r['班级ID'] || r['班级id'] || r['班级'] || r['classId'] || r['class_id'] || '';
 const buildWeekMetaMap = (groupMap) => {
     const weekMetaMap = new Map();
@@ -1629,7 +1629,6 @@ function exportCSV() {
         return;
     }
     
-    // 按学校、年级、班级分组
     const groupMap = new Map();
     AppState.filteredData.forEach(r => {
         const classId = getClassId(r);
@@ -1658,8 +1657,9 @@ function exportCSV() {
                 count: 0,
                 paidCount: +r['未过期付费学生数'] || 0,
                 trialCount: +r['未过期试用学生数'] || 0,
-                conversionSum: (+r['转化率'] || 0) * 100,
-                conversionCount: (+r['转化率'] || 0) > 0 ? 1 : 0
+                conversionSum: 0,
+                conversionCount: 0,
+                conversionRate: 0
             });
         }
         const w = g.weeks.get(weekKey);
@@ -1667,29 +1667,25 @@ function exportCSV() {
         w.completionSum += (+r['作业完成率'] || 0) * 100;
         if ((+r['转化率'] || 0) > 0) {
             w.conversionSum += (+r['转化率'] || 0) * 100;
-            w.conversionCount++;
+            w.conversionCount += 1;
         }
-        w.count++;
-        w.completionRate = w.count ? (w.completionSum / w.count).toFixed(1) : 0;
-        w.conversionRate = w.conversionCount ? (w.conversionSum / w.conversionCount).toFixed(1) : 0;
+        w.count += 1;
+        w.completionRate = w.count ? (w.completionSum / w.count).toFixed(1) : '0.0';
+        w.conversionRate = w.conversionCount ? (w.conversionSum / w.conversionCount).toFixed(1) : '0.0';
         w.paidCount = +r['未过期付费学生数'] || 0;
         w.trialCount = +r['未过期试用学生数'] || 0;
     });
     
-    // 获取所有周次
     const weekMetaMap = buildWeekMetaMap(groupMap);
     const sortedWeeks = sortWeekKeys(weekMetaMap);
-    });
     
-    // 生成 CSV 表头
-    let headers = ['省份', '城市', '区县', '学校', '年级', '班级'];
+    const headers = ['省份', '城市', '区县', '学校', '年级', '班级'];
     sortedWeeks.forEach(week => {
         const w = weekMetaMap.get(week) || { display: week };
         headers.push(`${w.display}_布置次数`, `${w.display}_完成率`);
     });
     headers.push('未过期付费学生数', '未过期试用学生数', '转化率');
     
-    // 生成 CSV 数据
     const rows = [headers.join(',')];
     const sortedGroups = [...groupMap.values()].sort((a, b) => {
         const pCmp = String(a.province).localeCompare(String(b.province), 'zh-CN');
@@ -1713,8 +1709,8 @@ function exportCSV() {
                 row.push('-', '-');
             }
         });
-        const lastWeek = g.weeks.get(sortedWeeks[sortedWeeks.length - 1]);
-        row.push((lastWeek?.paidCount || 0).toString(), (lastWeek?.trialCount || 0).toString(), (lastWeek?.conversionRate || '--') + '%');
+        const lastWeek = sortedWeeks.length ? g.weeks.get(sortedWeeks[sortedWeeks.length - 1]) : null;
+        row.push((lastWeek?.paidCount || 0).toString(), (lastWeek?.trialCount || 0).toString(), `${lastWeek?.conversionRate || '0.0'}%`);
         rows.push(row.join(','));
     });
     
