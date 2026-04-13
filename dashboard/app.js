@@ -1393,12 +1393,16 @@ function renderTbl(page = 1) {
     });
     
     // 获取所有周次（按时间排序）
-    const allWeeks = new Set();
-    groupMap.forEach(g => g.weeks.forEach((_, k) => allWeeks.add(k)));
-    const sortedWeeks = [...allWeeks].sort((a, b) => {
-        const wa = groupMap.values().next().value.weeks.get(a);
-        const wb = groupMap.values().next().value.weeks.get(b);
-        return dayjs(wa.startDate).isBefore(dayjs(wb.startDate)) ? -1 : 1;
+    const weekMetaMap = new Map();
+    groupMap.forEach(g => {
+        g.weeks.forEach((w, k) => {
+            if (!weekMetaMap.has(k)) weekMetaMap.set(k, w);
+        });
+    });
+    const sortedWeeks = [...weekMetaMap.keys()].sort((a, b) => {
+        const wa = weekMetaMap.get(a);
+        const wb = weekMetaMap.get(b);
+        return dayjs(wa.startDate).valueOf() - dayjs(wb.startDate).valueOf();
     });
     
     // 生成表头
@@ -1411,7 +1415,7 @@ function renderTbl(page = 1) {
     theadHtml += '<th rowspan="2" style="min-width:100px;">班级</th>';
     
     sortedWeeks.forEach(week => {
-        const w = groupMap.values().next().value.weeks.get(week);
+        const w = weekMetaMap.get(week);
         theadHtml += `<th colspan="2" style="text-align:center;background:#f8fafc;">${w.display}</th>`;
     });
     
@@ -1602,18 +1606,22 @@ function exportCSV() {
     });
     
     // 获取所有周次
-    const allWeeks = new Set();
-    groupMap.forEach(g => g.weeks.forEach((_, k) => allWeeks.add(k)));
-    const sortedWeeks = [...allWeeks].sort((a, b) => {
-        const wa = groupMap.values().next().value.weeks.get(a);
-        const wb = groupMap.values().next().value.weeks.get(b);
-        return dayjs(wa.startDate).isBefore(dayjs(wb.startDate)) ? -1 : 1;
+    const weekMetaMap = new Map();
+    groupMap.forEach(g => {
+        g.weeks.forEach((w, k) => {
+            if (!weekMetaMap.has(k)) weekMetaMap.set(k, w);
+        });
+    });
+    const sortedWeeks = [...weekMetaMap.keys()].sort((a, b) => {
+        const wa = weekMetaMap.get(a);
+        const wb = weekMetaMap.get(b);
+        return dayjs(wa.startDate).valueOf() - dayjs(wb.startDate).valueOf();
     });
     
     // 生成 CSV 表头
     let headers = ['省份', '城市', '区县', '学校', '年级', '班级'];
     sortedWeeks.forEach(week => {
-        const w = groupMap.values().next().value.weeks.get(week);
+        const w = weekMetaMap.get(week);
         headers.push(`${w.display}_布置次数`, `${w.display}_完成率`);
     });
     headers.push('未过期付费学生数', '未过期试用学生数', '转化率');
