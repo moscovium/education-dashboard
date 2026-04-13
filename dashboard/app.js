@@ -6,7 +6,7 @@ const MAX_STORAGE_MB = 500; // 最大存储限制（MB）
 let db = null;
 const AppState = { files: [], filteredData: [], cache: new Map(), provinces: new Set(), cities: new Set(), districts: new Set(), schools: new Set(), grades: new Set() };
 const elements = {};
-const APP_VERSION = 'v2.2.2-20260413b';
+const APP_VERSION = 'v2.2.3-20260413c';
 const getClassId = (r = {}) => r['班级 id'] || r['班级ID'] || r['班级id'] || r['班级'] || r['classId'] || r['class_id'] || '';
 const buildWeekMetaMap = (groupMap) => {
     const weekMetaMap = new Map();
@@ -186,6 +186,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 function updateStatus(text, ok) {
     const el = document.getElementById('storageStatus');
     if (el) { el.textContent = text; el.className = ok ? 'connected' : ''; }
+    const debugBar = document.getElementById('debugBar');
+    if (debugBar) {
+        debugBar.innerHTML = `<span>版本：${APP_VERSION}</span><span>状态：${text}</span><span>文件数：${AppState.files.length}</span>`;
+    }
 }
 
 // 事件处理 - 修改：省份等筛选独立于时间段，不再级联禁用
@@ -1357,14 +1361,15 @@ let totalRows = 0;
 
 function renderTbl(page = 1) {
     const theadEl = document.querySelector('#dataTable > thead');
-    if (!AppState.filteredData.length) {
-        theadEl.innerHTML = '';
-        elements.tableBody.innerHTML = '<tr><td colspan="20" style="text-align:center;padding:40px;color:#999;">暂无数据，请先上传并筛选</td></tr>';
-        return;
-    }
-    
-    // 按学校、年级、班级分组，合并多周数据
-    const groupMap = new Map();
+    try {
+        if (!AppState.filteredData.length) {
+            theadEl.innerHTML = '';
+            elements.tableBody.innerHTML = '<tr><td colspan="20" style="text-align:center;padding:40px;color:#999;">暂无数据，请先上传并筛选</td></tr>';
+            return;
+        }
+        
+        // 按学校、年级、班级分组，合并多周数据
+        const groupMap = new Map();
     AppState.filteredData.forEach(r => {
         const classId = getClassId(r);
         const key = `${r['省份']||''}|${r['城市']||''}|${r['区县']||''}|${r['学校名称']||''}|${r['年级']||''}|${r['班级名称']||''}|${classId}`;
@@ -1498,6 +1503,19 @@ function renderTbl(page = 1) {
     
     // 渲染分页
     renderPagination(totalPages, currentPage, totalRows, startIdx + 1, endIdx);
+    } catch (err) {
+        console.error('renderTbl failed', err, {
+            version: APP_VERSION,
+            filteredCount: AppState.filteredData?.length,
+            sample: AppState.filteredData?.slice?.(0, 3)
+        });
+        const debugBar = document.getElementById('debugBar');
+        if (debugBar) {
+            debugBar.innerHTML = `<span>版本：${APP_VERSION}</span><span style="color:#dc2626;">明细表报错：${err.message}</span><span>数据量：${AppState.filteredData?.length || 0}</span>`;
+        }
+        theadEl.innerHTML = '';
+        elements.tableBody.innerHTML = `<tr><td colspan="20" style="text-align:center;padding:40px;color:#dc2626;">班级数据明细渲染失败：${err.message}</td></tr>`;
+    }
 }
 
 function renderPagination(totalPages, currentPage, totalRows, startRow, endRow) {
