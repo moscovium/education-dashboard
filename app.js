@@ -6,7 +6,7 @@ const MAX_STORAGE_MB = 500; // 最大存储限制（MB）
 let db = null;
 const AppState = { files: [], filteredData: [], cache: new Map(), provinces: new Set(), cities: new Set(), districts: new Set(), schools: new Set(), grades: new Set() };
 const elements = {};
-const APP_VERSION = 'v2.2.6-root-20260413f';
+const APP_VERSION = 'v2.2.7-root-20260413g';
 const getClassId = (r = {}) => r['班级 id'] || r['班级ID'] || r['班级id'] || r['班级'] || r['classId'] || r['class_id'] || '';
 const buildWeekMetaMap = (groupMap) => {
     const weekMetaMap = new Map();
@@ -202,12 +202,14 @@ function updateStatus(text, ok) {
 
 // 事件处理 - 修改：省份等筛选独立于时间段，不再级联禁用
 function initHandlers() {
-    elements.uploadBtn.onclick = (e) => { e.preventDefault(); elements.fileInput.click(); };
-    elements.fileInput.onchange = async (e) => {
-        const files = [...(e.target.files || [])];
-        if (files.length) await handleUploadBatch(files);
-        elements.fileInput.value = '';
-    };
+    if (elements.uploadBtn && elements.fileInput) {
+        elements.uploadBtn.onclick = (e) => { e.preventDefault(); elements.fileInput.click(); };
+        elements.fileInput.onchange = async (e) => {
+            const files = [...(e.target.files || [])];
+            if (files.length) await handleUploadBatch(files);
+            elements.fileInput.value = '';
+        };
+    }
     document.ondragover = (e) => e.preventDefault();
     document.ondrop = async (e) => {
         e.preventDefault();
@@ -276,27 +278,27 @@ function initHandlers() {
     }
     
     // 省份等筛选独立，不立即触发筛选，仅更新下级选项
-    elements.provinceSelect.onchange = () => { cascade('province'); };
-    elements.citySelect.onchange = () => { cascade('city'); };
-    elements.districtSelect.onchange = () => { cascade('district'); };
-    elements.schoolSelect.onchange = () => { cascade('school'); };
-    elements.gradeSelect.onchange = () => { cascade('grade'); };
+    if (elements.provinceSelect) elements.provinceSelect.onchange = () => { cascade('province'); };
+    if (elements.citySelect) elements.citySelect.onchange = () => { cascade('city'); };
+    if (elements.districtSelect) elements.districtSelect.onchange = () => { cascade('district'); };
+    if (elements.schoolSelect) elements.schoolSelect.onchange = () => { cascade('school'); };
+    if (elements.gradeSelect) elements.gradeSelect.onchange = () => { cascade('grade'); };
     // 学校模糊搜索（条件筛选区域的搜索框）
     const schoolFilterInput = document.getElementById('schoolFilterInput');
     if (schoolFilterInput) {
         schoolFilterInput.oninput = () => filterSchoolOptions(schoolFilterInput.value);
     }
     
-    elements.applyFilter.onclick = applyFilter;
-    elements.resetFilter.onclick = resetFilter;
-    elements.exportBtn.onclick = exportCSV;
+    if (elements.applyFilter) elements.applyFilter.onclick = applyFilter;
+    if (elements.resetFilter) elements.resetFilter.onclick = resetFilter;
+    if (elements.exportBtn) elements.exportBtn.onclick = exportCSV;
     
     // 高价值筛选事件
-    elements.hvProvinceSelect.onchange = () => { cascadeHighValue('province'); };
-    elements.hvCitySelect.onchange = () => { cascadeHighValue('city'); };
-    elements.hvDistrictSelect.onchange = () => { cascadeHighValue('district'); };
-    elements.applyHighValueFilter.onclick = applyHighValueFilter;
-    elements.resetHighValueFilter.onclick = resetHighValueFilter;
+    if (elements.hvProvinceSelect) elements.hvProvinceSelect.onchange = () => { cascadeHighValue('province'); };
+    if (elements.hvCitySelect) elements.hvCitySelect.onchange = () => { cascadeHighValue('city'); };
+    if (elements.hvDistrictSelect) elements.hvDistrictSelect.onchange = () => { cascadeHighValue('district'); };
+    if (elements.applyHighValueFilter) elements.applyHighValueFilter.onclick = applyHighValueFilter;
+    if (elements.resetHighValueFilter) elements.resetHighValueFilter.onclick = resetHighValueFilter;
 }
 
 // 批量上传入口
