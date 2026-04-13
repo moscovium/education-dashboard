@@ -111,11 +111,16 @@ function initElements() {
 // 数据库操作
 function saveFile(record, blob) {
     return new Promise((resolve, reject) => {
-        const tx = db.transaction([DB_CONFIG.store], 'readwrite');
-        const store = tx.objectStore(DB_CONFIG.store);
-        store.put({ ...record, data: blob, uploadDate: new Date().toISOString() });
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
+        try {
+            const tx = db.transaction([DB_CONFIG.store], 'readwrite');
+            const store = tx.objectStore(DB_CONFIG.store);
+            store.put({ ...record, data: blob, uploadDate: new Date().toISOString() });
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error || new Error('IndexedDB 写入失败'));
+            tx.onabort = () => reject(tx.error || new Error('IndexedDB 事务中止'));
+        } catch (err) {
+            reject(err);
+        }
     });
 }
 
@@ -298,6 +303,8 @@ function initHandlers() {
 async function handleUploadBatch(files) {
     const items = [...files].filter(Boolean);
     if (!items.length) return;
+    const debugBar = document.getElementById('debugBar');
+    if (debugBar) debugBar.innerHTML = `<span>版本：${APP_VERSION}</span><span>准备上传：${items.length} 个文件</span>`;
     for (const file of items) {
         await handleUpload(file);
     }
@@ -307,9 +314,19 @@ async function handleUploadBatch(files) {
 
 // 上传文件 - 优化版：实时进度、详细错误、大文件支持
 async function handleUpload(file) {
+    const debugBar = document.getElementById('debugBar');
+    if (debugBar) debugBar.innerHTML = `<span>版本：${APP_VERSION}</span><span>处理中：${file.name}</span><span>大小：${(file.size / 1024 / 1024).toFixed(2)}MB</span>`;
     const dateInfo = parseName(file.name);
-    if (!dateInfo) { showMsg('❌ 格式错误\n使用：20260316-20260322_xxx.xlsx', 'error'); return; }
-    if (AppState.files.find(f => f.filename === file.name)) { showMsg('⚠️ 已上传', 'warning'); return; }
+    if (!dateInfo) {
+        if (debugBar) debugBar.innerHTML = `<span>版本：${APP_VERSION}</span><span style="color:#dc2626;">文件名不符合规则：${file.name}</span>`;
+        showMsg('❌ 格式错误\n使用：20260316-20260322_xxx.xlsx', 'error');
+        return;
+    }
+    if (AppState.files.find(f => f.filename === file.name)) {
+        if (debugBar) debugBar.innerHTML = `<span>版本：${APP_VERSION}</span><span>已存在：${file.name}</span>`;
+        showMsg('⚠️ 已上传', 'warning');
+        return;
+    }
     
     const sizeMB = (file.size / 1024 / 1024).toFixed(2);
     const sizeNum = parseFloat(sizeMB);
@@ -361,6 +378,7 @@ async function handleUpload(file) {
         AppState.files.push({ id: Date.now().toString(), filename: file.name, dateInfo, fileSize: file.size, status: 'ready' });
         const elapsed = ((Date.now() - progStart) / 1000).toFixed(1);
         hideProgress();
+        if (debugBar) debugBar.innerHTML = `<span>版本：${APP_VERSION}</span><span>上传成功：${file.name}</span><span>累计：${AppState.files.length} 周</span>`;
         showMsg(`✅ 保存成功\n${sizeMB} MB | ${elapsed}秒`, 'success');
         renderWeeks();
         
@@ -373,6 +391,7 @@ async function handleUpload(file) {
     } catch (e) {
         hideProgress();
         console.error('上传失败:', e);
+        if (debugBar) debugBar.innerHTML = `<span>版本：${APP_VERSION}</span><span style="color:#dc2626;">上传失败：${file.name}</span><span>${e.message}</span>`;
         showMsg(`❌ 上传失败：${e.message}\n请检查：\n1. 文件格式是否正确\n2. 存储空间是否足够\n3. 浏览器是否支持大文件存储`, 'error');
     }
 }
