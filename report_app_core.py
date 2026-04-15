@@ -311,7 +311,7 @@ def analyze_data(class_df, hw_df, qt_df=None):
                 for c, g in ct_dev.index
             }
 
-        # ⑤ 各班薄弱题型（得分率最低的题型）
+        # ⑤ 各班薄弱题型（按班内离均差识别，并为正文展示预先筛选重点项）
         if '班级' in qt.columns and '年级' in qt.columns:
             ct_mean2 = ct_matrix.mean(axis=1)
             ct_dev2 = ct_matrix.sub(ct_mean2, axis=0)
@@ -321,6 +321,19 @@ def analyze_data(class_df, hw_df, qt_df=None):
                 _format_grade_class(g, c): {'题型': weak_qt.loc[(c, g)], '离均差': round(float(weak_score.loc[(c, g)])*100, 2)}
                 for c, g in weak_qt.index
             }
+            # 正文仅展示差异最突出的重点班级，且总量不超过5个
+            ranked_weak = []
+            for c, g in weak_qt.index:
+                diff = round(float(weak_score.loc[(c, g)]) * 100, 2)
+                if diff < 0:
+                    ranked_weak.append({
+                        '班级': _format_grade_class(g, c),
+                        '题型': weak_qt.loc[(c, g)],
+                        '离均差': diff,
+                        'abs_diff': abs(diff),
+                    })
+            ranked_weak = sorted(ranked_weak, key=lambda x: x['abs_diff'], reverse=True)
+            results['qt_weak_top'] = ranked_weak[:5]
 
         # ⑥ 教师 × 题型 得分率（教师效能分析）
         if '教师' in qt.columns and '题型名称' in qt.columns:
@@ -417,7 +430,7 @@ def generate_report_text(data):
 
     # ── 一、学校信息 ───────────────────────────────────────
     L.append("## 一、学校信息\n")
-    L.append(f"{school}积极推进教育数字化转型，在{data.get('province', '黑龙江省')}全面推进英语听说教学改革的背景下，学校引入E听说AI听说教学系统，依托大数据与人工智能技术赋能英语听说教学变革。本学期{data['classes']}个班级、{data['total_students']}名学生全面激活并投入使用，系统应用已深度融入日常教学，数据覆盖周期为{mr}。\n\n")
+    L.append(f"　　{school}积极推进教育数字化转型，在{data.get('province', '黑龙江省')}全面推进英语听说教学改革的背景下，学校引入E听说AI听说教学系统，依托大数据与人工智能技术赋能英语听说教学变革。本学期{data['classes']}个班级、{data['total_students']}名学生全面激活并投入使用，系统应用已深度融入日常教学，数据覆盖周期为{mr}。\n\n")
     L.append("| 项目 | 内容 |\n|------|------|\n")
     L.append(f"| 学校名称 | {school} |\n")
     L.append(f"| 所属省份 | {data.get('province', '黑龙江省')} |\n")
@@ -429,7 +442,7 @@ def generate_report_text(data):
 
     # ── 二、激活/应用概况 ──────────────────────────────────
     L.append("## 二、激活/应用概况\n")
-    L.append(f"{school}在{mr}期间，E听说产品应用覆盖{data['classes']}个班级、{data['total_students']}名学生，全面激活率达100%，形成稳定的常态化应用节奏，教师持续通过系统布置听说作业，为教学减负增效奠定坚实基础。\n\n")
+    L.append(f"　　{school}在{mr}期间，E听说产品应用覆盖{data['classes']}个班级、{data['total_students']}名学生，全面激活率达100%，形成稳定的常态化应用节奏，教师持续通过系统布置听说作业，为教学减负增效奠定坚实基础。\n\n")
     L.append("**核心应用数据如下：**\n\n")
     L.append("| 指标 | 数值 |\n|------|------|\n")
     L.append(f"| 参与学校数 | {data['schools']}所 |\n")
@@ -453,7 +466,7 @@ def generate_report_text(data):
         # 数据小结：找完成率最高和得分率最高的年级
         best_completion_grade = max(grade_stats, key=lambda g: grade_stats[g]['completion_rate'])
         best_score_grade = max(grade_stats, key=lambda g: grade_stats[g]['score_rate'])
-        L.append(f"从各年级横向对比来看，{best_completion_grade}平均完成率最高（{grade_stats[best_completion_grade]['completion_rate']}%），{best_score_grade}平均得分率领先（{grade_stats[best_score_grade]['score_rate']}%），反映出不同年级在应用侧重上存在差异。\n\n")
+        L.append(f"　　从各年级横向对比来看，{best_completion_grade}平均完成率最高（{grade_stats[best_completion_grade]['completion_rate']}%），{best_score_grade}平均得分率领先（{grade_stats[best_score_grade]['score_rate']}%），反映出不同年级在应用侧重上存在一定差异。\n\n")
 
     L.append("> 数据来源：班级数据总览、作业明细\n\n")
 
@@ -461,7 +474,7 @@ def generate_report_text(data):
     L.append("## 三、应用情况分析\n")
 
     L.append("### 3.1 训练内容/栏目介绍\n")
-    L.append(f"系统应用覆盖四类训练场景，以「同步」日常开口训练为主体，辅以「专项」「模拟」等训练形式，形成较为完整的听说教学支持体系。其中，「同步」训练侧重夯实发音基础与语感积累，「专项」训练侧重提升重点题型能力，「模拟」训练侧重服务阶段性检测与考前演练。\n\n")
+    L.append(f"　　系统应用覆盖四类训练场景，以「同步」日常开口训练为主体，辅以「专项」「模拟」等训练形式，形成较为完整的听说教学支持体系。其中，「同步」训练侧重夯实发音基础与语感积累，「专项」训练侧重提升重点题型能力，「模拟」训练侧重服务阶段性检测与考前演练。\n\n")
     L.append("| 大类 | 次数 | 占比 | 定位说明 |\n|------|------|------|----------|\n")
     cat_meta = {
         '同步':      '课文朗读/跟读等日常基础训练，帮助学生建立标准发音与语感',
@@ -476,7 +489,7 @@ def generate_report_text(data):
     L.append("\n")
 
     L.append("### 3.2 整体应用数据\n")
-    L.append(f"在作业应用方面，{data['classes']}个班级教师本周期内合计布置作业**{data['assign_count']}次**（{data['assign_total']}份），作业完成率均值为**{data['completion_rate']}%**，班级平均作业得分率为**{data['score_rate_avg']}%**。具体数据如下：\n\n")
+    L.append(f"　　在作业应用方面，{data['classes']}个班级教师本周期内合计布置作业**{data['assign_count']}次**（{data['assign_total']}份），作业完成率均值为**{data['completion_rate']}%**，班级平均作业得分率为**{data['score_rate_avg']}%**。具体数据如下：\n\n")
     L.append("| 指标 | 数值 |\n|------|------|\n")
     L.append(f"| 布置作业次数 | {data['assign_count']}次 |\n")
     L.append(f"| 布置作业份数 | {data['assign_total']}份 |\n")
@@ -485,35 +498,21 @@ def generate_report_text(data):
     L.append(f"| 学生自主练习次数 | {data['self_practice']}次 |\n")
     L.append(f"| 词汇自主练习次数 | {vocab_p}次 |\n")
     L.append("\n")
-    L.append(f"与此同时，学生自主练习保持一定活跃度，词汇自主练习次数累计达**{vocab_p}次**，生均约{per_student}次，表明学生在课堂训练之外已初步形成较为稳定的自主巩固习惯。\n\n")
+    L.append(f"　　与此同时，学生自主练习保持一定活跃度，词汇自主练习次数累计达**{vocab_p}次**，生均约{per_student}次，表明学生在课堂训练之外已初步形成较为稳定的自主巩固习惯。\n\n")
 
     # 动态找峰值月及增长趋势
     peak_m = max(months, key=lambda m: data['monthly_hw'].get(m, 0)) if months else months[0] if months else ''
     peak_cnt = data['monthly_hw'].get(peak_m, 0)
     L.append("### 3.3 应用频次分析\n")
-    L.append(f"在应用频次方面，{total_hw}次作业分布于{len(months)}个月份，整体呈现常态化推进态势。{months[0] if months else ''}至{months[-1] if months else ''}期间，{peak_m}月作业量最高（{peak_cnt}次），与阶段复习安排基本一致，说明系统应用与学校教学节奏保持较好匹配。\n\n")
-    L.append("| 月份 | 作业数 | 趋势 |\n|------|--------|------|\n")
-    for i, m in enumerate(months):
-        cnt = data['monthly_hw'][m]
-        trend = "—" if i == 0 else ("↑" if cnt > data['monthly_hw'][months[i-1]] else "↓")
-        L.append(f"| {m} | {cnt} | {trend} |\n")
-    L.append("\n")
-    L.append(f"**各年级月度作业量分布（数据来源：作业明细）：**\n\n")
-    L.append("| 月份 | " + " | ".join(actual_grades) + " |\n")
-    L.append("|" + "|".join(["------"] * (len(actual_grades)+1)) + "\n")
+    L.append(f"　　在应用频次方面，{total_hw}次作业分布于{len(months)}个月份，整体呈现常态化推进态势。{months[0] if months else ''}至{months[-1] if months else ''}期间，{peak_m}月作业量最高（{peak_cnt}次），与阶段复习安排基本一致，说明系统应用与学校教学节奏保持较好匹配。\n\n")
     grade_hw = data.get('grade_monthly_hw', {})
-    for m in months:
-        vals = [str(grade_hw.get(g, {}).get(m, 0)) for g in actual_grades]
-        L.append(f"| {m} | " + " | ".join(vals) + " |\n")
-    L.append("\n")
-    # 各年级对比小结
     if grade_hw:
         peak_month = max(months, key=lambda m: data['monthly_hw'][m])
         peak_grade = max(actual_grades, key=lambda g: grade_hw.get(g, {}).get(peak_month, 0))
-        L.append(f"从各年级横向对比来看，{peak_month}月作业量最高，{peak_grade}在当月作业量最大，表明该年级在本周期应用节奏中最为活跃。\n\n")
+        L.append(f"　　从各年级横向对比来看，{peak_month}月作业量最高，{peak_grade}在当月作业量最大，表明该年级在当月应用节奏中最为活跃。\n\n")
 
     L.append("### 3.4 应用方式分析\n")
-    L.append(f"从作业内容结构来看，「同步」训练（课文朗读/跟读）是学生日常接触最多的形式，合计占比高达**{syn_pct}%**，构成学生每日开口说英语的基础；「专项」训练占比**{sub_pct}%**，用于考前针对性强化；「模拟」训练占比**{mon_pct}%**，直接服务听说考试备考。整体呈现「日常打基础＋考前专项强化＋模拟实战」的组合模式，是科学备考的正确路径。\n\n")
+    L.append(f"　　从作业内容结构来看，「同步」训练（课文朗读、跟读等）是学生日常接触最多的形式，合计占比高达**{syn_pct}%**，构成学生每日开口说英语的基础；「专项」训练占比**{sub_pct}%**，主要用于针对性强化重点题型；「模拟」训练占比**{mon_pct}%**，直接服务阶段检测与听说考试备考。整体呈现“日常打基础 + 专项补短板 + 模拟促实战”的组合模式，符合循序渐进的教学与备考规律。\n\n")
     L.append("| 大类 | 占比 | 定位说明 |\n|------|------|----------|\n")
     for cat in ['同步', '专项', '模拟', '课外拓展']:
         pct_v = data['category_pct'].get(cat, 0)
@@ -543,11 +542,11 @@ def generate_report_text(data):
     if best_recovery:
         g, lm, ls, ltm, lts = best_recovery
         gain = round(lts - ls, 2)
-        best_trend_text = f"**{g}**听说模拟得分率从最低{lm}的**{ls}%**逐步回升至{ltm}的**{lts}%**，整体提升**{gain}个百分点**"
+        best_trend_text = f"　　**{g}**听说模拟得分率从最低点{lm}的**{ls}%**逐步回升至{ltm}的**{lts}%**，整体提升**{gain}个百分点**"
     elif grade_scores:
         best_g = max(grade_scores.keys(), key=lambda g: len(grade_scores[g]))
         sm = sorted(grade_scores[best_g].items())
-        best_trend_text = f"**{best_g}**听说模拟月均得分率走势：{' → '.join([f'{m}{s}%' for m,s in sm])}"
+        best_trend_text = f"　　**{best_g}**听说模拟月均得分率走势为：{' → '.join([f'{m}{s}%' for m,s in sm])}"
     if best_trend_text:
         L.append(f"{best_trend_text}，具体数据如下：\n\n")
 
@@ -586,27 +585,19 @@ def generate_report_text(data):
                 label = qt_labels.get(qt_name, '')
                 L.append(f"| {qt_name} | {info['mean']}% | {label} |\n")
             L.append("\n")
-            L.append(f"从全校横向对比情况看，**{easiest_qt}**得分率最高（{qt_school[easiest_qt]['mean']}%），反映出学生在该题型上的整体掌握情况相对较好；**{hardest_qt}**得分率最低（{qt_school[hardest_qt]['mean']}%），低分率为**{data.get('qt_hr_lr', {}).get(hardest_qt, {}).get('低分率', 'N/A')}%**，应作为下一阶段专项教学与复习提升的重点关注题型。\n\n")
+            L.append(f"　　从全校横向对比情况看，**{easiest_qt}**得分率最高（{qt_school[easiest_qt]['mean']}%），反映出学生在该题型上的整体掌握情况相对较好；**{hardest_qt}**得分率最低（{qt_school[hardest_qt]['mean']}%），低分率为**{data.get('qt_hr_lr', {}).get(hardest_qt, {}).get('低分率', 'N/A')}%**，应作为下一阶段专项教学与复习提升的重点关注题型。\n\n")
 
-        # 各班薄弱题型（每年级最多展示2个班级，按偏差最大优先）
-        qt_weak = data.get('qt_weak', {})
-        if qt_weak:
+        # 各班薄弱题型（仅展示差异最突出的重点项，总量不超过5个）
+        qt_weak_top = data.get('qt_weak_top', [])
+        if qt_weak_top:
             L.append("**各班薄弱题型诊断：**\n\n")
-            grade_groups = {}
-            for ck, v in qt_weak.items():
-                grade = ck.split('班')[0]
-                grade_groups.setdefault(grade, []).append((ck, v))
-
             weak_list = []
-            for grade in sorted(grade_groups.keys()):
-                selected = sorted(grade_groups[grade], key=lambda x: x[1]['离均差'])[:2]
-                for ck, v in selected:
-                    if v['离均差'] < 0:
-                        weak_list.append(f"- **{ck}**：**{v['题型']}**得分率最低，距班级均值{v['离均差']}个百分点")
+            for item in qt_weak_top:
+                weak_list.append(f"- **{item['班级']}**：**{item['题型']}**相对班级平均水平偏弱，离均差为{item['离均差']}个百分点")
 
             if weak_list:
                 L.append("\n".join(weak_list) + "\n")
-                L.append("以上班级按照各年级内偏差程度由高到低遴选展示，每个年级最多展示2个班级。建议围绕对应薄弱题型制定针对性训练安排，提升教学改进的精准性。\n\n")
+                L.append("　　以上诊断聚焦差异最突出的重点班级与题型，便于学校优先开展针对性训练与教学改进。\n\n")
 
         # 教师效能
         qt_teacher = data.get('qt_teacher_rank', {})
@@ -629,7 +620,7 @@ def generate_report_text(data):
                 best_score = sorted_teachers[0][1]
                 worst_score = sorted_teachers[-1][1]
                 diff = best_score - worst_score
-                L.append(f"教师所带班级综合得分率存在**{diff:.1f}个百分点**的差异（{best_t}所带班级最高{best_score}%，{worst_t}所带班级最低{worst_score}%），建议通过校本教研、课堂观摩与经验交流等方式，促进有效做法的校内共享。\n\n")
+                L.append(f"　　教师所带班级综合得分率存在**{diff:.1f}个百分点**的差异（{best_t}所带班级最高{best_score}%，{worst_t}所带班级相对较低，为{worst_score}%），建议通过校本教研、课堂观摩与经验交流等方式，促进有效做法在校内共享。\n\n")
 
     if strong:
         L.append("### 4.3 相关性分析\n")
@@ -648,10 +639,10 @@ def generate_report_text(data):
         L.append("**Pearson相关系数理论说明：**\n\n")
         L.append("| 系数范围 | 相关强度 | 统计含义 |\n")
         L.append("|---------|---------|---------|\n")
-        L.append("| |r| ≥ 0.7 | 强相关 | 两变量存在明显线性关系 |\n")
+        L.append("| 0.7 ≤ |r| ≤ 1.0 | 强相关 | 两变量存在明显线性关系 |\n")
         L.append("| 0.4 ≤ |r| < 0.7 | 中等相关 | 两变量存在一定线性关系 |\n")
         L.append("| 0.2 ≤ |r| < 0.4 | 弱相关 | 两变量存在微弱线性关系 |\n")
-        L.append("| |r| < 0.2 | 几乎无相关 | 两变量无线性关系 |\n")
+        L.append("| 0 ≤ |r| < 0.2 | 几乎无相关 | 两变量线性关系较弱 |\n")
         L.append("\n")
         L.append("**强相关发现：**\n")
         for lbl, r, n in strong:
@@ -662,7 +653,7 @@ def generate_report_text(data):
     L.append("## 五、典型班级分析\n")
     if top:
         top0 = top[0]
-        L.append(f"以**{tc_name}**作为标杆班级（数据周期内作业总量全校第一）：\n\n")
+        L.append(f"　　以**{tc_name}**作为标杆班级（数据周期内作业总量位居全校前列）：\n\n")
         L.append(f"- 该班共完成**{top0['all_hw_count']}次**作业（所有类目），其中听说模拟**{top0['mock_count']}次**\n")
         L.append(f"- 听说模拟平均得分率高达**{top0['avg_score']}%**，居全校前列\n\n")
 
@@ -815,9 +806,12 @@ def make_charts(data):
         name='作业总量', hovertemplate='%{x}<br>作业量：%{y}次<extra></extra>'
     ))
     fig.update_layout(
-        title=dict(text='图1 月度作业布置总量趋势', font=dict(size=16)),
+        title=dict(text='图1 月度作业总量趋势', font=dict(size=16)),
         xaxis_title='月份', yaxis_title='作业次数',
-        height=420, template='plotly_white', hovermode='x unified', margin=dict(b=40)
+        height=460, template='plotly_white', hovermode='x unified',
+        margin=dict(l=70, r=40, t=90, b=70),
+        xaxis=dict(tickangle=0, automargin=True),
+        yaxis=dict(automargin=True)
     )
     charts['monthly_line'] = fig
 
@@ -828,26 +822,37 @@ def make_charts(data):
         y = [gd.get(m, 0) for m in months]
         fig2.add_trace(go.Scatter(
             name=grade, x=months, y=y,
-            mode='lines+markers', line=dict(width=2.5),
-            marker=dict(size=7, color=GC.get(grade, '#999'))
+            mode='lines+markers+text', line=dict(width=2.5),
+            marker=dict(size=7, color=GC.get(grade, '#999')),
+            text=y, textposition='top center', textfont=dict(size=10),
+            cliponaxis=False
         ))
     fig2.update_layout(
         title=dict(text='图2 各年级月度作业量趋势', font=dict(size=16)),
         xaxis_title='月份', yaxis_title='作业次数',
-        height=400, template='plotly_white'
+        height=440, template='plotly_white',
+        margin=dict(l=70, r=40, t=90, b=70),
+        xaxis=dict(automargin=True),
+        yaxis=dict(automargin=True)
     )
     charts['grade_monthly_line'] = fig2
 
     fig3 = go.Figure()
     for cat in cats:
         y = [data.get('cat_monthly', {}).get(m, {}).get(cat, 0) for m in months]
-        fig3.add_trace(go.Bar(name=cat, x=months, y=y, marker_color=CC.get(cat, '#999')))
+        fig3.add_trace(go.Bar(
+            name=cat, x=months, y=y, marker_color=CC.get(cat, '#999'),
+            text=y, textposition='inside', textfont=dict(size=10), cliponaxis=False
+        ))
     fig3.update_layout(
         barmode='stack',
-        title=dict(text='图3 月度作业大类分布堆叠图', font=dict(size=16)),
+        title=dict(text='图3 各月各类作业量分布', font=dict(size=16)),
         xaxis_title='月份', yaxis_title='作业次数',
-        height=400, template='plotly_white',
-        legend=dict(orientation='h', yanchor='bottom', y=1.02)
+        height=460, template='plotly_white',
+        legend=dict(orientation='h', yanchor='bottom', y=1.02),
+        margin=dict(l=70, r=40, t=100, b=70),
+        xaxis=dict(automargin=True),
+        yaxis=dict(automargin=True)
     )
     charts['cat_stacked'] = fig3
 
@@ -857,11 +862,14 @@ def make_charts(data):
         labels=list(cat_pct.keys()),
         values=list(cat_pct.values()),
         marker_colors=[CC.get(c, '#999') for c in cat_pct.keys()],
-        textinfo='label+percent', hole=0.35
+        textinfo='label+percent',
+        textposition='outside',
+        hole=0.35
     ))
     fig4.update_layout(
         title=dict(text='图4 作业类型占比分布', font=dict(size=16)),
-        height=380, template='plotly_white'
+        height=460, template='plotly_white',
+        margin=dict(l=60, r=60, t=90, b=60)
     )
     charts['cat_pie'] = fig4
 
@@ -876,6 +884,7 @@ def make_charts(data):
         fig5.add_trace(go.Bar(
             x=ms, y=mc, name='月均作业次数',
             marker_color='#F58518', opacity=0.6,
+            text=mc, textposition='outside', textfont=dict(size=10),
             yaxis='y2'
         ))
         # 折线图：月均得分率趋势
@@ -888,9 +897,12 @@ def make_charts(data):
         ))
         fig5.update_layout(
             title=dict(text='图5 听说模拟类月均得分率趋势', font=dict(size=16)),
-            template='plotly_white', height=380,
+            template='plotly_white', height=430,
             legend=dict(orientation='h', yanchor='bottom', y=1.02),
-            hovermode='x unified'
+            hovermode='x unified',
+            margin=dict(l=70, r=70, t=90, b=70),
+            xaxis=dict(automargin=True),
+            yaxis=dict(automargin=True)
         )
         fig5.update_layout(yaxis2=dict(title_text='作业次数', overlaying='y', side='right'))
         fig5.update_yaxes(title_text='得分率（%）', range=[0, 100])
@@ -905,13 +917,18 @@ def make_charts(data):
             ys = [s for m, s in gm]
             fig6.add_trace(go.Scatter(
                 name=grade, x=xs, y=ys,
-                mode='lines+markers', line=dict(width=2.5),
-                marker=dict(size=7, color=GC.get(grade, '#999'))
+                mode='lines+markers+text', line=dict(width=2.5),
+                marker=dict(size=7, color=GC.get(grade, '#999')),
+                text=[f"{v}%" for v in ys], textposition='top center', textfont=dict(size=10),
+                cliponaxis=False
             ))
         fig6.update_layout(
-            title=dict(text='图6 各年级听说模拟得分率月度对比', font=dict(size=16)),
+            title=dict(text='图6 各年级听说模拟得分率趋势', font=dict(size=16)),
             xaxis_title='月份', yaxis_title='得分率（%）',
-            height=380, template='plotly_white', yaxis=dict(range=[0, 100])
+            height=430, template='plotly_white',
+            yaxis=dict(range=[0, 100], automargin=True),
+            margin=dict(l=70, r=40, t=90, b=70),
+            xaxis=dict(automargin=True)
         )
         charts['grade_score'] = fig6
 
@@ -933,13 +950,17 @@ def make_charts(data):
         ))
         fig7.add_trace(go.Bar(
             x=all_months, y=ct_t, name='所有类目布置次数',
-            opacity=0.35, marker_color='#F58518', yaxis='y2'
+            opacity=0.35, marker_color='#F58518', yaxis='y2',
+            text=ct_t, textposition='outside', textfont=dict(size=10)
         ))
         fig7.update_layout(
             title=dict(text=f"图7 {data.get('top_class_name','')}月度作业量与听说模拟得分率组合图", font=dict(size=16)),
-            template='plotly_white', height=380,
+            template='plotly_white', height=430,
             legend=dict(orientation='h', yanchor='bottom', y=1.02),
-            hovermode='x unified'
+            hovermode='x unified',
+            margin=dict(l=70, r=70, t=90, b=70),
+            xaxis=dict(automargin=True),
+            yaxis=dict(automargin=True)
         )
         fig7.update_layout(yaxis2=dict(title_text='布置次数', overlaying='y', side='right'))
         fig7.update_yaxes(title_text='得分率（%）', range=[0, 100])
@@ -1096,15 +1117,9 @@ def export_to_docx(report_md: str, charts: dict = None) -> tuple:
     pending_charts = {}         # 当前节待插入图表 {key: caption}
 
     CHART_MAP = {
-        '三、': {
-            'monthly_line':       '图1  月度作业总量趋势',
-            'grade_monthly_line': '图2  各年级月度作业量趋势',
-            'cat_stacked':        '图3  各月各类作业量分布',
-        },
+        '三、': {},
         '四、': {
-            'cat_pie':       '图4  作业类型占比分布',
             'mock_score':    '图5  听说模拟类月均得分率趋势',
-            'grade_score':   '图6  各年级听说模拟得分率趋势',
         },
         '五、': {
             'top_class_trend': '图7  标杆班级月度作业量与得分率组合图',
@@ -1159,14 +1174,22 @@ def export_to_docx(report_md: str, charts: dict = None) -> tuple:
             add_para(sub_text, '楷体_GB2312', 16, True,
                      WD_ALIGN_PARAGRAPH.LEFT, first_indent=False,
                      space_before=6, space_after=3)
-            # ── 图表位置优化：
-            # • 图1月总量、图2年级趋势 → 放在 3.3 末尾（flush）
-            # • 图3分类堆叠   → 放在 3.4 末尾（flush）
-            # • 图5得分率组合图（柱状+折线）→ 已在四、，无需操作
-            if sub_text in ('3.3 应用频次分析',):
-                flush_section_charts()
-            elif sub_text in ('3.4 应用方式分析',):
-                flush_section_charts()
+
+            # 按小节精确控制图表位置
+            if sub_text == '3.3 应用频次分析':
+                if charts and 'monthly_line' in charts:
+                    add_chart_image('monthly_line', '图1  月度作业总量趋势', width=Cm(13), height=Cm(6.5))
+                if charts and 'grade_monthly_line' in charts:
+                    add_chart_image('grade_monthly_line', '图2  各年级月度作业量趋势', width=Cm(13), height=Cm(6.5))
+            elif sub_text == '3.4 应用方式分析':
+                # 用户要求图3与图4顺序对调：正文内先图4后图3
+                if charts and 'cat_pie' in charts:
+                    add_chart_image('cat_pie', '图4  作业类型占比分布', width=Cm(13), height=Cm(6.5))
+                if charts and 'cat_stacked' in charts:
+                    add_chart_image('cat_stacked', '图3  各月各类作业量分布', width=Cm(13), height=Cm(6.5))
+            elif sub_text == '4.1 成绩数据对比':
+                if charts and 'grade_score' in charts:
+                    add_chart_image('grade_score', '图6  各年级听说模拟得分率趋势', width=Cm(13), height=Cm(6.5))
             i += 1; continue
 
         # ── 段落（处理内联加粗）────────────────────────────────
