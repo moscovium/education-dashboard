@@ -6,7 +6,7 @@ const MAX_STORAGE_MB = 500; // 最大存储限制（MB）
 let db = null;
 const AppState = { files: [], filteredData: [], cache: new Map(), provinces: new Set(), cities: new Set(), districts: new Set(), schools: new Set(), grades: new Set() };
 const elements = {};
-const APP_VERSION = 'v2.2.8-root-20260414a';
+const APP_VERSION = 'v2.2.9-root-20260416c';
 const getClassId = (r = {}) => r['班级 id'] || r['班级ID'] || r['班级id'] || r['班级'] || r['classId'] || r['class_id'] || '';
 const buildWeekMetaMap = (groupMap) => {
     const weekMetaMap = new Map();
@@ -1200,7 +1200,10 @@ function renderMet() {
     // 覆盖班级：筛选项下班级总数（按班级ID去重）- 基于实际筛选结果
     const cls = new Set(AppState.filteredData.map(r => getClassId(r)).filter(Boolean));
     const clsCount = cls.size;
-    const stu = AppState.filteredData.reduce((s, r) => s + (+r['总学生数'] || 0), 0);
+    const weeksForSum = [...new Set(AppState.filteredData.map(r => r.weekStartDate))].sort();
+    const lastWeekForSum = weeksForSum[weeksForSum.length - 1];
+    const lastWeekDataForSum = AppState.filteredData.filter(r => r.weekStartDate === lastWeekForSum);
+    const stu = lastWeekDataForSum.reduce((s, r) => s + (+r['总学生数'] || 0), 0);
     
     // 平均布置作业次数 = 布置作业次数求和 / 班级数求和
     const avgAssignments = clsCount > 0 ? (ta / clsCount).toFixed(1) : 0;
@@ -1219,8 +1222,11 @@ function renderMet() {
     // 1.1 总学生数
     elements.studentCount.textContent = stu.toLocaleString();
     
-    // 1.2 未过期付费学生数：基于筛选后的选项直接求和
-    const paidNotExpired = AppState.filteredData.reduce((s, r) => s + (+r['未过期付费学生数'] || 0), 0);
+    // 1.2 未过期付费学生数：基于筛选条件，仅取最后一周数据求和
+    const weeks = [...new Set(AppState.filteredData.map(r => r.weekStartDate))].sort();
+    const lastWeekStart = weeks[weeks.length - 1];
+    const lastWeekData = AppState.filteredData.filter(r => r.weekStartDate === lastWeekStart);
+    const paidNotExpired = lastWeekData.reduce((s, r) => s + (+r['未过期付费学生数'] || 0), 0);
     elements.paidNotExpired.textContent = paidNotExpired.toLocaleString();
     
     // 1.3 转化率
