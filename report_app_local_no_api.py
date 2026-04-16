@@ -17,6 +17,8 @@ from report_app_core import (
 
 st.set_page_config(page_title="E听说成效报告系统", page_icon="📊", layout="wide")
 
+APP_VERSION = f"v{datetime.now().strftime('%Y%m%d')}"
+
 with st.sidebar:
     st.title("📋 使用说明")
     st.markdown("""
@@ -36,7 +38,7 @@ with st.sidebar:
     st.caption("纯本地/纯数据版")
 
 st.title("E听说 成效报告系统")
-st.caption("上传 Excel 后自动生成报告与图表（无 API Key 版）")
+st.caption(f"上传 Excel 后自动生成报告与图表（无 API Key 版）｜版本 {APP_VERSION}")
 
 col1, col2, col3 = st.columns(3)
 with col1:
