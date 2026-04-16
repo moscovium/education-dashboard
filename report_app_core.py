@@ -806,7 +806,7 @@ def make_charts(data):
         name='作业总量', hovertemplate='%{x}<br>作业量：%{y}次<extra></extra>'
     ))
     fig.update_layout(
-        title=dict(text='图1 月度作业总量趋势', font=dict(size=16)),
+        title=None,
         xaxis_title='月份', yaxis_title='作业次数',
         height=460, template='plotly_white', hovermode='x unified',
         margin=dict(l=70, r=40, t=90, b=70),
@@ -828,7 +828,7 @@ def make_charts(data):
             cliponaxis=False
         ))
     fig2.update_layout(
-        title=dict(text='图2 各年级月度作业量趋势', font=dict(size=16)),
+        title=None,
         xaxis_title='月份', yaxis_title='作业次数',
         height=440, template='plotly_white',
         margin=dict(l=70, r=40, t=90, b=70),
@@ -846,7 +846,7 @@ def make_charts(data):
         ))
     fig3.update_layout(
         barmode='stack',
-        title=dict(text='图3 各月各类作业量分布', font=dict(size=16)),
+        title=None,
         xaxis_title='月份', yaxis_title='作业次数',
         height=460, template='plotly_white',
         legend=dict(orientation='h', yanchor='bottom', y=1.02),
@@ -867,7 +867,7 @@ def make_charts(data):
         hole=0.35
     ))
     fig4.update_layout(
-        title=dict(text='图4 作业类型占比分布', font=dict(size=16)),
+        title=None,
         height=460, template='plotly_white',
         margin=dict(l=60, r=60, t=90, b=60)
     )
@@ -896,7 +896,7 @@ def make_charts(data):
             yaxis='y'
         ))
         fig5.update_layout(
-            title=dict(text='图5 听说模拟类月均得分率趋势', font=dict(size=16)),
+            title=None,
             template='plotly_white', height=430,
             legend=dict(orientation='h', yanchor='bottom', y=1.02),
             hovermode='x unified',
@@ -923,7 +923,7 @@ def make_charts(data):
                 cliponaxis=False
             ))
         fig6.update_layout(
-            title=dict(text='图6 各年级听说模拟得分率趋势', font=dict(size=16)),
+            title=None,
             xaxis_title='月份', yaxis_title='得分率（%）',
             height=430, template='plotly_white',
             yaxis=dict(range=[0, 100], automargin=True),
@@ -954,7 +954,7 @@ def make_charts(data):
             text=ct_t, textposition='outside', textfont=dict(size=10)
         ))
         fig7.update_layout(
-            title=dict(text=f"图7 {data.get('top_class_name','')}月度作业量与听说模拟得分率组合图", font=dict(size=16)),
+            title=None,
             template='plotly_white', height=430,
             legend=dict(orientation='h', yanchor='bottom', y=1.02),
             hovermode='x unified',
@@ -1016,7 +1016,7 @@ def export_to_docx(report_md: str, charts: dict = None) -> tuple:
         para.alignment = align
         pf = para.paragraph_format
         if first_indent:
-            pf.first_line_indent = Cm(0.74)
+            pf.first_line_indent = Pt(32)
         pf.space_before = Pt(space_before)
         pf.space_after = Pt(space_after)
         pf.line_spacing = Pt(line_spacing)
@@ -1207,16 +1207,15 @@ def export_to_docx(report_md: str, charts: dict = None) -> tuple:
 
             if any(b for _, b in segments):
                 p = doc.add_paragraph()
-                para_fmt(p, WD_ALIGN_PARAGRAPH.JUSTIFY, first_indent=(active_section in ('三、', '四、', '五、', '六、', '七、')), space_before=0, space_after=3, line_spacing=31)
+                para_fmt(p, WD_ALIGN_PARAGRAPH.JUSTIFY, first_indent=True, space_before=0, space_after=3, line_spacing=31)
                 for text, bold in segments:
                     r = p.add_run(text)
                     set_font(r, '仿宋_GB2312', 16, bold)
             else:
                 clean = re.sub(r'\*\*(.+?)\*\*', r'\1', line).strip()
                 if clean:
-                    fi = (active_section in ('三、', '四、', '五、', '六、', '七、'))
                     add_para(clean, '仿宋_GB2312', 16, False,
-                             WD_ALIGN_PARAGRAPH.JUSTIFY, first_indent=fi, space_before=0, space_after=3)
+                             WD_ALIGN_PARAGRAPH.JUSTIFY, first_indent=True, space_before=0, space_after=3)
             i += 1; continue
 
         # ── 列表项（处理加粗）────────────────────────────────
