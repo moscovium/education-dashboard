@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>教育数据看板 - 作业完成情况监测</title>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/dayjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/locale/zh-cn.js"></script>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        /* 进度条样式 */
+        #uploadProgress {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            z-index: 10001;
+            min-width: 400px;
+            text-align: center;
+        }
+        #uploadProgress.show {
+            display: block;
+            animation: fadeIn 0.3s ease-out;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 20px 0 10px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        .progress-text {
+            font-size: 14px;
+            color: #666;
+            margin-top: 8px;
+        }
+        .progress-stats {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            color: #999;
+            margin-top: 8px;
+        }
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 10000;
+        }
+        .overlay.show {
+            display: block;
+        }
+        /* 虚拟滚动表格 */
+        .table-wrapper {
+            max-height: 600px;
+            overflow: auto;
+            position: relative;
+        }
+        /* 表头冻结 */
+        .data-table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        /* 缩小行距 */
+        .data-table thead + tbody tr,
+        .data-table tbody tr {
+            line-height: 1.2 !important;
+        }
+        .data-table thead + tbody td,
+        .data-table tbody td {
+            padding: 6px 12px !important;
+            font-size: 12px !important;
+        }
+        .data-table thead th {
+            padding: 8px 12px !important;
+            font-size: 11px !important;
+        }
+        /* 分页样式 */
+        .pagination-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+        }
+        .pagination-info {
+            font-size: 13px;
+            color: #64748b;
+        }
+        .pagination-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .pagination-btn {
+            padding: 8px 14px;
+            border: 1px solid #e2e8f0;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        .pagination-btn:hover:not(:disabled) {
+            border-color: #3b82f6;
+            color: #3b82f6;
+        }
+        .pagination-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .pagination-btn.active {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+            border-color: #3b82f6;
+        }
+        .pagination-jump {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: #64748b;
+        }
+        .pagination-jump input {
+            width: 60px;
+            padding: 6px 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            text-align: center;
+            font-size: 13px;
+        }
+        .pagination-jump input:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+        /* 分页样式 */
+        .pagination-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+        }
+        .pagination-info {
+            font-size: 13px;
+            color: #64748b;
+        }
+        .pagination-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .pagination-btn {
+            padding: 8px 14px;
+            border: 1px solid #e2e8f0;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        .pagination-btn:hover:not(:disabled) {
+            border-color: #3b82f6;
+            color: #3b82f6;
+        }
+        .pagination-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .pagination-btn.active {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+            border-color: #3b82f6;
+        }
+        .pagination-jump {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: #64748b;
+        }
+        .pagination-jump input {
+            width: 60px;
+            padding: 6px 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            text-align: center;
+            font-size: 13px;
+        }
+        .pagination-jump input:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+    </style>
+</head>
+<body>
+    <!-- 进度弹窗 -->
+    <div class="overlay" id="overlay"></div>
+    <div id="uploadProgress">
+        <div style="font-size: 48px; margin-bottom: 16px;">📊</div>
+        <h3 id="progressTitle">正在解析 Excel 文件...</h3>
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <div class="progress-text" id="progressText">0%</div>
+        <div class="progress-stats">
+            <span id="progressStats">0 / 0 条记录</span>
+            <span id="progressSpeed">0 条/秒</span>
+        </div>
+        <p style="margin-top: 20px; font-size: 13px; color: #999;">
+            ⏱️ 预计剩余时间：<span id="progressETA">计算中...</span>
+        </p>
+    </div>
+
+    <div class="dashboard-container">
+        <!-- 头部 -->
+        <header class="dashboard-header">
+            <div class="header-content">
+                <h1 class="dashboard-title">
+                    <span class="title-icon">📊</span>
+                    教育数据看板
+                </h1>
+                <p class="dashboard-subtitle">转化率与作业完成情况监测 - 基于班级 ID 关联</p>
+                <div id="debugBar" style="margin-top:8px;font-size:12px;color:#475569;display:flex;gap:12px;flex-wrap:wrap;">页面版本占位：root-20260416b</div>
+            </div>
+        </header>
+
+        <!-- 上传区域 -->
+        <section class="upload-section">
+            <div class="section-header">
+                <h2 class="section-title">
+                    <span class="section-icon">📁</span>
+                    每周数据上传
+                </h2>
+            </div>
+            
+            <div style="text-align: center; padding: 20px 0;">
+                <input type="file" id="fileInput" accept=".xlsx,.xls" multiple style="display: none;">
+                <label for="fileInput" id="uploadBtn" class="btn btn-primary" style="font-size: 16px; padding: 16px 32px; display: inline-block; cursor: pointer;">
+                    📁 选择 Excel 文件上传
+                </label>
+                <p style="margin-top: 16px; color: #666; font-size: 13px;">
+                    支持格式：20260316-20260322_作业数据.xlsx<br>
+                    或将文件拖拽到此页面任意位置
+                </p>
+            </div>
+        </section>
+
+        <!-- 筛选区域 -->
+        <section class="filter-section">
+            <div class="section-header">
+                <h2 class="section-title">
+                    <span class="section-icon">🔍</span>
+                    数据筛选
+                </h2>
+            </div>
+
+            <!-- 搜索模式切换 -->
+            <div class="search-mode-toggle">
+                <button id="modeFilter" class="mode-btn active">
+                    <span class="btn-icon">🔍</span>
+                    条件筛选
+                </button>
+                <button id="modeSearch" class="mode-btn">
+                    <span class="btn-icon">⚡</span>
+                    快速搜索
+                </button>
+            </div>
+
+            <!-- 条件筛选模式 -->
+            <div id="filterMode" class="filter-mode">
+                <!-- 时间段独立区域 -->
+                <div class="filter-section-title">
+                    <span class="section-icon">📅</span>
+                    时间段
+                </div>
+                <div class="date-range-wrapper">
+                    <div class="date-range-inputs">
+                        <input type="date" id="startDate" class="date-input">
+                        <span class="date-separator">至</span>
+                        <input type="date" id="endDate" class="date-input">
+                    </div>
+                    <div class="date-range-info" id="dateRangeInfo">
+                        <small>📊 可筛选范围： -- ~ --</small>
+                    </div>
+                </div>
+
+                <!-- 条件筛选独立区域 -->
+                <div class="filter-section-title">
+                    <span class="section-icon">🔍</span>
+                    条件筛选
+                </div>
+                <div class="filter-grid">
+                    <div class="filter-group">
+                        <label class="filter-label">
+                            <span class="label-icon">📍</span>
+                            省份
+                        </label>
+                        <select id="provinceSelect" class="filter-select">
+                            <option value="">全部省份</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label class="filter-label">
+                            <span class="label-icon">🏙️</span>
+                            城市
+                        </label>
+                        <select id="citySelect" class="filter-select">
+                            <option value="">全部城市</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label class="filter-label">
+                            <span class="label-icon">🏘️</span>
+                            区县
+                        </label>
+                        <select id="districtSelect" class="filter-select">
+                            <option value="">全部区县</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label class="filter-label">
+                            <span class="label-icon">🏫</span>
+                            学校
+                        </label>
+                        <input type="text" id="schoolFilterInput" class="filter-select" placeholder="搜索学校..." style="width:130px;">
+                        <select id="schoolSelect" class="filter-select" style="width:130px;">
+                            <option value="">全部学校</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label class="filter-label">
+                            <span class="label-icon">📚</span>
+                            年级
+                        </label>
+                        <select id="gradeSelect" class="filter-select">
+                            <option value="">全部年级</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 快速搜索模式 -->
+            <div id="searchMode" class="search-mode" style="display: none;">
+                <div class="search-input-wrapper">
+                    <input type="text" id="schoolSearchInput" class="search-input" placeholder="输入学校名称关键词，如'实验'、'外国语'...">
+                    <button id="quickSearchBtn" class="btn btn-primary">
+                        <span class="btn-icon">🔍</span>
+                        搜索
+                    </button>
+                </div>
+                <p class="search-hint">💡 支持模糊搜索，输入部分校名即可查找</p>
+            </div>
+
+            <div class="filter-actions-bar">
+                <button id="applyFilter" class="btn btn-primary">
+                    <span class="btn-icon">🔍</span>
+                    应用筛选
+                </button>
+                <button id="resetFilter" class="btn btn-secondary">
+                    <span class="btn-icon">🔄</span>
+                    重置
+                </button>
+                <button id="clearAllBtn" class="btn btn-danger" style="margin-left: auto;">
+                    <span class="btn-icon">🗑️</span>
+                    清空全部
+                </button>
+                <span class="filter-status">共 <strong id="dataCount">0</strong> 条数据</span>
+            </div>
+        </section>
+
+        <!-- 已上传数据管理 -->
+        <section class="uploaded-section" id="uploadedSection" style="display: none;">
+            <div class="section-header">
+                <h2 class="section-title">
+                    <span class="section-icon">📁</span>
+                    已上传的周次数据
+                </h2>
+                <button id="batchDeleteBtn" class="btn btn-danger btn-small">
+                    <span class="btn-icon">🗑️</span>
+                    批量删除
+                </button>
+            </div>
+            <div class="weeks-grid" id="weeksGrid"></div>
+        </section>
+
+        <!-- 核心指标卡片 -->
+        <section class="metrics-section" id="metricsSection" style="display: none;">
+            <div class="metrics-grid">
+                <!-- 1.1 总学生数 -->
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <span class="metric-icon">👨</span>
+                        <span class="metric-title">学生总数</span>
+                    </div>
+                    <div class="metric-value" id="studentCount">--</div>
+                    <div class="metric-subtitle">名学生</div>
+                </div>
+
+                <!-- 1.2 未过期付费学生数 -->
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <span class="metric-icon">💰</span>
+                        <span class="metric-title">未过期付费学生数</span>
+                    </div>
+                    <div class="metric-value" id="paidNotExpired">--</div>
+                    <div class="metric-subtitle">最后一周</div>
+                </div>
+
+                <!-- 1.3 转化率 -->
+                <div class="metric-card metric-primary">
+                    <div class="metric-header">
+                        <span class="metric-icon">📊</span>
+                        <span class="metric-title">转化率</span>
+                    </div>
+                    <div class="metric-value" id="conversionRate">--</div>
+                    <div class="metric-subtitle">平均转化率</div>
+                </div>
+
+                <!-- 1.4 覆盖班级 -->
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <span class="metric-icon">📚</span>
+                        <span class="metric-title">覆盖班级</span>
+                    </div>
+                    <div class="metric-value" id="classCount">--</div>
+                    <div class="metric-subtitle">个班级</div>
+                </div>
+
+                <!-- 1.5 平均布置作业次数（新增） -->
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <span class="metric-icon">📈</span>
+                        <span class="metric-title">平均布置作业次数</span>
+                    </div>
+                    <div class="metric-value" id="avgAssignments">--</div>
+                    <div class="metric-subtitle">布置次数/班级数</div>
+                </div>
+
+                <!-- 1.6 作业完成率 -->
+                <div class="metric-card metric-primary">
+                    <div class="metric-header">
+                        <span class="metric-icon">✅</span>
+                        <span class="metric-title">作业完成率</span>
+                    </div>
+                    <div class="metric-value" id="avgCompletionRate">--</div>
+                    <div class="metric-subtitle">平均完成比例</div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- 数据可视化区域 -->
+        <section class="charts-section" id="chartsSection" style="display: none;">
+            <div class="section-header">
+                <h2 class="section-title">
+                    <span class="section-icon">📈</span>
+                    趋势分析
+                </h2>
+            </div>
+
+            <div class="charts-grid">
+                <div class="chart-card chart-card-wide">
+                    <div class="chart-header">
+                        <h3 class="chart-title">布置作业情况（组合图）</h3>
+                        <p class="chart-subtitle">柱状图：布置作业次数 | 折线图：作业完成率</p>
+                    </div>
+                    <div class="chart-container" id="comboChart"></div>
+                </div>
+
+                <div class="chart-card chart-card-wide">
+                    <div class="chart-header">
+                        <h3 class="chart-title">转化率趋势（组合图）</h3>
+                        <p class="chart-subtitle">柱状图：未过期付费学生数 | 折线图：转化率</p>
+                    </div>
+                    <div class="chart-container" id="conversionChart"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 数据表格 -->
+        <section class="table-section" id="tableSection" style="display: none;">
+            <div class="section-header">
+                <h2 class="section-title">
+                    <span class="section-icon">📋</span>
+                    班级数据明细
+                </h2>
+                <div class="table-actions">
+                    <button class="btn btn-small btn-export" id="exportBtn">
+                        <span class="btn-icon">📥</span>
+                        导出 CSV
+                    </button>
+                </div>
+            </div>
+            <div class="table-wrapper">
+                <table class="data-table" id="dataTable">
+                    <thead>
+                        <tr>
+                            <th>周次</th>
+                            <th>日期范围</th>
+                            <th>省份</th>
+                            <th>城市</th>
+                            <th>区县</th>
+                            <th>学校</th>
+                            <th>年级</th>
+                            <th>班级</th>
+                            <th>班级 ID</th>
+                            <th>学生数</th>
+                            <th>转化率</th>
+                            <th>布置作业次数</th>
+                            <th>作业完成率</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- 高价值学校年级筛选 -->
+        <section class="high-value-section" id="highValueSection" style="display: none;">
+            <div class="section-header">
+                <h2 class="section-title">
+                    <span class="section-icon">⭐</span>
+                    高价值学校/年级
+                </h2>
+            </div>
+            
+            <!-- 高价值筛选条件 -->
+            <div class="high-value-filters">
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <label class="filter-label">
+                            <span class="label-icon">📍</span>
+                            省份
+                        </label>
+                        <select id="hvProvinceSelect" class="filter-select">
+                            <option value="">全部省份</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">
+                            <span class="label-icon">🏙️</span>
+                            城市
+                        </label>
+                        <select id="hvCitySelect" class="filter-select">
+                            <option value="">全部城市</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">
+                            <span class="label-icon">🏘️</span>
+                            区县
+                        </label>
+                        <select id="hvDistrictSelect" class="filter-select">
+                            <option value="">全部区县</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">
+                            <span class="label-icon">📚</span>
+                            年级
+                        </label>
+                        <select id="hvGradeSelect" class="filter-select">
+                            <option value="">全部年级</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <label class="filter-label">
+                            <span class="label-icon">💰</span>
+                            年级付费率
+                        </label>
+                        <select id="hvPayRateSelect" class="filter-select">
+                            <option value="">不限</option>
+                            <option value="60">≤60%</option>
+                            <option value="40">≤40%</option>
+                            <option value="20">≤20%</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">
+                            <span class="label-icon">📝</span>
+                            年级作业布置率
+                        </label>
+                        <select id="hvAssignRateSelect" class="filter-select">
+                            <option value="">不限</option>
+                            <option value="50">≥50%</option>
+                            <option value="80">≥80%</option>
+                            <option value="100">=100%</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">
+                            <span class="label-icon">✅</span>
+                            年级平均完成率
+                        </label>
+                        <select id="hvCompletionRateSelect" class="filter-select">
+                            <option value="">不限</option>
+                            <option value="30">≥30%</option>
+                            <option value="50">≥50%</option>
+                            <option value="70">≥70%</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">
+                            <span class="label-icon">👥</span>
+                            年级未过期试用人数
+                        </label>
+                        <select id="hvTrialCountSelect" class="filter-select">
+                            <option value="">不限</option>
+                            <option value="150">≥150人</option>
+                            <option value="300">≥300人</option>
+                            <option value="500">≥500人</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">
+                            <span class="label-icon">🏷️</span>
+                            学校定义
+                        </label>
+                        <select id="hvSchoolCategorySelect" class="filter-select">
+                            <option value="">不限</option>
+                            <option value="付费校">付费校</option>
+                            <option value="付费率需提升校">付费率需提升校</option>
+                            <option value="试用校">试用校</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="filter-actions">
+                    <button id="applyHighValueFilter" class="btn btn-primary btn-small">
+                        <span class="btn-icon">🔍</span>
+                        应用筛选
+                    </button>
+                    <button id="resetHighValueFilter" class="btn btn-secondary btn-small">
+                        <span class="btn-icon">🔄</span>
+                        重置
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 高价值学校年级列表 -->
+            <div class="high-value-table-wrapper">
+                <table class="data-table" id="highValueTable">
+                    <thead id="highValueTableHead">
+                        <tr>
+                            <th>省份</th>
+                            <th>城市</th>
+                            <th>区县</th>
+                            <th>学校</th>
+                            <th>学校定义</th>
+                            <th>年级</th>
+                            <th>班级数</th>
+                            <th>学生总数</th>
+                            <th>未过期试用人数</th>
+                            <th>年级付费率</th>
+                        </tr>
+                    </thead>
+                    <tbody id="highValueTableBody"></tbody>
+                </table>
+            </div>
+            <div class="high-value-info" id="highValueInfo"></div>
+        </section>
+
+        <!-- 空状态 -->
+        <section class="empty-state" id="emptyState">
+            <div class="empty-icon">📂</div>
+            <h3>暂无数据</h3>
+            <p>请先上传 Excel 数据文件</p>
+            <p class="empty-hint">文件格式：20260316-20260322_作业数据.xlsx</p>
+        </section>
+    </div>
+
+    <script>
+        window.__ROOT_DEPLOY_MARKER__='root-20260416b';
+        document.addEventListener('DOMContentLoaded', function () {
+            var input = document.getElementById('fileInput');
+            var debugBar = document.getElementById('debugBar');
+            if (debugBar) debugBar.textContent = '页面版本占位：root-20260416b';
+            if (input) {
+                input.addEventListener('change', function (e) {
+                    var files = Array.from((e.target && e.target.files) || []);
+                    if (debugBar) {
+                        debugBar.textContent = files.length
+                            ? '原生 change 已触发：' + files.map(function (f) { return f.name; }).join(' | ')
+                            : '原生 change 已触发，但未读取到文件';
+                    }
+                }, true);
+            } else if (debugBar) {
+                debugBar.textContent = '未找到 fileInput';
+            }
+        });
+    </script>
+    <script src="app.js?v=20260416b"></script>
+</body>
+</html>
