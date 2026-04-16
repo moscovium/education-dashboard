@@ -580,71 +580,62 @@ function cascade(lvl) {
     let allRecs = [];
     AppState.cache.forEach(d => allRecs.push(...d));
     if (allRecs.length === 0) return;
-    
-    // 获取最后一周的数据（按weekStartDate排序）
+
     const weekStarts = [...new Set(allRecs.map(r => r.weekStartDate))].sort();
     const lastWeekStart = weekStarts[weekStarts.length - 1] || '';
-    let recs = allRecs.filter(r => r.weekStartDate === lastWeekStart);
-    
-    // 获取当前选中值
-    const selProvince = elements.provinceSelect.value;
-    const selCity = elements.citySelect.value;
-    const selDistrict = elements.districtSelect.value;
-    const selSchool = elements.schoolSelect.value;
-    
-    // 根据上级筛选条件下钻
-    if (selProvince) recs = recs.filter(r => r['省份'] === selProvince);
-    if (selCity) recs = recs.filter(r => r['城市'] === selCity);
-    if (selDistrict) recs = recs.filter(r => r['区县'] === selDistrict);
-    if (selSchool) recs = recs.filter(r => r['学校名称'] === selSchool);
-    
-    // 省份下拉框 - 只用最后一周的省份
-    const provinces = [...new Set(recs.map(r => r['省份']).filter(Boolean))];
+    const lastWeekRecs = allRecs.filter(r => r.weekStartDate === lastWeekStart);
+
+    let selProvince = elements.provinceSelect.value;
+    let selCity = elements.citySelect.value;
+    let selDistrict = elements.districtSelect.value;
+    let selSchool = elements.schoolSelect.value;
+    let selGrade = elements.gradeSelect.value;
+
+    const provinces = [...new Set(lastWeekRecs.map(r => r['省份']).filter(Boolean))];
     updateSel(elements.provinceSelect, new Set(provinces));
-    elements.provinceSelect.value = selProvince && provinces.includes(selProvince) ? selProvince : '';
-    
-    // 城市下拉框 - 受省份筛选影响
-    let cityRecs = allRecs.filter(r => r.weekStartDate === lastWeekStart);
+    if (!provinces.includes(selProvince)) selProvince = '';
+    elements.provinceSelect.value = selProvince;
+
+    let cityRecs = lastWeekRecs;
     if (selProvince) cityRecs = cityRecs.filter(r => r['省份'] === selProvince);
     const cities = [...new Set(cityRecs.map(r => r['城市']).filter(Boolean))];
     updateSel(elements.citySelect, new Set(cities));
-    elements.citySelect.value = selCity && cities.includes(selCity) ? selCity : '';
-    
-    // 区县下拉框 - 受省、市筛选影响
-    let districtRecs = allRecs.filter(r => r.weekStartDate === lastWeekStart);
+    if (!cities.includes(selCity)) selCity = '';
+    elements.citySelect.value = selCity;
+
+    let districtRecs = lastWeekRecs;
     if (selProvince) districtRecs = districtRecs.filter(r => r['省份'] === selProvince);
     if (selCity) districtRecs = districtRecs.filter(r => r['城市'] === selCity);
     const districts = [...new Set(districtRecs.map(r => r['区县']).filter(Boolean))];
     updateSel(elements.districtSelect, new Set(districts));
-    elements.districtSelect.value = selDistrict && districts.includes(selDistrict) ? selDistrict : '';
-    
-    // 学校下拉框 - 受省、市、区筛选影响
-    let schoolRecs = allRecs.filter(r => r.weekStartDate === lastWeekStart);
+    if (!districts.includes(selDistrict)) selDistrict = '';
+    elements.districtSelect.value = selDistrict;
+
+    let schoolRecs = lastWeekRecs;
     if (selProvince) schoolRecs = schoolRecs.filter(r => r['省份'] === selProvince);
     if (selCity) schoolRecs = schoolRecs.filter(r => r['城市'] === selCity);
     if (selDistrict) schoolRecs = schoolRecs.filter(r => r['区县'] === selDistrict);
     const schools = [...new Set(schoolRecs.map(r => r['学校名称']).filter(Boolean))];
     updateSel(elements.schoolSelect, new Set(schools));
-    elements.schoolSelect.value = selSchool && schools.includes(selSchool) ? selSchool : '';
-    
-    // 年级下拉框 - 受所有上级筛选影响
-    let gradeRecs = allRecs.filter(r => r.weekStartDate === lastWeekStart);
+    if (!schools.includes(selSchool)) selSchool = '';
+    elements.schoolSelect.value = selSchool;
+
+    let gradeRecs = lastWeekRecs;
     if (selProvince) gradeRecs = gradeRecs.filter(r => r['省份'] === selProvince);
     if (selCity) gradeRecs = gradeRecs.filter(r => r['城市'] === selCity);
     if (selDistrict) gradeRecs = gradeRecs.filter(r => r['区县'] === selDistrict);
     if (selSchool) gradeRecs = gradeRecs.filter(r => r['学校名称'] === selSchool);
     const grades = [...new Set(gradeRecs.map(r => r['年级']).filter(Boolean))];
     updateSel(elements.gradeSelect, new Set(grades));
-    elements.gradeSelect.value = elements.gradeSelect.value && grades.includes(elements.gradeSelect.value) ? elements.gradeSelect.value : '';
-    
-    // 启用所有下拉框
+    if (!grades.includes(selGrade)) selGrade = '';
+    elements.gradeSelect.value = selGrade;
+
     elements.provinceSelect.disabled = false;
     elements.citySelect.disabled = false;
     elements.districtSelect.disabled = false;
     elements.schoolSelect.disabled = false;
     elements.gradeSelect.disabled = false;
-    
-    // 更新高价值筛选下拉选项
+
     updateHighValueSels();
 }
 
@@ -1010,7 +1001,8 @@ function resetHighValueFilter() {
     elements.hvTrialCountSelect.value = '';
     elements.hvSchoolCategorySelect.value = '';
     updateHighValueSels();
-    elements.highValueSection.style.display = 'none';
+    renderHighValueTable([], []);
+    elements.highValueSection.style.display = AppState.filteredData.length ? 'block' : 'none';
     showMsg('✅ 已重置', 'success');
 }
 
@@ -1227,11 +1219,8 @@ function renderMet() {
     // 1.1 总学生数
     elements.studentCount.textContent = stu.toLocaleString();
     
-    // 1.2 未过期付费学生数（仅取最后一周）
-    const weeks = [...new Set(AppState.filteredData.map(r => r.weekStartDate))].sort();
-    const lastWeekStart = weeks[weeks.length - 1];
-    const lastWeekData = AppState.filteredData.filter(r => r.weekStartDate === lastWeekStart);
-    const paidNotExpired = lastWeekData.reduce((s, r) => s + (+r['未过期付费学生数'] || 0), 0);
+    // 1.2 未过期付费学生数：基于筛选后的选项直接求和
+    const paidNotExpired = AppState.filteredData.reduce((s, r) => s + (+r['未过期付费学生数'] || 0), 0);
     elements.paidNotExpired.textContent = paidNotExpired.toLocaleString();
     
     // 1.3 转化率
