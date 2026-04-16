@@ -1,3 +1,13 @@
+---
+title: E听说成效报告系统
+emoji: 📊
+colorFrom: blue
+colorTo: indigo
+sdk: streamlit
+app_file: report_app_local_no_api.py
+pinned: false
+---
+
 # E听说成效报告系统
 
 一个基于上传 Excel 数据自动生成成效报告的 Streamlit 应用。

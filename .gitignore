@@ -22,3 +22,6 @@ reports/
 
 # Build artifacts (dashboard-deploy is served from gh-pages branch)
 dashboard-deploy/
+
+# Local data imports
+*.xlsx
