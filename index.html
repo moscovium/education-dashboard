@@ -243,8 +243,8 @@
                     教育数据看板
                 </h1>
                 <p class="dashboard-subtitle">转化率与作业完成情况监测 - 基于班级 ID 关联</p>
-                <div id="debugBar" style="margin-top:8px;font-size:12px;color:#475569;display:flex;gap:12px;flex-wrap:wrap;">页面版本占位：root-20260416c</div>
-                <div id="pageVersion" style="margin-top:6px;font-size:12px;color:#0f172a;font-weight:600;background:#e2e8f0;display:inline-block;padding:4px 10px;border-radius:999px;">页面版本：v20260416c</div>
+                <div id="debugBar" style="margin-top:8px;font-size:12px;color:#475569;display:flex;gap:12px;flex-wrap:wrap;">页面版本占位：root-20260418a</div>
+                <div id="pageVersion" style="margin-top:6px;font-size:12px;color:#0f172a;font-weight:600;background:#e2e8f0;display:inline-block;padding:4px 10px;border-radius:999px;">页面版本：v20260418a</div>
             </div>
         </header>
 
@@ -530,6 +530,7 @@
                             <th>区县</th>
                             <th>学校</th>
                             <th>年级</th>
+                            <th>老师</th>
                             <th>班级</th>
                             <th>班级 ID</th>
                             <th>学生数</th>
@@ -589,6 +590,18 @@
                         </label>
                         <select id="hvGradeSelect" class="filter-select">
                             <option value="">全部年级</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">
+                            <span class="label-icon">👨</span>
+                            年级总数
+                        </label>
+                        <select id="hvStudentCountSelect" class="filter-select">
+                            <option value="">不限</option>
+                            <option value="200">≥200人</option>
+                            <option value="400">≥400人</option>
+                            <option value="800">≥800人</option>
                         </select>
                     </div>
                 </div>
@@ -699,11 +712,11 @@
     </div>
 
     <script>
-        window.__ROOT_DEPLOY_MARKER__='root-20260416c';
+        window.__ROOT_DEPLOY_MARKER__='root-20260418a';
         document.addEventListener('DOMContentLoaded', function () {
             var input = document.getElementById('fileInput');
             var debugBar = document.getElementById('debugBar');
-            if (debugBar) debugBar.textContent = '页面版本占位：root-20260416c';
+            if (debugBar) debugBar.textContent = '页面版本占位：root-20260418a';
             if (input) {
                 input.addEventListener('change', function (e) {
                     var files = Array.from((e.target && e.target.files) || []);
@@ -718,6 +731,6 @@
             }
         });
     </script>
-    <script src="app.js?v=20260416c"></script>
+    <script src="app.js?v=20260418a"></script>
 </body>
 </html>

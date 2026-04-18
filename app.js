@@ -6,7 +6,7 @@ const MAX_STORAGE_MB = 500; // 最大存储限制（MB）
 let db = null;
 const AppState = { files: [], filteredData: [], cache: new Map(), provinces: new Set(), cities: new Set(), districts: new Set(), schools: new Set(), grades: new Set() };
 const elements = {};
-const APP_VERSION = 'v2.2.9-root-20260416c';
+const APP_VERSION = 'v2.2.9-root-20260418a';
 const getClassId = (r = {}) => r['班级 id'] || r['班级ID'] || r['班级id'] || r['班级'] || r['classId'] || r['class_id'] || '';
 const buildWeekMetaMap = (groupMap) => {
     const weekMetaMap = new Map();
@@ -98,6 +98,7 @@ function initElements() {
     elements.hvDistrictSelect = document.getElementById('hvDistrictSelect');
     elements.hvGradeSelect = document.getElementById('hvGradeSelect');
     elements.hvPayRateSelect = document.getElementById('hvPayRateSelect');
+    elements.hvStudentCountSelect = document.getElementById('hvStudentCountSelect');
     elements.hvAssignRateSelect = document.getElementById('hvAssignRateSelect');
     elements.hvCompletionRateSelect = document.getElementById('hvCompletionRateSelect');
     elements.hvTrialCountSelect = document.getElementById('hvTrialCountSelect');
@@ -737,10 +738,10 @@ function applyHighValueFilter() {
     if (selDistrict) allRecs = allRecs.filter(r => r['区县'] === selDistrict);
     if (selGrade) allRecs = allRecs.filter(r => r['年级'] === selGrade);
     
-    // 获取所有周次并排序
     const sortedWeeks = [...new Set(allRecs.map(r => r.weekStartDate))].sort();
+    const lastWeekStart = sortedWeeks[sortedWeeks.length - 1] || '';
     
-    // 按学校+年级分组，计算指标（基于所有周汇总）
+    // 按学校+年级分组，计算指标（付费率与周趋势基于所有周；班级数/学生总数/试用人数基于最后一周）
     const gradeMap = new Map();
     allRecs.forEach(r => {
         const key = `${r['省份']}|${r['城市']}|${r['区县']}|${r['学校名称']}|${r['年级']}`;
@@ -753,10 +754,13 @@ function applyHighValueFilter() {
                 grade: r['年级'] || '',
                 totalClassCount: 0,
                 totalStudentCount: 0,
-                totalPaidCount: 0,  // 未过期付费人数
-                totalTrialCount: 0,  // 未过期试用人数
-                totalStudents: 0,  // 总人数
-                weeklyData: new Map()  // 每周数据
+                totalPaidCount: 0,
+                totalTrialCount: 0,
+                totalStudents: 0,
+                lastWeekClassCount: 0,
+                lastWeekStudentCount: 0,
+                lastWeekTrialCount: 0,
+                weeklyData: new Map()
             });
         }
         const g = gradeMap.get(key);
@@ -800,6 +804,12 @@ function applyHighValueFilter() {
         g.totalPaidCount += +r['未过期付费学生数'] || 0;
         g.totalTrialCount += +r['未过期试用学生数'] || 0;
         g.totalStudents += +r['总学生数'] || 0;
+        
+        if (r.weekStartDate === lastWeekStart) {
+            g.lastWeekClassCount++;
+            g.lastWeekStudentCount += +r['总学生数'] || 0;
+            g.lastWeekTrialCount += +r['未过期试用学生数'] || 0;
+        }
     });
     
     // 计算年级指标
@@ -831,9 +841,9 @@ function applyHighValueFilter() {
             district: g.district,
             school: g.school,
             grade: g.grade,
-            classCount: g.totalClassCount,
-            studentCount: g.totalStudentCount,
-            trialCount: g.totalTrialCount,
+            classCount: g.lastWeekClassCount,
+            studentCount: g.lastWeekStudentCount,
+            trialCount: g.lastWeekTrialCount,
             payRate: payRate,
             weeklyMetrics: weeklyMetrics
         });
@@ -866,6 +876,7 @@ function applyHighValueFilter() {
     
     // 获取筛选条件
     const payRateThreshold = parseFloat(elements.hvPayRateSelect.value) || 0;
+    const studentCountThreshold = parseFloat(elements.hvStudentCountSelect.value) || 0;
     const assignRateThreshold = parseFloat(elements.hvAssignRateSelect.value) || 0;
     const completionRateThreshold = parseFloat(elements.hvCompletionRateSelect.value) || 0;
     const trialCountThreshold = parseFloat(elements.hvTrialCountSelect.value) || 0;
@@ -874,6 +885,7 @@ function applyHighValueFilter() {
     // 应用筛选 - 付费率为小于等于筛选
     let filteredGrades = gradeMetrics.filter(g => {
         if (payRateThreshold > 0 && g.payRate > payRateThreshold) return false;
+        if (studentCountThreshold > 0 && g.studentCount < studentCountThreshold) return false;
         // 布置率/完成率筛选基于所有周的平均值
         if (assignRateThreshold > 0) {
             const avgAssignRate = g.weeklyMetrics.length > 0 
@@ -996,6 +1008,7 @@ function resetHighValueFilter() {
     elements.hvDistrictSelect.value = '';
     elements.hvGradeSelect.value = '';
     elements.hvPayRateSelect.value = '';
+    elements.hvStudentCountSelect.value = '';
     elements.hvAssignRateSelect.value = '';
     elements.hvCompletionRateSelect.value = '';
     elements.hvTrialCountSelect.value = '';
@@ -1419,6 +1432,7 @@ function renderTbl(page = 1) {
                 district: r['区县'] || '-',
                 school: r['学校名称'] || '-',
                 grade: r['年级'] || '-',
+                teacherName: r['教师姓名'] || r['老师姓名'] || r['教师'] || '-',
                 className: r['班级名称'] || '-',
                 classId: classId || '-',
                 weeks: new Map()
@@ -1465,6 +1479,7 @@ function renderTbl(page = 1) {
     theadHtml += '<th rowspan="2" style="min-width:80px;">区县</th>';
     theadHtml += '<th rowspan="2" style="min-width:150px;">学校</th>';
     theadHtml += '<th rowspan="2" style="min-width:80px;">年级</th>';
+    theadHtml += '<th rowspan="2" style="min-width:90px;">老师</th>';
     theadHtml += '<th rowspan="2" style="min-width:100px;">班级</th>';
     
     sortedWeeks.forEach(week => {
@@ -1513,6 +1528,7 @@ function renderTbl(page = 1) {
         tbody += `<td>${g.district}</td>`;
         tbody += `<td>${g.school}</td>`;
         tbody += `<td>${g.grade}</td>`;
+        tbody += `<td>${g.teacherName}</td>`;
         tbody += `<td>${g.className}</td>`;
         
         sortedWeeks.forEach(weekKey => {

@@ -1034,3 +1034,25 @@ body {
 .date-range-info small {
     font-size: 12px;
 }
+
+
+#highValueTable {
+    table-layout: auto;
+    width: max-content;
+    min-width: 100%;
+}
+
+#highValueTable th,
+#highValueTable td {
+    white-space: nowrap;
+    width: auto;
+    padding: 8px 10px;
+}
+
+#highValueTable th {
+    font-size: 11px;
+}
+
+#highValueTable td {
+    font-size: 12px;
+}
