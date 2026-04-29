@@ -803,14 +803,14 @@ def make_charts(data):
         line=dict(color='#2E86AB', width=3),
         marker=dict(size=10, color='#2E86AB'),
         fill='tozeroy', fillcolor='rgba(46,134,171,0.1)',
-        text=totals, textposition='top center', textfont=dict(size=11, family=FONT_FAMILY, color='#1f2937'),
+        text=totals, textposition='top center', textfont=dict(size=12, family=FONT_FAMILY, color='#1f2937'),
         name='作业总量', hovertemplate='%{x}<br>作业量：%{y}次<extra></extra>'
     ))
     fig.update_layout(
         title=None,
         xaxis_title='月份', yaxis_title='作业次数',
         height=460, template='plotly_white', hovermode='x unified',
-        font=dict(size=15, color='#1f2937', family=FONT_FAMILY),
+        font=dict(size=16, color='#1f2937', family=FONT_FAMILY),
         margin=dict(l=70, r=40, t=90, b=70),
         xaxis=dict(tickangle=0, automargin=True),
         yaxis=dict(automargin=True)
@@ -826,14 +826,14 @@ def make_charts(data):
             name=grade, x=months, y=y,
             mode='lines+markers+text', line=dict(width=2.5),
             marker=dict(size=7, color=GC.get(grade, '#999')),
-            text=y, textposition='top center', textfont=dict(size=10, family=FONT_FAMILY, color='#1f2937'),
+            text=y, textposition='top center', textfont=dict(size=11, family=FONT_FAMILY, color='#1f2937'),
             cliponaxis=False
         ))
     fig2.update_layout(
         title=None,
         xaxis_title='月份', yaxis_title='作业次数',
         height=440, template='plotly_white',
-        font=dict(size=13, color='#1f2937', family=FONT_FAMILY),
+        font=dict(size=15, color='#1f2937', family=FONT_FAMILY),
         margin=dict(l=70, r=40, t=90, b=70),
         xaxis=dict(automargin=True),
         yaxis=dict(automargin=True)
@@ -852,12 +852,12 @@ def make_charts(data):
         title=None,
         xaxis_title='月份', yaxis_title='作业次数',
         height=460, template='plotly_white',
-        font=dict(size=13, color='#1f2937', family=FONT_FAMILY),
+        font=dict(size=15, color='#1f2937', family=FONT_FAMILY),
         legend=dict(
             orientation='v',
             x=1.02, xanchor='left',
             y=1, yanchor='top',
-            font=dict(size=14, color='#1f2937', family=FONT_FAMILY)
+            font=dict(size=15, color='#1f2937', family=FONT_FAMILY)
         ),
         margin=dict(l=70, r=120, t=40, b=70),
         xaxis=dict(automargin=True),
@@ -873,8 +873,8 @@ def make_charts(data):
         marker_colors=[CC.get(c, '#999') for c in cat_pct.keys()],
         textinfo='label+percent',
         textposition='outside',
-        textfont=dict(size=18, family=FONT_FAMILY, color='#1f2937'),
-        outsidetextfont=dict(size=18, family=FONT_FAMILY, color='#1f2937'),
+        textfont=dict(size=19, family=FONT_FAMILY, color='#1f2937'),
+        outsidetextfont=dict(size=19, family=FONT_FAMILY, color='#1f2937'),
         hovertemplate='%{label}<br>%{percent}<extra></extra>',
         hole=0.35,
         sort=False,
@@ -883,7 +883,7 @@ def make_charts(data):
     fig4.update_layout(
         title=None,
         height=460, template='plotly_white',
-        font=dict(size=13, color='#1f2937', family=FONT_FAMILY),
+        font=dict(size=15, color='#1f2937', family=FONT_FAMILY),
         legend=dict(
             orientation='v',
             x=1.02, xanchor='left',
@@ -919,7 +919,7 @@ def make_charts(data):
         fig5.update_layout(
             title=None,
             template='plotly_white', height=430,
-            font=dict(size=13, color='#1f2937', family=FONT_FAMILY),
+            font=dict(size=15, color='#1f2937', family=FONT_FAMILY),
             legend=dict(
                 orientation='v',
                 x=1.02, xanchor='left',
@@ -946,14 +946,14 @@ def make_charts(data):
                 name=grade, x=xs, y=ys,
                 mode='lines+markers+text', line=dict(width=2.5),
                 marker=dict(size=7, color=GC.get(grade, '#999')),
-                text=[f"{v}%" for v in ys], textposition='top center', textfont=dict(size=10, family=FONT_FAMILY, color='#1f2937'),
+                text=[f"{v}%" for v in ys], textposition='top center', textfont=dict(size=11, family=FONT_FAMILY, color='#1f2937'),
                 cliponaxis=False
             ))
         fig6.update_layout(
             title=None,
             xaxis_title='月份', yaxis_title='得分率（%）',
             height=430, template='plotly_white',
-            font=dict(size=13, color='#1f2937', family=FONT_FAMILY),
+            font=dict(size=15, color='#1f2937', family=FONT_FAMILY),
             yaxis=dict(range=[0, 100], automargin=True),
             margin=dict(l=70, r=40, t=90, b=70),
             xaxis=dict(automargin=True)
@@ -973,18 +973,18 @@ def make_charts(data):
             x=all_months, y=sc_t, name='听说模拟得分率',
             mode='lines+markers+text',
             line=dict(color='#4C78A8', width=2.5), marker=dict(size=8),
-            text=sc_t_fmt, textposition='top center', textfont=dict(size=10, family=FONT_FAMILY, color='#1f2937'),
+            text=sc_t_fmt, textposition='top center', textfont=dict(size=11, family=FONT_FAMILY, color='#1f2937'),
             yaxis='y'
         ))
         fig7.add_trace(go.Bar(
             x=all_months, y=ct_t, name='所有类目布置次数',
             opacity=0.35, marker_color='#F58518', yaxis='y2',
-            text=ct_t, textposition='outside', textfont=dict(size=10, family=FONT_FAMILY, color='#1f2937')
+            text=ct_t, textposition='outside', textfont=dict(size=11, family=FONT_FAMILY, color='#1f2937')
         ))
         fig7.update_layout(
             title=None,
             template='plotly_white', height=430,
-            font=dict(size=13, color='#1f2937', family=FONT_FAMILY),
+            font=dict(size=15, color='#1f2937', family=FONT_FAMILY),
             legend=dict(
                 orientation='v',
                 x=1.02, xanchor='left',
@@ -1120,13 +1120,13 @@ def export_to_docx(report_md: str, charts: dict = None, data: dict = None) -> tu
         tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
         return tbl
 
-    def add_chart_image(key, title, width=Cm(15.5), height=Cm(8.5), legend_text=None):
+    def add_chart_image(key, title, width=Cm(16.2), height=Cm(9.0), legend_text=None):
         """以无间隔居中图片方式插入图表"""
         if not charts or key not in charts:
             return
         fig = charts[key]
         try:
-            img_bytes = fig.to_image(format='png', width=1000, height=500, scale=2)
+            img_bytes = fig.to_image(format='png', width=1280, height=720, scale=2)
         except Exception:
             note = doc.add_paragraph()
             para_fmt(note, align=WD_ALIGN_PARAGRAPH.CENTER, first_indent=False, space_before=0, space_after=6, line_spacing=24)
@@ -1225,15 +1225,15 @@ def export_to_docx(report_md: str, charts: dict = None, data: dict = None) -> tu
             # 按小节精确控制图表位置
             if sub_text == '3.3 应用频次分析':
                 if charts and 'monthly_line' in charts:
-                    add_chart_image('monthly_line', '图1  月度作业总量趋势', width=Cm(13), height=Cm(6.5))
+                    add_chart_image('monthly_line', '图1  月度作业总量趋势', width=Cm(16.2), height=Cm(9.0))
                 if charts and 'grade_monthly_line' in charts:
-                    add_chart_image('grade_monthly_line', '图2  各年级月度作业量趋势', width=Cm(13), height=Cm(6.5))
+                    add_chart_image('grade_monthly_line', '图2  各年级月度作业量趋势', width=Cm(16.2), height=Cm(9.0))
             elif sub_text == '3.4 应用方式分析':
                 # 用户要求图3与图4顺序对调：正文内先图4后图3
                 if charts and 'cat_pie' in charts:
-                    add_chart_image('cat_pie', '图4  作业类型占比分布', width=Cm(16), height=Cm(9.2))
+                    add_chart_image('cat_pie', '图4  作业类型占比分布', width=Cm(16.4), height=Cm(9.4))
                 if charts and 'cat_stacked' in charts:
-                    add_chart_image('cat_stacked', '图3  各月各类作业量分布', width=Cm(15.5), height=Cm(8.5))
+                    add_chart_image('cat_stacked', '图3  各月各类作业量分布', width=Cm(16.2), height=Cm(9.0))
                     cat_monthly = data.get('cat_monthly', {})
                     cats_order = ['同步', '专项', '模拟', '课外拓展']
                     rows = []
@@ -1242,7 +1242,7 @@ def export_to_docx(report_md: str, charts: dict = None, data: dict = None) -> tu
                     add_chart_data_table('图3 各月分类明细', ['月份'] + cats_order, rows)
             elif sub_text == '4.1 成绩数据对比':
                 if charts and 'grade_score' in charts:
-                    add_chart_image('grade_score', '图6  各年级听说模拟得分率趋势', width=Cm(13), height=Cm(6.5))
+                    add_chart_image('grade_score', '图6  各年级听说模拟得分率趋势', width=Cm(16.2), height=Cm(9.0))
             i += 1; continue
 
         # ── 段落（处理内联加粗）────────────────────────────────
