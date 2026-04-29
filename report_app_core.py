@@ -810,7 +810,7 @@ def make_charts(data):
         title=None,
         xaxis_title='月份', yaxis_title='作业次数',
         height=460, template='plotly_white', hovermode='x unified',
-        font=dict(size=13, color='#1f2937', family=FONT_FAMILY),
+        font=dict(size=15, color='#1f2937', family=FONT_FAMILY),
         margin=dict(l=70, r=40, t=90, b=70),
         xaxis=dict(tickangle=0, automargin=True),
         yaxis=dict(automargin=True)
@@ -857,7 +857,7 @@ def make_charts(data):
             orientation='v',
             x=1.02, xanchor='left',
             y=1, yanchor='top',
-            font=dict(size=12, color='#1f2937', family=FONT_FAMILY)
+            font=dict(size=14, color='#1f2937', family=FONT_FAMILY)
         ),
         margin=dict(l=70, r=120, t=40, b=70),
         xaxis=dict(automargin=True),
@@ -871,7 +871,10 @@ def make_charts(data):
         labels=list(cat_pct.keys()),
         values=list(cat_pct.values()),
         marker_colors=[CC.get(c, '#999') for c in cat_pct.keys()],
-        textinfo='none',
+        textinfo='label+percent',
+        textposition='outside',
+        textfont=dict(size=18, family=FONT_FAMILY, color='#1f2937'),
+        outsidetextfont=dict(size=18, family=FONT_FAMILY, color='#1f2937'),
         hovertemplate='%{label}<br>%{percent}<extra></extra>',
         hole=0.35,
         sort=False,
@@ -1117,7 +1120,7 @@ def export_to_docx(report_md: str, charts: dict = None, data: dict = None) -> tu
         tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
         return tbl
 
-    def add_chart_image(key, title, width=Cm(13), height=Cm(6.5), legend_text=None):
+    def add_chart_image(key, title, width=Cm(15.5), height=Cm(8.5), legend_text=None):
         """以无间隔居中图片方式插入图表"""
         if not charts or key not in charts:
             return
@@ -1141,11 +1144,6 @@ def export_to_docx(report_md: str, charts: dict = None, data: dict = None) -> tu
         cap_run = cap.add_run(title)
         set_font(cap_run, '宋体', 10.5, False)
 
-        if legend_text:
-            legend = doc.add_paragraph()
-            para_fmt(legend, align=WD_ALIGN_PARAGRAPH.CENTER, first_indent=False, space_before=0, space_after=6, line_spacing=24)
-            legend_run = legend.add_run(f"图例：{legend_text}")
-            set_font(legend_run, '宋体', 10.5, False)
 
     def add_chart_data_table(title, headers, rows):
         """为导出文档补充原生中文数据表，避免静态图中文丢失"""
@@ -1157,23 +1155,6 @@ def export_to_docx(report_md: str, charts: dict = None, data: dict = None) -> tu
         set_font(note_run, '宋体', 10.5, True)
         add_border_table(headers, rows)
 
-    def add_pie_legend_block(cat_pct):
-        """在 Word 中原生输出饼图分类图例和占比，避免图片 legend 中文缺失"""
-        if not cat_pct:
-            return
-        note = doc.add_paragraph()
-        para_fmt(note, align=WD_ALIGN_PARAGRAPH.LEFT, first_indent=False, space_before=0, space_after=3, line_spacing=24)
-        note_run = note.add_run('图4 分类标签与占比')
-        set_font(note_run, '宋体', 10.5, True)
-
-        color_map = {'同步': '■', '专项': '■', '模拟': '■', '课外拓展': '■'}
-        color_order = ['同步', '专项', '模拟', '课外拓展']
-        for cat in color_order:
-            if cat in cat_pct:
-                p = doc.add_paragraph()
-                para_fmt(p, align=WD_ALIGN_PARAGRAPH.LEFT, first_indent=False, space_before=0, space_after=0, line_spacing=22)
-                r = p.add_run(f"{color_map.get(cat, '■')} {cat}：{cat_pct[cat]}%")
-                set_font(r, '宋体', 10.5, False)
 
     # ── Markdown解析与Word构建 ────────────────────────────────
     lines = report_md.split('\n')
@@ -1201,7 +1182,7 @@ def export_to_docx(report_md: str, charts: dict = None, data: dict = None) -> tu
             para_fmt(gap, space_before=0, space_after=0, line_spacing=0)
         for key, caption in list(pending_charts.items()):
             if charts and key in charts:
-                add_chart_image(key, caption, width=Cm(13), height=Cm(6.5), legend_text='听说模拟得分率、所有类目布置次数' if key == 'top_class_trend' else ('听说模拟类月均得分率、月均作业次数' if key == 'mock_score' else None))
+                add_chart_image(key, caption, width=Cm(13), height=Cm(6.5))
         pending_charts.clear()
         section_had_table = True   # 标记已处理，防止重复插入
 
@@ -1246,16 +1227,13 @@ def export_to_docx(report_md: str, charts: dict = None, data: dict = None) -> tu
                 if charts and 'monthly_line' in charts:
                     add_chart_image('monthly_line', '图1  月度作业总量趋势', width=Cm(13), height=Cm(6.5))
                 if charts and 'grade_monthly_line' in charts:
-                    add_chart_image('grade_monthly_line', '图2  各年级月度作业量趋势', width=Cm(13), height=Cm(6.5), legend_text='六年级、七年级、八年级')
+                    add_chart_image('grade_monthly_line', '图2  各年级月度作业量趋势', width=Cm(13), height=Cm(6.5))
             elif sub_text == '3.4 应用方式分析':
                 # 用户要求图3与图4顺序对调：正文内先图4后图3
                 if charts and 'cat_pie' in charts:
-                    add_chart_image('cat_pie', '图4  作业类型占比分布', width=Cm(13), height=Cm(6.5), legend_text='同步、专项、模拟、课外拓展')
-                    cat_pct = data.get('category_pct', {})
-                    add_pie_legend_block(cat_pct)
-                    add_chart_data_table('图4 类目占比', ['类目', '占比（%）'], [[k, v] for k, v in cat_pct.items()])
+                    add_chart_image('cat_pie', '图4  作业类型占比分布', width=Cm(16), height=Cm(9.2))
                 if charts and 'cat_stacked' in charts:
-                    add_chart_image('cat_stacked', '图3  各月各类作业量分布', width=Cm(13), height=Cm(6.5), legend_text='同步、专项、模拟、课外拓展')
+                    add_chart_image('cat_stacked', '图3  各月各类作业量分布', width=Cm(15.5), height=Cm(8.5))
                     cat_monthly = data.get('cat_monthly', {})
                     cats_order = ['同步', '专项', '模拟', '课外拓展']
                     rows = []
@@ -1264,7 +1242,7 @@ def export_to_docx(report_md: str, charts: dict = None, data: dict = None) -> tu
                     add_chart_data_table('图3 各月分类明细', ['月份'] + cats_order, rows)
             elif sub_text == '4.1 成绩数据对比':
                 if charts and 'grade_score' in charts:
-                    add_chart_image('grade_score', '图6  各年级听说模拟得分率趋势', width=Cm(13), height=Cm(6.5), legend_text='六年级、七年级、八年级')
+                    add_chart_image('grade_score', '图6  各年级听说模拟得分率趋势', width=Cm(13), height=Cm(6.5))
             i += 1; continue
 
         # ── 段落（处理内联加粗）────────────────────────────────
