@@ -17,7 +17,7 @@ from report_app_core import (
 
 st.set_page_config(page_title="E听说成效报告系统", page_icon="📊", layout="wide")
 
-APP_VERSION = f"v{datetime.now().strftime('%Y%m%d')}"
+APP_VERSION = "V1.1"
 
 with st.sidebar:
     st.title("📋 使用说明")

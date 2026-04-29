@@ -842,15 +842,21 @@ def make_charts(data):
         y = [data.get('cat_monthly', {}).get(m, {}).get(cat, 0) for m in months]
         fig3.add_trace(go.Bar(
             name=cat, x=months, y=y, marker_color=CC.get(cat, '#999'),
-            text=y, textposition='inside', textfont=dict(size=10), cliponaxis=False
+            text=y, textposition='inside', textfont=dict(size=10, color='#1f2937'), cliponaxis=False
         ))
     fig3.update_layout(
         barmode='stack',
         title=None,
         xaxis_title='月份', yaxis_title='作业次数',
         height=460, template='plotly_white',
-        legend=dict(orientation='h', yanchor='bottom', y=1.02),
-        margin=dict(l=70, r=40, t=100, b=70),
+        font=dict(size=13, color='#1f2937'),
+        legend=dict(
+            orientation='v',
+            x=1.02, xanchor='left',
+            y=1, yanchor='top',
+            font=dict(size=12, color='#1f2937')
+        ),
+        margin=dict(l=70, r=120, t=40, b=70),
         xaxis=dict(automargin=True),
         yaxis=dict(automargin=True)
     )
@@ -862,14 +868,23 @@ def make_charts(data):
         labels=list(cat_pct.keys()),
         values=list(cat_pct.values()),
         marker_colors=[CC.get(c, '#999') for c in cat_pct.keys()],
-        textinfo='label+percent',
-        textposition='outside',
-        hole=0.35
+        textinfo='none',
+        hovertemplate='%{label}<br>%{percent}<extra></extra>',
+        hole=0.35,
+        sort=False,
+        showlegend=True
     ))
     fig4.update_layout(
         title=None,
         height=460, template='plotly_white',
-        margin=dict(l=60, r=60, t=90, b=60)
+        font=dict(size=13, color='#1f2937'),
+        legend=dict(
+            orientation='v',
+            x=1.02, xanchor='left',
+            y=0.95, yanchor='top',
+            font=dict(size=12, color='#1f2937')
+        ),
+        margin=dict(l=40, r=180, t=30, b=40)
     )
     charts['cat_pie'] = fig4
 
@@ -882,25 +897,31 @@ def make_charts(data):
         fig5 = make_subplots(specs=[[{"secondary_y": True}]])
         # 柱状图：月均作业次数（典型班级）
         fig5.add_trace(go.Bar(
-            x=ms, y=mc, name='月均作业次数',
+            x=ms, y=mc, name='作业数',
             marker_color='#F58518', opacity=0.6,
-            text=mc, textposition='outside', textfont=dict(size=10),
+            text=mc, textposition='outside', textfont=dict(size=10, color='#1f2937'),
             yaxis='y2'
         ))
         # 折线图：月均得分率趋势
         fig5.add_trace(go.Scatter(
-            x=ms, y=sc, name='月均得分率',
+            x=ms, y=sc, name='得分率',
             mode='lines+markers+text',
             line=dict(color='#E45756', width=2.5), marker=dict(size=8, color='#E45756'),
-            text=[f"{s}%" for s in sc], textposition='top center', textfont=dict(size=10),
+            text=[f"{s}%" for s in sc], textposition='top center', textfont=dict(size=10, color='#1f2937'),
             yaxis='y'
         ))
         fig5.update_layout(
             title=None,
             template='plotly_white', height=430,
-            legend=dict(orientation='h', yanchor='bottom', y=1.02),
+            font=dict(size=13, color='#1f2937'),
+            legend=dict(
+                orientation='v',
+                x=1.02, xanchor='left',
+                y=1, yanchor='top',
+                font=dict(size=12, color='#1f2937')
+            ),
             hovermode='x unified',
-            margin=dict(l=70, r=70, t=90, b=70),
+            margin=dict(l=70, r=120, t=40, b=70),
             xaxis=dict(automargin=True),
             yaxis=dict(automargin=True)
         )
