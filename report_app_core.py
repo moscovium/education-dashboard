@@ -790,6 +790,7 @@ def generate_report_text(data):
 
 def make_charts(data):
     charts = {}
+    FONT_FAMILY = 'Noto Sans CJK SC, Microsoft YaHei, SimHei, Arial Unicode MS, sans-serif'
     GC = {'六年级': '#4C78A8', '七年级': '#F58518', '八年级': '#E45756'}
     CC = {'同步': '#4C78A8', '专项': '#F58518', '模拟': '#E45756', '课外拓展': '#72D7B8'}
     cats = ['同步', '专项', '模拟', '课外拓展']
@@ -802,13 +803,14 @@ def make_charts(data):
         line=dict(color='#2E86AB', width=3),
         marker=dict(size=10, color='#2E86AB'),
         fill='tozeroy', fillcolor='rgba(46,134,171,0.1)',
-        text=totals, textposition='top center', textfont=dict(size=11),
+        text=totals, textposition='top center', textfont=dict(size=11, family=FONT_FAMILY, color='#1f2937'),
         name='作业总量', hovertemplate='%{x}<br>作业量：%{y}次<extra></extra>'
     ))
     fig.update_layout(
         title=None,
         xaxis_title='月份', yaxis_title='作业次数',
         height=460, template='plotly_white', hovermode='x unified',
+        font=dict(size=13, color='#1f2937', family=FONT_FAMILY),
         margin=dict(l=70, r=40, t=90, b=70),
         xaxis=dict(tickangle=0, automargin=True),
         yaxis=dict(automargin=True)
@@ -824,13 +826,14 @@ def make_charts(data):
             name=grade, x=months, y=y,
             mode='lines+markers+text', line=dict(width=2.5),
             marker=dict(size=7, color=GC.get(grade, '#999')),
-            text=y, textposition='top center', textfont=dict(size=10),
+            text=y, textposition='top center', textfont=dict(size=10, family=FONT_FAMILY, color='#1f2937'),
             cliponaxis=False
         ))
     fig2.update_layout(
         title=None,
         xaxis_title='月份', yaxis_title='作业次数',
         height=440, template='plotly_white',
+        font=dict(size=13, color='#1f2937', family=FONT_FAMILY),
         margin=dict(l=70, r=40, t=90, b=70),
         xaxis=dict(automargin=True),
         yaxis=dict(automargin=True)
@@ -842,19 +845,19 @@ def make_charts(data):
         y = [data.get('cat_monthly', {}).get(m, {}).get(cat, 0) for m in months]
         fig3.add_trace(go.Bar(
             name=cat, x=months, y=y, marker_color=CC.get(cat, '#999'),
-            text=y, textposition='inside', textfont=dict(size=10, color='#1f2937'), cliponaxis=False
+            text=y, textposition='inside', textfont=dict(size=10, color='#1f2937', family=FONT_FAMILY), cliponaxis=False
         ))
     fig3.update_layout(
         barmode='stack',
         title=None,
         xaxis_title='月份', yaxis_title='作业次数',
         height=460, template='plotly_white',
-        font=dict(size=13, color='#1f2937'),
+        font=dict(size=13, color='#1f2937', family=FONT_FAMILY),
         legend=dict(
             orientation='v',
             x=1.02, xanchor='left',
             y=1, yanchor='top',
-            font=dict(size=12, color='#1f2937')
+            font=dict(size=12, color='#1f2937', family=FONT_FAMILY)
         ),
         margin=dict(l=70, r=120, t=40, b=70),
         xaxis=dict(automargin=True),
@@ -877,12 +880,12 @@ def make_charts(data):
     fig4.update_layout(
         title=None,
         height=460, template='plotly_white',
-        font=dict(size=13, color='#1f2937'),
+        font=dict(size=13, color='#1f2937', family=FONT_FAMILY),
         legend=dict(
             orientation='v',
             x=1.02, xanchor='left',
             y=0.95, yanchor='top',
-            font=dict(size=12, color='#1f2937')
+            font=dict(size=12, color='#1f2937', family=FONT_FAMILY)
         ),
         margin=dict(l=40, r=180, t=30, b=40)
     )
@@ -899,7 +902,7 @@ def make_charts(data):
         fig5.add_trace(go.Bar(
             x=ms, y=mc, name='作业数',
             marker_color='#F58518', opacity=0.6,
-            text=mc, textposition='outside', textfont=dict(size=10, color='#1f2937'),
+            text=mc, textposition='outside', textfont=dict(size=10, color='#1f2937', family=FONT_FAMILY),
             yaxis='y2'
         ))
         # 折线图：月均得分率趋势
@@ -907,18 +910,18 @@ def make_charts(data):
             x=ms, y=sc, name='得分率',
             mode='lines+markers+text',
             line=dict(color='#E45756', width=2.5), marker=dict(size=8, color='#E45756'),
-            text=[f"{s}%" for s in sc], textposition='top center', textfont=dict(size=10, color='#1f2937'),
+            text=[f"{s}%" for s in sc], textposition='top center', textfont=dict(size=10, color='#1f2937', family=FONT_FAMILY),
             yaxis='y'
         ))
         fig5.update_layout(
             title=None,
             template='plotly_white', height=430,
-            font=dict(size=13, color='#1f2937'),
+            font=dict(size=13, color='#1f2937', family=FONT_FAMILY),
             legend=dict(
                 orientation='v',
                 x=1.02, xanchor='left',
                 y=1, yanchor='top',
-                font=dict(size=12, color='#1f2937')
+                font=dict(size=12, color='#1f2937', family=FONT_FAMILY)
             ),
             hovermode='x unified',
             margin=dict(l=70, r=120, t=40, b=70),
@@ -940,13 +943,14 @@ def make_charts(data):
                 name=grade, x=xs, y=ys,
                 mode='lines+markers+text', line=dict(width=2.5),
                 marker=dict(size=7, color=GC.get(grade, '#999')),
-                text=[f"{v}%" for v in ys], textposition='top center', textfont=dict(size=10),
+                text=[f"{v}%" for v in ys], textposition='top center', textfont=dict(size=10, family=FONT_FAMILY, color='#1f2937'),
                 cliponaxis=False
             ))
         fig6.update_layout(
             title=None,
             xaxis_title='月份', yaxis_title='得分率（%）',
             height=430, template='plotly_white',
+            font=dict(size=13, color='#1f2937', family=FONT_FAMILY),
             yaxis=dict(range=[0, 100], automargin=True),
             margin=dict(l=70, r=40, t=90, b=70),
             xaxis=dict(automargin=True)
@@ -966,20 +970,26 @@ def make_charts(data):
             x=all_months, y=sc_t, name='听说模拟得分率',
             mode='lines+markers+text',
             line=dict(color='#4C78A8', width=2.5), marker=dict(size=8),
-            text=sc_t_fmt, textposition='top center', textfont=dict(size=10),
+            text=sc_t_fmt, textposition='top center', textfont=dict(size=10, family=FONT_FAMILY, color='#1f2937'),
             yaxis='y'
         ))
         fig7.add_trace(go.Bar(
             x=all_months, y=ct_t, name='所有类目布置次数',
             opacity=0.35, marker_color='#F58518', yaxis='y2',
-            text=ct_t, textposition='outside', textfont=dict(size=10)
+            text=ct_t, textposition='outside', textfont=dict(size=10, family=FONT_FAMILY, color='#1f2937')
         ))
         fig7.update_layout(
             title=None,
             template='plotly_white', height=430,
-            legend=dict(orientation='h', yanchor='bottom', y=1.02),
+            font=dict(size=13, color='#1f2937', family=FONT_FAMILY),
+            legend=dict(
+                orientation='v',
+                x=1.02, xanchor='left',
+                y=1, yanchor='top',
+                font=dict(size=12, color='#1f2937', family=FONT_FAMILY)
+            ),
             hovermode='x unified',
-            margin=dict(l=70, r=70, t=90, b=70),
+            margin=dict(l=70, r=120, t=40, b=70),
             xaxis=dict(automargin=True),
             yaxis=dict(automargin=True)
         )
