@@ -998,7 +998,7 @@ def make_charts(data):
         charts['top_class_trend'] = fig7
 
     return charts
-def export_to_docx(report_md: str, charts: dict = None) -> tuple:
+def export_to_docx(report_md: str, charts: dict = None, data: dict = None) -> tuple:
     """导出为公文格式Word
 
     格式要求：
@@ -1011,6 +1011,7 @@ def export_to_docx(report_md: str, charts: dict = None) -> tuple:
     - 表格：无边框线，宋体五号(10.5pt)，列宽紧凑
     - 图表：无间隔，居中，宽500px×高250px
     """
+    data = data or {}
     try:
         from docx import Document
         from docx.shared import Pt, Cm, Emu

@@ -108,7 +108,7 @@ if 'report' in st.session_state:
         st.divider()
         if st.button("📄 生成Word文档", type="primary"):
             with st.spinner("正在生成Word文档..."):
-                buf, err = export_to_docx(report_text, charts)
+                buf, err = export_to_docx(report_text, charts, data)
                 if err:
                     st.error(err)
                 else:
