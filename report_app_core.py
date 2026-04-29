@@ -1149,11 +1149,31 @@ def export_to_docx(report_md: str, charts: dict = None, data: dict = None) -> tu
 
     def add_chart_data_table(title, headers, rows):
         """为导出文档补充原生中文数据表，避免静态图中文丢失"""
+        if not rows:
+            return
         note = doc.add_paragraph()
         para_fmt(note, align=WD_ALIGN_PARAGRAPH.LEFT, first_indent=False, space_before=0, space_after=3, line_spacing=24)
         note_run = note.add_run(f"{title}（文字版）")
         set_font(note_run, '宋体', 10.5, True)
         add_border_table(headers, rows)
+
+    def add_pie_legend_block(cat_pct):
+        """在 Word 中原生输出饼图分类图例和占比，避免图片 legend 中文缺失"""
+        if not cat_pct:
+            return
+        note = doc.add_paragraph()
+        para_fmt(note, align=WD_ALIGN_PARAGRAPH.LEFT, first_indent=False, space_before=0, space_after=3, line_spacing=24)
+        note_run = note.add_run('图4 分类标签与占比')
+        set_font(note_run, '宋体', 10.5, True)
+
+        color_map = {'同步': '■', '专项': '■', '模拟': '■', '课外拓展': '■'}
+        color_order = ['同步', '专项', '模拟', '课外拓展']
+        for cat in color_order:
+            if cat in cat_pct:
+                p = doc.add_paragraph()
+                para_fmt(p, align=WD_ALIGN_PARAGRAPH.LEFT, first_indent=False, space_before=0, space_after=0, line_spacing=22)
+                r = p.add_run(f"{color_map.get(cat, '■')} {cat}：{cat_pct[cat]}%")
+                set_font(r, '宋体', 10.5, False)
 
     # ── Markdown解析与Word构建 ────────────────────────────────
     lines = report_md.split('\n')
@@ -1232,6 +1252,7 @@ def export_to_docx(report_md: str, charts: dict = None, data: dict = None) -> tu
                 if charts and 'cat_pie' in charts:
                     add_chart_image('cat_pie', '图4  作业类型占比分布', width=Cm(13), height=Cm(6.5), legend_text='同步、专项、模拟、课外拓展')
                     cat_pct = data.get('category_pct', {})
+                    add_pie_legend_block(cat_pct)
                     add_chart_data_table('图4 类目占比', ['类目', '占比（%）'], [[k, v] for k, v in cat_pct.items()])
                 if charts and 'cat_stacked' in charts:
                     add_chart_image('cat_stacked', '图3  各月各类作业量分布', width=Cm(13), height=Cm(6.5), legend_text='同步、专项、模拟、课外拓展')
