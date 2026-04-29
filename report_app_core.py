@@ -1146,6 +1146,14 @@ def export_to_docx(report_md: str, charts: dict = None) -> tuple:
             legend_run = legend.add_run(f"图例：{legend_text}")
             set_font(legend_run, '宋体', 10.5, False)
 
+    def add_chart_data_table(title, headers, rows):
+        """为导出文档补充原生中文数据表，避免静态图中文丢失"""
+        note = doc.add_paragraph()
+        para_fmt(note, align=WD_ALIGN_PARAGRAPH.LEFT, first_indent=False, space_before=0, space_after=3, line_spacing=24)
+        note_run = note.add_run(f"{title}（文字版）")
+        set_font(note_run, '宋体', 10.5, True)
+        add_border_table(headers, rows)
+
     # ── Markdown解析与Word构建 ────────────────────────────────
     lines = report_md.split('\n')
     i = 0
@@ -1222,8 +1230,16 @@ def export_to_docx(report_md: str, charts: dict = None) -> tuple:
                 # 用户要求图3与图4顺序对调：正文内先图4后图3
                 if charts and 'cat_pie' in charts:
                     add_chart_image('cat_pie', '图4  作业类型占比分布', width=Cm(13), height=Cm(6.5), legend_text='同步、专项、模拟、课外拓展')
+                    cat_pct = data.get('category_pct', {})
+                    add_chart_data_table('图4 类目占比', ['类目', '占比（%）'], [[k, v] for k, v in cat_pct.items()])
                 if charts and 'cat_stacked' in charts:
                     add_chart_image('cat_stacked', '图3  各月各类作业量分布', width=Cm(13), height=Cm(6.5), legend_text='同步、专项、模拟、课外拓展')
+                    cat_monthly = data.get('cat_monthly', {})
+                    cats_order = ['同步', '专项', '模拟', '课外拓展']
+                    rows = []
+                    for month in sorted(cat_monthly.keys()):
+                        rows.append([month] + [cat_monthly.get(month, {}).get(cat, 0) for cat in cats_order])
+                    add_chart_data_table('图3 各月分类明细', ['月份'] + cats_order, rows)
             elif sub_text == '4.1 成绩数据对比':
                 if charts and 'grade_score' in charts:
                     add_chart_image('grade_score', '图6  各年级听说模拟得分率趋势', width=Cm(13), height=Cm(6.5), legend_text='六年级、七年级、八年级')
