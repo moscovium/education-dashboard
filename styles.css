@@ -1056,3 +1056,134 @@ body {
 #highValueTable td {
     font-size: 12px;
 }
+
+
+.upload-panel-grid {
+    display: grid;
+    grid-template-columns: minmax(320px, 420px) 1fr;
+    gap: 20px;
+    align-items: start;
+}
+
+.upload-entry-card,
+.upload-weeks-card,
+.custom-school-panel {
+    background: rgba(248, 250, 252, 0.75);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+}
+
+.subsection-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.custom-school-section {
+    margin-bottom: 24px;
+}
+
+.custom-school-textarea {
+    width: 100%;
+    min-height: 110px;
+    resize: vertical;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 13px;
+    line-height: 1.6;
+    background: var(--surface);
+    color: var(--text-primary);
+}
+
+.custom-school-textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.custom-school-actions,
+.custom-school-tabs {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.custom-school-result {
+    margin-top: 16px;
+}
+
+.custom-school-view {
+    margin-top: 14px;
+}
+
+#customSchoolTable,
+#customSchoolClassTable {
+    width: max-content;
+    min-width: 100%;
+}
+
+#customSchoolTable th,
+#customSchoolTable td,
+#customSchoolClassTable th,
+#customSchoolClassTable td {
+    white-space: nowrap;
+    padding: 8px 10px;
+}
+
+#customSchoolTable {
+    width: max-content;
+    min-width: 100%;
+    table-layout: auto;
+}
+
+#customSchoolTable th,
+#customSchoolTable td {
+    white-space: nowrap;
+    word-break: keep-all;
+    text-align: center;
+    line-height: 1.2;
+    padding: 6px 8px;
+}
+
+#customSchoolTable td.school-name-cell {
+    white-space: normal;
+    word-break: break-all;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    text-align: left;
+    max-width: 140px;
+    min-width: 120px;
+    line-height: 1.25;
+}
+
+.compact-number-cell {
+    font-size: 12px;
+    line-height: 1.2;
+}
+
+#customSchoolTable td.metric-good,
+#customSchoolClassTable td.metric-good,
+#customSchoolTable .metric-good,
+#customSchoolClassTable .metric-good {
+    color: #16a34a !important;
+    font-weight: 700;
+}
+
+#customSchoolTable td.metric-bad,
+#customSchoolClassTable td.metric-bad,
+#customSchoolTable .metric-bad,
+#customSchoolClassTable .metric-bad {
+    color: #dc2626 !important;
+    font-weight: 700;
+}
+
+@media (max-width: 1100px) {
+    .upload-panel-grid {
+        grid-template-columns: 1fr;
+    }
+}

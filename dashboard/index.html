@@ -243,12 +243,12 @@
                     教育数据看板
                 </h1>
                 <p class="dashboard-subtitle">转化率与作业完成情况监测 - 基于班级 ID 关联</p>
-                <div id="debugBar" style="margin-top:8px;font-size:12px;color:#475569;display:flex;gap:12px;flex-wrap:wrap;">页面版本占位：root-20260418a</div>
-                <div id="pageVersion" style="margin-top:6px;font-size:12px;color:#0f172a;font-weight:600;background:#e2e8f0;display:inline-block;padding:4px 10px;border-radius:999px;">页面版本：v20260418a</div>
+                <div id="debugBar" style="margin-top:8px;font-size:12px;color:#475569;display:flex;gap:12px;flex-wrap:wrap;">页面版本占位：root-20260506a</div>
+                <div id="pageVersion" style="margin-top:6px;font-size:12px;color:#0f172a;font-weight:600;background:#e2e8f0;display:inline-block;padding:4px 10px;border-radius:999px;">页面版本：v20260506a</div>
             </div>
         </header>
 
-        <!-- 上传区域 -->
+        <!-- 上传与已上传周次 -->
         <section class="upload-section">
             <div class="section-header">
                 <h2 class="section-title">
@@ -257,19 +257,33 @@
                 </h2>
             </div>
             
-            <div style="text-align: center; padding: 20px 0;">
-                <input type="file" id="fileInput" accept=".xlsx,.xls" multiple style="display: none;">
-                <label for="fileInput" id="uploadBtn" class="btn btn-primary" style="font-size: 16px; padding: 16px 32px; display: inline-block; cursor: pointer;">
-                    📁 选择 Excel 文件上传
-                </label>
-                <p style="margin-top: 16px; color: #666; font-size: 13px;">
-                    支持格式：20260316-20260322_作业数据.xlsx<br>
-                    或将文件拖拽到此页面任意位置
-                </p>
+            <div class="upload-panel-grid">
+                <div class="upload-entry-card">
+                    <h3 class="subsection-title">上传入口</h3>
+                    <div style="text-align: center; padding: 20px 0;">
+                        <input type="file" id="fileInput" accept=".xlsx,.xls" multiple style="display: none;">
+                        <label for="fileInput" id="uploadBtn" class="btn btn-primary" style="font-size: 16px; padding: 16px 32px; display: inline-block; cursor: pointer;">
+                            📁 选择 Excel 文件上传
+                        </label>
+                        <p style="margin-top: 16px; color: #666; font-size: 13px;">
+                            支持格式：20260316-20260322_作业数据.xlsx<br>
+                            或将文件拖拽到此页面任意位置
+                        </p>
+                    </div>
+                </div>
+
+                <div class="upload-weeks-card" id="uploadedSection" style="display: none;">
+                    <div class="section-header" style="margin-bottom: 12px;">
+                        <h3 class="subsection-title">已上传周次数据</h3>
+                        <button id="batchDeleteBtn" class="btn btn-danger btn-small">
+                            <span class="btn-icon">🗑️</span>
+                            批量删除
+                        </button>
+                    </div>
+                    <div class="weeks-grid" id="weeksGrid"></div>
+                </div>
             </div>
         </section>
-
-        <!-- 筛选区域 -->
         <section class="filter-section">
             <div class="section-header">
                 <h2 class="section-title">
@@ -396,22 +410,48 @@
             </div>
         </section>
 
-        <!-- 已上传数据管理 -->
-        <section class="uploaded-section" id="uploadedSection" style="display: none;">
+        <!-- 数据表格 -->
+
+        <section class="table-section" id="tableSection" style="display: none;">
             <div class="section-header">
                 <h2 class="section-title">
-                    <span class="section-icon">📁</span>
-                    已上传的周次数据
+                    <span class="section-icon">📋</span>
+                    班级数据明细
                 </h2>
-                <button id="batchDeleteBtn" class="btn btn-danger btn-small">
-                    <span class="btn-icon">🗑️</span>
-                    批量删除
-                </button>
+                <div class="table-actions">
+                    <button class="btn btn-small btn-export" id="exportBtn">
+                        <span class="btn-icon">📥</span>
+                        导出 CSV
+                    </button>
+                </div>
             </div>
-            <div class="weeks-grid" id="weeksGrid"></div>
+            <div class="table-wrapper">
+                <table class="data-table" id="dataTable">
+                    <thead>
+                        <tr>
+                            <th>周次</th>
+                            <th>日期范围</th>
+                            <th>省份</th>
+                            <th>城市</th>
+                            <th>区县</th>
+                            <th>学校</th>
+                            <th>年级</th>
+                            <th>老师</th>
+                            <th>班级</th>
+                            <th>班级 ID</th>
+                            <th>学生数</th>
+                            <th>转化率</th>
+                            <th>布置作业次数</th>
+                            <th>作业完成率</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
         </section>
 
         <!-- 核心指标卡片 -->
+
         <section class="metrics-section" id="metricsSection" style="display: none;">
             <div class="metrics-grid">
                 <!-- 1.1 总学生数 -->
@@ -502,45 +542,6 @@
                     </div>
                     <div class="chart-container" id="conversionChart"></div>
                 </div>
-            </div>
-        </section>
-
-        <!-- 数据表格 -->
-        <section class="table-section" id="tableSection" style="display: none;">
-            <div class="section-header">
-                <h2 class="section-title">
-                    <span class="section-icon">📋</span>
-                    班级数据明细
-                </h2>
-                <div class="table-actions">
-                    <button class="btn btn-small btn-export" id="exportBtn">
-                        <span class="btn-icon">📥</span>
-                        导出 CSV
-                    </button>
-                </div>
-            </div>
-            <div class="table-wrapper">
-                <table class="data-table" id="dataTable">
-                    <thead>
-                        <tr>
-                            <th>周次</th>
-                            <th>日期范围</th>
-                            <th>省份</th>
-                            <th>城市</th>
-                            <th>区县</th>
-                            <th>学校</th>
-                            <th>年级</th>
-                            <th>老师</th>
-                            <th>班级</th>
-                            <th>班级 ID</th>
-                            <th>学生数</th>
-                            <th>转化率</th>
-                            <th>布置作业次数</th>
-                            <th>作业完成率</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tableBody"></tbody>
-                </table>
             </div>
         </section>
 
@@ -709,14 +710,66 @@
             <p>请先上传 Excel 数据文件</p>
             <p class="empty-hint">文件格式：20260316-20260322_作业数据.xlsx</p>
         </section>
+
+        <!-- 自定义重点校数据 -->
+        <section class="custom-school-section" id="customSchoolSection" style="display: none;">
+            <div class="section-header">
+                <h2 class="section-title">
+                    <span class="section-icon">🎯</span>
+                    自定义重点校数据
+                </h2>
+            </div>
+            <div class="custom-school-panel">
+                <div class="custom-school-input-wrap">
+                    <label class="filter-label">
+                        <span class="label-icon">🏫</span>
+                        自定义文本框
+                    </label>
+                    <textarea id="customSchoolInput" class="custom-school-textarea" placeholder="请输入学校名称，支持多所学校；可用换行或“、”分隔"></textarea>
+                    <div class="custom-school-actions">
+                        <button id="customSchoolSearchBtn" class="btn btn-primary btn-small">
+                            <span class="btn-icon">🔍</span>
+                            搜索
+                        </button>
+                        <button id="customSchoolResetBtn" class="btn btn-secondary btn-small">
+                            <span class="btn-icon">🔄</span>
+                            重置
+                        </button>
+                    </div>
+                </div>
+                <div class="custom-school-result" id="customSchoolResult" style="display:none;">
+                    <div class="custom-school-tabs">
+                        <button id="customSchoolTabSchool" class="mode-btn active">按校展示</button>
+                        <button id="customSchoolTabClass" class="mode-btn">按班级展示</button>
+                    </div>
+                    <div id="customSchoolSummary" class="high-value-info"></div>
+                    <div id="customSchoolSchoolView" class="custom-school-view">
+                        <div class="high-value-table-wrapper">
+                            <table class="data-table" id="customSchoolTable">
+                                <thead id="customSchoolTableHead"></thead>
+                                <tbody id="customSchoolTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div id="customSchoolClassView" class="custom-school-view" style="display:none;">
+                        <div class="table-wrapper">
+                            <table class="data-table" id="customSchoolClassTable">
+                                <thead id="customSchoolClassTableHead"></thead>
+                                <tbody id="customSchoolClassTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
     </div>
 
     <script>
-        window.__ROOT_DEPLOY_MARKER__='root-20260418a';
+        window.__ROOT_DEPLOY_MARKER__='root-20260506a';
         document.addEventListener('DOMContentLoaded', function () {
             var input = document.getElementById('fileInput');
             var debugBar = document.getElementById('debugBar');
-            if (debugBar) debugBar.textContent = '页面版本占位：root-20260418a';
+            if (debugBar) debugBar.textContent = '页面版本占位：root-20260506a';
             if (input) {
                 input.addEventListener('change', function (e) {
                     var files = Array.from((e.target && e.target.files) || []);
@@ -731,6 +784,6 @@
             }
         });
     </script>
-    <script src="app.js?v=20260418a"></script>
+    <script src="app.js?v=20260506a"></script>
 </body>
 </html>

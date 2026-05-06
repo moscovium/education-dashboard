@@ -6,7 +6,7 @@ const MAX_STORAGE_MB = 500; // 最大存储限制（MB）
 let db = null;
 const AppState = { files: [], filteredData: [], cache: new Map(), provinces: new Set(), cities: new Set(), districts: new Set(), schools: new Set(), grades: new Set() };
 const elements = {};
-const APP_VERSION = 'v2.2.9-root-20260418a';
+const APP_VERSION = 'v2.3.1-root-20260506a';
 const getClassId = (r = {}) => r['班级 id'] || r['班级ID'] || r['班级id'] || r['班级'] || r['classId'] || r['class_id'] || '';
 const buildWeekMetaMap = (groupMap) => {
     const weekMetaMap = new Map();
@@ -66,7 +66,6 @@ function initElements() {
     elements.progressSpeed = document.getElementById('progressSpeed');
     elements.progressETA = document.getElementById('progressETA');
     elements.weeksGrid = document.getElementById('weeksGrid');
-    elements.uploadedWeeks = document.getElementById('uploadedWeeks');
     elements.clearAllBtn = document.getElementById('clearAllBtn');
     elements.startDate = document.getElementById('startDate');
     elements.endDate = document.getElementById('endDate');
@@ -107,7 +106,22 @@ function initElements() {
     elements.highValueInfo = document.getElementById('highValueInfo');
     elements.applyHighValueFilter = document.getElementById('applyHighValueFilter');
     elements.resetHighValueFilter = document.getElementById('resetHighValueFilter');
+    elements.customSchoolSection = document.getElementById('customSchoolSection');
+    elements.customSchoolInput = document.getElementById('customSchoolInput');
+    elements.customSchoolSearchBtn = document.getElementById('customSchoolSearchBtn');
+    elements.customSchoolResetBtn = document.getElementById('customSchoolResetBtn');
+    elements.customSchoolResult = document.getElementById('customSchoolResult');
+    elements.customSchoolSummary = document.getElementById('customSchoolSummary');
+    elements.customSchoolTabSchool = document.getElementById('customSchoolTabSchool');
+    elements.customSchoolTabClass = document.getElementById('customSchoolTabClass');
+    elements.customSchoolSchoolView = document.getElementById('customSchoolSchoolView');
+    elements.customSchoolClassView = document.getElementById('customSchoolClassView');
+    elements.customSchoolTableHead = document.getElementById('customSchoolTableHead');
+    elements.customSchoolTableBody = document.getElementById('customSchoolTableBody');
+    elements.customSchoolClassTableHead = document.getElementById('customSchoolClassTableHead');
+    elements.customSchoolClassTableBody = document.getElementById('customSchoolClassTableBody');
 }
+
 
 // 数据库操作
 function saveFile(record, blob) {
@@ -300,7 +314,12 @@ function initHandlers() {
     if (elements.hvDistrictSelect) elements.hvDistrictSelect.onchange = () => { cascadeHighValue('district'); };
     if (elements.applyHighValueFilter) elements.applyHighValueFilter.onclick = applyHighValueFilter;
     if (elements.resetHighValueFilter) elements.resetHighValueFilter.onclick = resetHighValueFilter;
+    if (elements.customSchoolSearchBtn) elements.customSchoolSearchBtn.onclick = applyCustomSchoolSearch;
+    if (elements.customSchoolResetBtn) elements.customSchoolResetBtn.onclick = resetCustomSchoolSearch;
+    if (elements.customSchoolTabSchool) elements.customSchoolTabSchool.onclick = () => switchCustomSchoolTab('school');
+    if (elements.customSchoolTabClass) elements.customSchoolTabClass.onclick = () => switchCustomSchoolTab('class');
 }
+
 
 // 批量上传入口
 async function handleUploadBatch(files) {
@@ -446,6 +465,7 @@ async function loadFileList() {
         if (AppState.cache.size > 0) {
             updateHighValueSels();
             elements.highValueSection.style.display = 'block';
+            if (elements.customSchoolSection) elements.customSchoolSection.style.display = 'block';
         }
     }
 }
@@ -1188,6 +1208,7 @@ function renderDash() {
         elements.chartsSection.style.display = 'none';
         elements.tableSection.style.display = 'none';
         elements.highValueSection.style.display = 'none';
+        if (elements.customSchoolSection) elements.customSchoolSection.style.display = 'none';
         elements.emptyState.style.display = 'block';
         return;
     }
@@ -1197,6 +1218,7 @@ function renderDash() {
     elements.tableSection.style.display = 'block';
     // 有数据时默认显示高价值筛选区域（仅显示筛选项，不自动统计）
     elements.highValueSection.style.display = 'block';
+    if (elements.customSchoolSection) elements.customSchoolSection.style.display = 'block';
     updateHighValueSels();
     renderMet();
     renderCharts();
@@ -1788,3 +1810,167 @@ function showConfirm(message) {
 
 // 响应式
 window.onresize = () => { ['comboChart', 'conversionChart'].forEach(id => { const c = echarts.getInstanceByDom(document.getElementById(id)); if (c) c.resize(); }); };
+
+
+function parseCustomSchoolNames(input = '') {
+    return [...new Set(input.split(/[\n、]+/).map(s => s.trim()).filter(Boolean))];
+}
+
+function applyCustomSchoolSearch() {
+    const names = parseCustomSchoolNames(elements.customSchoolInput?.value || '');
+    if (!names.length) {
+        showMsg('⚠️ 请输入学校名称', 'warning');
+        return;
+    }
+
+    let records = [];
+    AppState.cache.forEach(d => records.push(...d));
+    if (!records.length) {
+        showMsg('⚠️ 暂无上传数据', 'warning');
+        return;
+    }
+
+    const matched = records.filter(r => names.some(name => (r['学校名称'] || '').includes(name)));
+    if (!matched.length) {
+        showMsg('⚠️ 未匹配到重点校数据', 'warning');
+        elements.customSchoolResult.style.display = 'none';
+        return;
+    }
+
+    renderCustomSchoolSchoolView(matched);
+    renderCustomSchoolClassView(matched);
+    elements.customSchoolSummary.textContent = `已匹配 ${names.length} 所目标学校，命中 ${matched.length} 条周次数据`;
+    elements.customSchoolResult.style.display = 'block';
+    switchCustomSchoolTab('school');
+    showMsg(`✅ 已匹配 ${matched.length} 条重点校数据`, 'success');
+}
+
+function resetCustomSchoolSearch() {
+    if (elements.customSchoolInput) elements.customSchoolInput.value = '';
+    if (elements.customSchoolResult) elements.customSchoolResult.style.display = 'none';
+    if (elements.customSchoolTableHead) elements.customSchoolTableHead.innerHTML = '';
+    if (elements.customSchoolTableBody) elements.customSchoolTableBody.innerHTML = '';
+    if (elements.customSchoolClassTableHead) elements.customSchoolClassTableHead.innerHTML = '';
+    if (elements.customSchoolClassTableBody) elements.customSchoolClassTableBody.innerHTML = '';
+    if (elements.customSchoolSummary) elements.customSchoolSummary.textContent = '';
+}
+
+function switchCustomSchoolTab(tab) {
+    const isSchool = tab === 'school';
+    elements.customSchoolTabSchool?.classList.toggle('active', isSchool);
+    elements.customSchoolTabClass?.classList.toggle('active', !isSchool);
+    if (elements.customSchoolSchoolView) elements.customSchoolSchoolView.style.display = isSchool ? 'block' : 'none';
+    if (elements.customSchoolClassView) elements.customSchoolClassView.style.display = isSchool ? 'none' : 'block';
+}
+
+function renderCustomSchoolSchoolView(records) {
+    const grouped = new Map();
+    records.forEach(r => {
+        const key = `${r['省份']||''}|${r['城市']||''}|${r['区县']||''}|${r['学校名称']||''}|${r['年级']||''}`;
+        if (!grouped.has(key)) grouped.set(key, {
+            province: r['省份'] || '-',
+            city: r['城市'] || '-',
+            district: r['区县'] || '-',
+            school: r['学校名称'] || '-',
+            grade: r['年级'] || '-',
+            classIds: new Set(),
+            weeks: new Map()
+        });
+        const g = grouped.get(key);
+        const classId = getClassId(r) || r['班级名称'] || `${r['学校名称'] || ''}-${r['年级'] || ''}-${r.weekLabel || ''}`;
+        g.classIds.add(classId);
+        const wk = r.weekLabel;
+        if (!g.weeks.has(wk)) g.weeks.set(wk, {
+            display: r.weekDisplay,
+            startDate: r.weekStartDate,
+            assignments: 0,
+            completionSum: 0,
+            completionCount: 0,
+            conversionSum: 0,
+            conversionCount: 0,
+            paid: 0,
+            trial: 0
+        });
+        const w = g.weeks.get(wk);
+        w.assignments += +r['布置作业次数'] || 0;
+        w.completionSum += (+r['作业完成率'] || 0) * 100;
+        w.completionCount += 1;
+        if ((+r['转化率'] || 0) > 0) {
+            w.conversionSum += (+r['转化率'] || 0) * 100;
+            w.conversionCount += 1;
+        }
+        w.paid += +r['未过期付费学生数'] || 0;
+        w.trial += +r['未过期试用学生数'] || 0;
+    });
+    const weekMetaMap = buildWeekMetaMap(grouped);
+    const sortedWeeks = sortWeekKeys(weekMetaMap);
+    const lastWeekKey = sortedWeeks[sortedWeeks.length - 1];
+    let thead = '<tr><th rowspan="2">省份</th><th rowspan="2">城市</th><th rowspan="2">区县</th><th rowspan="2">学校</th><th rowspan="2">年级</th><th rowspan="2">年级班级数</th>';
+    sortedWeeks.forEach(week => { const w = weekMetaMap.get(week) || { display: week }; thead += `<th colspan="2" style="text-align:center;">${w.display}</th>`; });
+    thead += '<th rowspan="2">未过期付费</th><th rowspan="2">未过期试用</th><th rowspan="2">转化率</th></tr><tr>';
+    sortedWeeks.forEach(() => { thead += '<th>平均布置作业数</th><th>作业完成率</th>'; });
+    thead += '</tr>';
+    elements.customSchoolTableHead.innerHTML = thead;
+    const rows = [...grouped.values()].sort((a,b)=>`${a.school}${a.grade}`.localeCompare(`${b.school}${b.grade}`,'zh-CN')).map(g => {
+        const classCount = g.classIds.size || 0;
+        let t = `<tr><td>${g.province}</td><td>${g.city}</td><td>${g.district}</td><td class="school-name-cell" title="${g.school}">${g.school}</td><td>${g.grade}</td><td>${classCount}</td>`;
+        sortedWeeks.forEach(week => {
+            const w = g.weeks.get(week);
+            if (!w) { t += '<td>-</td><td>-</td>'; return; }
+            const completion = w.completionCount ? (w.completionSum / w.completionCount).toFixed(1) : '0.0';
+            const avgAssignments = classCount ? (w.assignments / classCount).toFixed(1) : '0.0';
+            const completionClass = Number(completion) < 50 ? 'metric-bad' : 'metric-good';
+            t += `<td class="compact-number-cell">${avgAssignments}</td><td class="compact-number-cell ${completionClass}">${completion}%</td>`;
+        });
+        const lastWeek = g.weeks.get(lastWeekKey);
+        const conversion = lastWeek?.conversionCount ? (lastWeek.conversionSum / lastWeek.conversionCount).toFixed(1) : '0.0';
+        t += `<td>${lastWeek?.paid || 0}</td><td>${lastWeek?.trial || 0}</td><td>${conversion}%</td>`;
+        return t + '</tr>';
+    }).join('');
+    elements.customSchoolTableBody.innerHTML = rows;
+}
+
+function renderCustomSchoolClassView(records) {
+    const groupMap = new Map();
+    records.forEach(r => {
+        const classId = getClassId(r);
+        const key = `${r['省份']||''}|${r['城市']||''}|${r['区县']||''}|${r['学校名称']||''}|${r['年级']||''}|${r['班级名称']||''}|${classId}`;
+        if (!groupMap.has(key)) groupMap.set(key, {
+            province: r['省份'] || '-', city: r['城市'] || '-', district: r['区县'] || '-', school: r['学校名称'] || '-', grade: r['年级'] || '-', teacherName: r['教师姓名'] || r['老师姓名'] || r['教师'] || '-', className: r['班级名称'] || '-', classId: classId || '-', weeks: new Map()
+        });
+        const g = groupMap.get(key);
+        const weekKey = r.weekLabel;
+        if (!g.weeks.has(weekKey)) g.weeks.set(weekKey, { display: r.weekDisplay, startDate: r.weekStartDate, assignments: 0, completionSum: 0, count: 0, paidCount: 0, trialCount: 0, conversionSum: 0, conversionCount: 0 });
+        const w = g.weeks.get(weekKey);
+        w.assignments += +r['布置作业次数'] || 0;
+        w.completionSum += (+r['作业完成率'] || 0) * 100;
+        w.count += 1;
+        w.paidCount += +r['未过期付费学生数'] || 0;
+        w.trialCount += +r['未过期试用学生数'] || 0;
+        if ((+r['转化率'] || 0) > 0) { w.conversionSum += (+r['转化率'] || 0) * 100; w.conversionCount += 1; }
+    });
+    const weekMetaMap = buildWeekMetaMap(groupMap);
+    const sortedWeeks = sortWeekKeys(weekMetaMap);
+    let thead = '<tr><th rowspan="2">省份</th><th rowspan="2">城市</th><th rowspan="2">区县</th><th rowspan="2">学校</th><th rowspan="2">年级</th><th rowspan="2">老师</th><th rowspan="2">班级</th>';
+    sortedWeeks.forEach(week => { const w = weekMetaMap.get(week) || { display: week }; thead += `<th colspan="2" style="text-align:center;">${w.display}</th>`; });
+    thead += '<th rowspan="2">未过期付费</th><th rowspan="2">未过期试用</th><th rowspan="2">转化率</th></tr><tr>';
+    sortedWeeks.forEach(() => { thead += '<th>布置次数</th><th>作业完成率</th>'; });
+    thead += '</tr>';
+    elements.customSchoolClassTableHead.innerHTML = thead;
+    const rows = [...groupMap.values()].sort((a,b)=>`${a.school}${a.grade}${a.className}`.localeCompare(`${b.school}${b.grade}${b.className}`,'zh-CN')).map(g => {
+        let t = `<tr><td>${g.province}</td><td>${g.city}</td><td>${g.district}</td><td>${g.school}</td><td>${g.grade}</td><td>${g.teacherName}</td><td>${g.className}</td>`;
+        sortedWeeks.forEach(weekKey => {
+            const w = g.weeks.get(weekKey);
+            if (!w) { t += '<td>-</td><td>-</td>'; return; }
+            const completion = w.count ? (w.completionSum / w.count).toFixed(1) : '0.0';
+            const completionClass = Number(completion) < 50 ? 'metric-bad' : 'metric-good';
+            t += `<td>${w.assignments}</td><td class="${completionClass}">${completion}%</td>`;
+        });
+        const lastWeekKey = sortedWeeks[sortedWeeks.length - 1];
+        const lastWeek = g.weeks.get(lastWeekKey);
+        const conversion = lastWeek?.conversionCount ? (lastWeek.conversionSum / lastWeek.conversionCount).toFixed(1) : '0.0';
+        t += `<td>${lastWeek?.paidCount || 0}</td><td>${lastWeek?.trialCount || 0}</td><td>${conversion}%</td></tr>`;
+        return t;
+    }).join('');
+    elements.customSchoolClassTableBody.innerHTML = rows;
+}
