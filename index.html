@@ -726,6 +726,46 @@
                         自定义文本框
                     </label>
                     <textarea id="customSchoolInput" class="custom-school-textarea" placeholder="请输入学校名称，支持多所学校；可用换行或“、”分隔"></textarea>
+                    <div class="custom-school-filter-grid">
+                        <div class="filter-group">
+                            <label class="filter-label">
+                                <span class="label-icon">🎓</span>
+                                学段
+                            </label>
+                            <select id="customSchoolStageFilter" class="filter-select">
+                                <option value="">不限</option>
+                                <option value="小学">小学</option>
+                                <option value="初中">初中</option>
+                                <option value="高中">高中</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label class="filter-label">
+                                <span class="label-icon">📈</span>
+                                作业平均布置数
+                            </label>
+                            <select id="customSchoolAvgAssignFilter" class="filter-select">
+                                <option value="">不限</option>
+                                <option value="eq0">等于0</option>
+                                <option value="gt0.5">大于0.5</option>
+                                <option value="gt0.8">大于0.8</option>
+                                <option value="gt1">大于1</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label class="filter-label">
+                                <span class="label-icon">✅</span>
+                                作业完成率
+                            </label>
+                            <select id="customSchoolCompletionFilter" class="filter-select">
+                                <option value="">不限</option>
+                                <option value="gt0.8">大于0.8</option>
+                                <option value="between0.5_0.8">0.5-0.8</option>
+                                <option value="lt0.5">小于0.5</option>
+                                <option value="eq0">等于0</option>
+                            </select>
+                        </div>
+                    </div>
                     <div class="custom-school-actions">
                         <button id="customSchoolSearchBtn" class="btn btn-primary btn-small">
                             <span class="btn-icon">🔍</span>

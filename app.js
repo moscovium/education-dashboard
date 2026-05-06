@@ -110,6 +110,9 @@ function initElements() {
     elements.customSchoolInput = document.getElementById('customSchoolInput');
     elements.customSchoolSearchBtn = document.getElementById('customSchoolSearchBtn');
     elements.customSchoolResetBtn = document.getElementById('customSchoolResetBtn');
+    elements.customSchoolAvgAssignFilter = document.getElementById('customSchoolAvgAssignFilter');
+    elements.customSchoolCompletionFilter = document.getElementById('customSchoolCompletionFilter');
+    elements.customSchoolStageFilter = document.getElementById('customSchoolStageFilter');
     elements.customSchoolResult = document.getElementById('customSchoolResult');
     elements.customSchoolSummary = document.getElementById('customSchoolSummary');
     elements.customSchoolTabSchool = document.getElementById('customSchoolTabSchool');
@@ -1812,6 +1815,15 @@ function showConfirm(message) {
 window.onresize = () => { ['comboChart', 'conversionChart'].forEach(id => { const c = echarts.getInstanceByDom(document.getElementById(id)); if (c) c.resize(); }); };
 
 
+function inferStageFromGrade(grade = '') {
+    const text = String(grade || '').trim();
+    if (!text) return '';
+    if (/高一|高二|高三|普高|职高|中专/.test(text)) return '高中';
+    if (/初一|初二|初三|七年级|八年级|九年级|7年级|8年级|9年级/.test(text)) return '初中';
+    if (/一年级|二年级|三年级|四年级|五年级|六年级|1年级|2年级|3年级|4年级|5年级|6年级|小学/.test(text)) return '小学';
+    return '';
+}
+
 function parseCustomSchoolNames(input = '') {
     return [...new Set(input.split(/[\n、]+/).map(s => s.trim()).filter(Boolean))];
 }
@@ -1830,6 +1842,9 @@ function applyCustomSchoolSearch() {
         return;
     }
 
+    const avgAssignFilter = elements.customSchoolAvgAssignFilter?.value || '';
+    const completionFilter = elements.customSchoolCompletionFilter?.value || '';
+    const stageFilter = elements.customSchoolStageFilter?.value || '';
     const matched = records.filter(r => names.some(name => (r['学校名称'] || '').includes(name)));
     if (!matched.length) {
         showMsg('⚠️ 未匹配到重点校数据', 'warning');
@@ -1837,8 +1852,8 @@ function applyCustomSchoolSearch() {
         return;
     }
 
-    renderCustomSchoolSchoolView(matched);
-    renderCustomSchoolClassView(matched);
+    renderCustomSchoolSchoolView(matched, names, avgAssignFilter, completionFilter, stageFilter);
+    renderCustomSchoolClassView(matched, names, stageFilter);
     elements.customSchoolSummary.textContent = `已匹配 ${names.length} 所目标学校，命中 ${matched.length} 条周次数据`;
     elements.customSchoolResult.style.display = 'block';
     switchCustomSchoolTab('school');
@@ -1847,6 +1862,9 @@ function applyCustomSchoolSearch() {
 
 function resetCustomSchoolSearch() {
     if (elements.customSchoolInput) elements.customSchoolInput.value = '';
+    if (elements.customSchoolAvgAssignFilter) elements.customSchoolAvgAssignFilter.value = '';
+    if (elements.customSchoolCompletionFilter) elements.customSchoolCompletionFilter.value = '';
+    if (elements.customSchoolStageFilter) elements.customSchoolStageFilter.value = '';
     if (elements.customSchoolResult) elements.customSchoolResult.style.display = 'none';
     if (elements.customSchoolTableHead) elements.customSchoolTableHead.innerHTML = '';
     if (elements.customSchoolTableBody) elements.customSchoolTableBody.innerHTML = '';
@@ -1863,7 +1881,7 @@ function switchCustomSchoolTab(tab) {
     if (elements.customSchoolClassView) elements.customSchoolClassView.style.display = isSchool ? 'none' : 'block';
 }
 
-function renderCustomSchoolSchoolView(records) {
+function renderCustomSchoolSchoolView(records, inputNames = [], avgAssignFilter = '', completionFilter = '', stageFilter = '') {
     const grouped = new Map();
     records.forEach(r => {
         const key = `${r['省份']||''}|${r['城市']||''}|${r['区县']||''}|${r['学校名称']||''}|${r['年级']||''}`;
@@ -1911,7 +1929,38 @@ function renderCustomSchoolSchoolView(records) {
     sortedWeeks.forEach(() => { thead += '<th>平均布置作业数</th><th>作业完成率</th>'; });
     thead += '</tr>';
     elements.customSchoolTableHead.innerHTML = thead;
-    const rows = [...grouped.values()].sort((a,b)=>`${a.school}${a.grade}`.localeCompare(`${b.school}${b.grade}`,'zh-CN')).map(g => {
+    const rows = [...grouped.values()].sort((a, b) => {
+        const getOrder = (school) => {
+            const idx = inputNames.findIndex(name => school.includes(name));
+            return idx === -1 ? Number.MAX_SAFE_INTEGER : idx;
+        };
+        const orderDiff = getOrder(a.school) - getOrder(b.school);
+        if (orderDiff !== 0) return orderDiff;
+        return `${a.school}${a.grade}`.localeCompare(`${b.school}${b.grade}`, 'zh-CN');
+    }).filter(g => {
+        const classCount = g.classIds.size || 0;
+        const lastWeek = g.weeks.get(lastWeekKey);
+        const avgAssignments = lastWeek && classCount ? (lastWeek.assignments / classCount) : 0;
+        const completion = lastWeek && lastWeek.completionCount ? (lastWeek.completionSum / lastWeek.completionCount) / 100 : 0;
+        const stage = inferStageFromGrade(g.grade);
+
+        let stagePass = true;
+        if (stageFilter) stagePass = stage === stageFilter;
+
+        let avgPass = true;
+        if (avgAssignFilter === 'eq0') avgPass = avgAssignments === 0;
+        if (avgAssignFilter === 'gt0.5') avgPass = avgAssignments > 0.5;
+        if (avgAssignFilter === 'gt0.8') avgPass = avgAssignments > 0.8;
+        if (avgAssignFilter === 'gt1') avgPass = avgAssignments > 1;
+
+        let completionPass = true;
+        if (completionFilter === 'gt0.8') completionPass = completion > 0.8;
+        if (completionFilter === 'between0.5_0.8') completionPass = completion >= 0.5 && completion <= 0.8;
+        if (completionFilter === 'lt0.5') completionPass = completion < 0.5;
+        if (completionFilter === 'eq0') completionPass = completion === 0;
+
+        return stagePass && avgPass && completionPass;
+    }).map(g => {
         const classCount = g.classIds.size || 0;
         let t = `<tr><td>${g.province}</td><td>${g.city}</td><td>${g.district}</td><td class="school-name-cell" title="${g.school}">${g.school}</td><td>${g.grade}</td><td>${classCount}</td>`;
         sortedWeeks.forEach(week => {
@@ -1930,7 +1979,7 @@ function renderCustomSchoolSchoolView(records) {
     elements.customSchoolTableBody.innerHTML = rows;
 }
 
-function renderCustomSchoolClassView(records) {
+function renderCustomSchoolClassView(records, inputNames = [], stageFilter = '') {
     const groupMap = new Map();
     records.forEach(r => {
         const classId = getClassId(r);
@@ -1957,7 +2006,18 @@ function renderCustomSchoolClassView(records) {
     sortedWeeks.forEach(() => { thead += '<th>布置次数</th><th>作业完成率</th>'; });
     thead += '</tr>';
     elements.customSchoolClassTableHead.innerHTML = thead;
-    const rows = [...groupMap.values()].sort((a,b)=>`${a.school}${a.grade}${a.className}`.localeCompare(`${b.school}${b.grade}${b.className}`,'zh-CN')).map(g => {
+    const rows = [...groupMap.values()].sort((a, b) => {
+        const getOrder = (school) => {
+            const idx = inputNames.findIndex(name => school.includes(name));
+            return idx === -1 ? Number.MAX_SAFE_INTEGER : idx;
+        };
+        const orderDiff = getOrder(a.school) - getOrder(b.school);
+        if (orderDiff !== 0) return orderDiff;
+        return `${a.school}${a.grade}${a.className}`.localeCompare(`${b.school}${b.grade}${b.className}`, 'zh-CN');
+    }).filter(g => {
+        if (!stageFilter) return true;
+        return inferStageFromGrade(g.grade) === stageFilter;
+    }).map(g => {
         let t = `<tr><td>${g.province}</td><td>${g.city}</td><td>${g.district}</td><td>${g.school}</td><td>${g.grade}</td><td>${g.teacherName}</td><td>${g.className}</td>`;
         sortedWeeks.forEach(weekKey => {
             const w = g.weeks.get(weekKey);

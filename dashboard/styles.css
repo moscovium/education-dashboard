@@ -1103,6 +1103,18 @@ body {
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
+.custom-school-filter-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(180px, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+    align-items: end;
+}
+
+.custom-school-filter-grid .filter-group {
+    min-width: 0;
+}
+
 .custom-school-actions,
 .custom-school-tabs {
     display: flex;
@@ -1144,7 +1156,16 @@ body {
     word-break: keep-all;
     text-align: center;
     line-height: 1.2;
-    padding: 6px 8px;
+    padding: 5px 6px;
+    font-size: 12px;
+}
+
+#customSchoolTable th {
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.15;
+    padding: 6px 5px;
+    font-size: 11px;
 }
 
 #customSchoolTable td.school-name-cell {
@@ -1156,9 +1177,9 @@ body {
     -webkit-line-clamp: 2;
     line-clamp: 2;
     text-align: left;
-    max-width: 140px;
-    min-width: 120px;
-    line-height: 1.25;
+    max-width: 180px;
+    min-width: 150px;
+    line-height: 1.2;
 }
 
 .compact-number-cell {
