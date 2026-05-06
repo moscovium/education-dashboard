@@ -1104,15 +1104,20 @@ body {
 }
 
 .custom-school-filter-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(180px, 1fr));
+    display: flex;
+    flex-wrap: nowrap;
     gap: 12px;
     margin-top: 12px;
     align-items: end;
 }
 
 .custom-school-filter-grid .filter-group {
+    flex: 1 1 0;
     min-width: 0;
+}
+
+.custom-school-filter-grid .filter-select {
+    width: 100%;
 }
 
 .custom-school-actions,
