@@ -6,7 +6,7 @@ const MAX_STORAGE_MB = 500; // 最大存储限制（MB）
 let db = null;
 const AppState = { files: [], filteredData: [], cache: new Map(), provinces: new Set(), cities: new Set(), districts: new Set(), schools: new Set(), grades: new Set() };
 const elements = {};
-const APP_VERSION = 'v2.3.2-root-20260506b';
+const APP_VERSION = 'v2.4.1-root-20260507b';
 const getClassId = (r = {}) => r['班级 id'] || r['班级ID'] || r['班级id'] || r['班级'] || r['classId'] || r['class_id'] || '';
 const buildWeekMetaMap = (groupMap) => {
     const weekMetaMap = new Map();
@@ -102,6 +102,7 @@ function initElements() {
     elements.hvCompletionRateSelect = document.getElementById('hvCompletionRateSelect');
     elements.hvTrialCountSelect = document.getElementById('hvTrialCountSelect');
     elements.hvSchoolCategorySelect = document.getElementById('hvSchoolCategorySelect');
+    elements.hvFavoriteSelect = document.getElementById('hvFavoriteSelect');
     elements.highValueTableBody = document.getElementById('highValueTableBody');
     elements.highValueInfo = document.getElementById('highValueInfo');
     elements.applyHighValueFilter = document.getElementById('applyHighValueFilter');
@@ -113,12 +114,17 @@ function initElements() {
     elements.customSchoolAvgAssignFilter = document.getElementById('customSchoolAvgAssignFilter');
     elements.customSchoolCompletionFilter = document.getElementById('customSchoolCompletionFilter');
     elements.customSchoolStageFilter = document.getElementById('customSchoolStageFilter');
+    elements.customSchoolGradeFilter = document.getElementById('customSchoolGradeFilter');
     elements.customSchoolResult = document.getElementById('customSchoolResult');
     elements.customSchoolSummary = document.getElementById('customSchoolSummary');
     elements.customSchoolTabSchool = document.getElementById('customSchoolTabSchool');
+    elements.customSchoolTabGrade = document.getElementById('customSchoolTabGrade');
     elements.customSchoolTabClass = document.getElementById('customSchoolTabClass');
     elements.customSchoolSchoolView = document.getElementById('customSchoolSchoolView');
+    elements.customSchoolGradeView = document.getElementById('customSchoolGradeView');
     elements.customSchoolClassView = document.getElementById('customSchoolClassView');
+    elements.customSchoolSchoolTableHead = document.getElementById('customSchoolSchoolTableHead');
+    elements.customSchoolSchoolTableBody = document.getElementById('customSchoolSchoolTableBody');
     elements.customSchoolTableHead = document.getElementById('customSchoolTableHead');
     elements.customSchoolTableBody = document.getElementById('customSchoolTableBody');
     elements.customSchoolClassTableHead = document.getElementById('customSchoolClassTableHead');
@@ -320,6 +326,7 @@ function initHandlers() {
     if (elements.customSchoolSearchBtn) elements.customSchoolSearchBtn.onclick = applyCustomSchoolSearch;
     if (elements.customSchoolResetBtn) elements.customSchoolResetBtn.onclick = resetCustomSchoolSearch;
     if (elements.customSchoolTabSchool) elements.customSchoolTabSchool.onclick = () => switchCustomSchoolTab('school');
+    if (elements.customSchoolTabGrade) elements.customSchoolTabGrade.onclick = () => switchCustomSchoolTab('grade');
     if (elements.customSchoolTabClass) elements.customSchoolTabClass.onclick = () => switchCustomSchoolTab('class');
 }
 
@@ -594,6 +601,7 @@ function filterSchoolOptions(keyword) {
         updateSel(elements.schoolSelect, new Set(allSchools));
     } else {
         const searchLower = keyword.toLowerCase().trim();
+    const exactKeyword = keyword.trim();
         const filtered = allSchools.filter(s => s.toLowerCase().includes(searchLower));
         updateSel(elements.schoolSelect, new Set(filtered));
     }
@@ -904,6 +912,8 @@ function applyHighValueFilter() {
     const completionRateThreshold = parseFloat(elements.hvCompletionRateSelect.value) || 0;
     const trialCountThreshold = parseFloat(elements.hvTrialCountSelect.value) || 0;
     const schoolCategoryFilter = elements.hvSchoolCategorySelect.value;
+    const favoriteFilter = elements.hvFavoriteSelect?.value || '';
+    const favoriteSet = loadFavorites();
     
     // 应用筛选 - 付费率为小于等于筛选
     let filteredGrades = gradeMetrics.filter(g => {
@@ -924,6 +934,9 @@ function applyHighValueFilter() {
         }
         if (trialCountThreshold > 0 && g.trialCount < trialCountThreshold) return false;
         if (schoolCategoryFilter && g.schoolCategory !== schoolCategoryFilter) return false;
+        const isFav = favoriteSet.has(favoriteKey(g));
+        if (favoriteFilter === 'yes' && !isFav) return false;
+        if (favoriteFilter === 'no' && isFav) return false;
         return true;
     });
     
@@ -952,6 +965,7 @@ function renderHighValueTable(grades, sortedWeeks) {
                 <th>学生总数</th>
                 <th>未过期试用人数</th>
                 <th>年级付费率</th>
+            <th>收藏</th>
             </tr>`;
         elements.highValueInfo.textContent = '';
         elements.highValueSection.style.display = 'block';
@@ -983,6 +997,7 @@ function renderHighValueTable(grades, sortedWeeks) {
         <th rowspan="2">学生总数</th>
         <th rowspan="2">未过期试用人数</th>
         <th rowspan="2">年级付费率</th>
+        <th rowspan="2">收藏</th>
         <th colspan="${sortedWeeks.length * 2}" style="text-align:center;">作业布置率/平均完成率</th>
     </tr><tr>`;
     sortedWeeks.forEach(week => {
@@ -997,13 +1012,14 @@ function renderHighValueTable(grades, sortedWeeks) {
             <td>${g.province}</td>
             <td>${g.city}</td>
             <td>${g.district}</td>
-            <td>${g.school}</td>
+            <td class="school-name-cell" title="${g.school}">${g.school}</td>
             <td style="text-align:center;font-weight:600;color:${g.schoolCategory === '付费校' ? '#10b981' : g.schoolCategory === '付费率需提升校' ? '#f59e0b' : '#6b7280'};">${g.schoolCategory}</td>
             <td>${g.grade}</td>
             <td style="text-align:center;">${g.classCount}</td>
             <td style="text-align:center;">${g.studentCount.toLocaleString()}</td>
             <td style="text-align:center;">${g.trialCount.toLocaleString()}</td>
-            <td style="text-align:center;font-weight:600;color:${g.payRate >= 30 ? '#10b981' : '#f59e0b'};">${g.payRate.toFixed(1)}%</td>`;
+            <td style="text-align:center;font-weight:600;color:${g.payRate >= 30 ? '#10b981' : '#f59e0b'};">${g.payRate.toFixed(1)}%</td>
+            <td style="text-align:center;"><button class="favorite-toggle" data-fav-key="${favoriteKey(g)}" style="border:none;background:none;cursor:pointer;font-size:18px;">${loadFavorites().has(favoriteKey(g)) ? '⭐' : '☆'}</button></td>`;
         
         // 每周的布置率和完成率
         sortedWeeks.forEach(week => {
@@ -1023,6 +1039,8 @@ function renderHighValueTable(grades, sortedWeeks) {
     const lastWeek = sortedWeeks.length > 0 ? sortedWeeks[sortedWeeks.length - 1] : '';
     elements.highValueInfo.textContent = `共 ${grades.length} 条记录 | 数据来源：${sortedWeeks.length}周（${lastWeek}）`;
     elements.highValueSection.style.display = 'block';
+    document.querySelectorAll('.favorite-toggle').forEach(btn => { btn.onclick = () => toggleFavoriteByKey(btn.dataset.favKey); });
+    scheduleAdaptNameCells();
 }
 
 function resetHighValueFilter() {
@@ -1036,6 +1054,7 @@ function resetHighValueFilter() {
     elements.hvCompletionRateSelect.value = '';
     elements.hvTrialCountSelect.value = '';
     elements.hvSchoolCategorySelect.value = '';
+    if (elements.hvFavoriteSelect) elements.hvFavoriteSelect.value = '';
     updateHighValueSels();
     renderHighValueTable([], []);
     elements.highValueSection.style.display = AppState.filteredData.length ? 'block' : 'none';
@@ -1062,6 +1081,14 @@ function updateSel(sel, vals) {
 
 // 应用筛选
 async function applyFilter() {
+    const searchModeBtn = document.getElementById('modeSearch');
+    const isQuickSearchMode = !!(searchModeBtn && searchModeBtn.classList.contains('active'));
+    if (isQuickSearchMode) {
+        const keyword = document.getElementById('schoolSearchInput')?.value || '';
+        await quickSearch(keyword);
+        return;
+    }
+
     const sd = elements.startDate.value, ed = elements.endDate.value;
     if (!sd || !ed) { alert('请选择日期范围'); return; }
     const st = dayjs(sd), en = dayjs(ed);
@@ -1116,6 +1143,7 @@ async function quickSearch(keyword) {
     }
     
     const searchLower = keyword.toLowerCase().trim();
+    const exactKeyword = keyword.trim();
     
     showLoading();
     try {
@@ -1131,7 +1159,9 @@ async function quickSearch(keyword) {
         
         // 根据关键词模糊搜索学校名称
         AppState.filteredData = all.filter(r => {
-            const schoolName = (r['学校名称'] || '').toLowerCase();
+            const schoolNameRaw = (r['学校名称'] || '').trim();
+            const schoolName = schoolNameRaw.toLowerCase();
+            if (schoolNameRaw === exactKeyword) return true;
             return schoolName.includes(searchLower);
         });
         
@@ -1286,18 +1316,27 @@ function renderMet() {
 
 // 图表 - 修复：作业完成率显示平均值
 function renderCharts() {
+    const comboEl = document.getElementById('comboChart');
+    if (comboEl) {
+        const comboInst = echarts.getInstanceByDom(comboEl);
+        if (comboInst) comboInst.dispose();
+        comboEl.closest('.chart-card')?.remove();
+    }
+
+    const conversionEl = document.getElementById('conversionChart');
+    if (!conversionEl) return;
+    const oldConversion = echarts.getInstanceByDom(conversionEl);
+    if (oldConversion) oldConversion.dispose();
+
     const wm = new Map();
     AppState.filteredData.forEach(r => {
         const k = r.weekLabel;
-        if (!wm.has(k)) wm.set(k, { label: r.weekFullDisplay, a: 0, c: 0, v: 0, n: 0, cSum: 0, vSum: 0, paidSum: 0 });
+        if (!wm.has(k)) wm.set(k, { label: r.weekFullDisplay, v: 0, n: 0, vSum: 0, paidSum: 0 });
         const w = wm.get(k);
-        w.a += +r['布置作业次数'] || 0;
-        w.cSum += (+r['作业完成率'] || 0) * 100;  // 小数转百分数，累加
-        w.vSum += (+r['转化率'] || 0) * 100;      // 小数转百分数，累加
-        w.paidSum += +r['未过期付费学生数'] || 0;  // 未过期付费学生数求和
+        w.vSum += (+r['转化率'] || 0) * 100;
+        w.paidSum += +r['未过期付费学生数'] || 0;
         w.n++;
-        w.c = w.n ? (w.cSum / w.n).toFixed(1) : 0;  // 平均值
-        w.v = w.n ? (w.vSum / w.n).toFixed(1) : 0;  // 平均值
+        w.v = w.n ? (w.vSum / w.n).toFixed(1) : 0;
     });
     const sw = [...wm.entries()].sort((a, b) => {
         const aStart = a[1].label.split('至')[0].trim();
@@ -1306,73 +1345,12 @@ function renderCharts() {
     });
     const data = {
         labels: sw.map(([_, d]) => d.label),
-        a: sw.map(([_, d]) => d.a),
-        c: sw.map(([_, d]) => d.c),  // 平均值
-        v: sw.map(([_, d]) => d.v),   // 平均值
-        paid: sw.map(([_, d]) => d.paidSum)  // 未过期付费学生数
+        v: sw.map(([_, d]) => d.v),
+        paid: sw.map(([_, d]) => d.paidSum)
     };
-    
-    echarts.init(document.getElementById('comboChart')).setOption({
-        tooltip: { 
-            trigger: 'axis',
-            formatter: function(params) {
-                let result = params[0].name + '<br/>';
-                params.forEach(p => {
-                    result += p.marker + p.seriesName + ': ' + p.value + (p.seriesName.includes('率') ? '%' : '次') + '<br/>';
-                });
-                return result;
-            }
-        },
-        legend: { data: ['布置作业次数', '作业完成率'], top: 0 },
-        grid: { left: '3%', right: '4%', bottom: '3%', top: '15%', containLabel: true },
-        xAxis: { type: 'category', data: data.labels, axisLabel: { rotate: 45, color: '#64748b' } },
-        yAxis: [{ 
-            type: 'value', 
-            name: '次数', 
-            axisLabel: { color: '#3b82f6' }, 
-            position: 'left' 
-        }, { 
-            type: 'value', 
-            name: '完成率', 
-            axisLabel: { color: '#10b981', formatter: '{value}%' }, 
-            position: 'right',
-            min: 0,
-            max: 100
-        }],
-        series: [{ 
-            name: '布置作业次数', 
-            type: 'bar', 
-            data: data.a, 
-            itemStyle: { 
-                color: new echarts.graphic.LinearGradient(0,0,0,1, [{offset:0,color:'#3b82f6'},{offset:1,color:'#1d4ed8'}]) 
-            },
-            label: {
-                show: true,
-                position: 'top',
-                color: '#3b82f6',
-                fontSize: 11,
-                formatter: '{c}'
-            }
-        }, { 
-            name: '作业完成率', 
-            type: 'line', 
-            yAxisIndex: 1, 
-            data: data.c, 
-            smooth: true, 
-            lineStyle: { color: '#10b981', width: 3 }, 
-            itemStyle: { color: '#10b981' },
-            label: {
-                show: true,
-                position: 'top',
-                color: '#10b981',
-                fontSize: 11,
-                formatter: '{c}%'
-            }
-        }]
-    });
-    
-    echarts.init(document.getElementById('conversionChart')).setOption({
-        tooltip: { 
+
+    echarts.init(conversionEl).setOption({
+        tooltip: {
             trigger: 'axis',
             formatter: function(params) {
                 let result = params[0].name + '<br/>';
@@ -1385,25 +1363,25 @@ function renderCharts() {
         legend: { data: ['未过期付费学生数', '转化率'], top: 0 },
         grid: { left: '3%', right: '4%', bottom: '3%', top: '15%', containLabel: true },
         xAxis: { type: 'category', data: data.labels, axisLabel: { rotate: 45, color: '#64748b' } },
-        yAxis: [{ 
-            type: 'value', 
-            name: '人数', 
-            axisLabel: { color: '#f59e0b' }, 
-            position: 'left' 
-        }, { 
-            type: 'value', 
-            name: '转化率', 
-            axisLabel: { color: '#8b5cf6', formatter: '{value}%' }, 
+        yAxis: [{
+            type: 'value',
+            name: '人数',
+            axisLabel: { color: '#f59e0b' },
+            position: 'left'
+        }, {
+            type: 'value',
+            name: '转化率',
+            axisLabel: { color: '#8b5cf6', formatter: '{value}%' },
             position: 'right',
             min: 0,
             max: 100
         }],
-        series: [{ 
-            name: '未过期付费学生数', 
-            type: 'bar', 
-            data: data.paid, 
-            itemStyle: { 
-                color: new echarts.graphic.LinearGradient(0,0,0,1, [{offset:0,color:'#f59e0b'},{offset:1,color:'#d97706'}]) 
+        series: [{
+            name: '未过期付费学生数',
+            type: 'bar',
+            data: data.paid,
+            itemStyle: {
+                color: new echarts.graphic.LinearGradient(0,0,0,1, [{offset:0,color:'#f59e0b'},{offset:1,color:'#d97706'}])
             },
             label: {
                 show: true,
@@ -1412,13 +1390,13 @@ function renderCharts() {
                 fontSize: 11,
                 formatter: '{c}'
             }
-        }, { 
-            name: '转化率', 
-            type: 'line', 
-            yAxisIndex: 1, 
-            data: data.v, 
-            smooth: true, 
-            lineStyle: { color: '#8b5cf6', width: 3 }, 
+        }, {
+            name: '转化率',
+            type: 'line',
+            yAxisIndex: 1,
+            data: data.v,
+            smooth: true,
+            lineStyle: { color: '#8b5cf6', width: 3 },
             itemStyle: { color: '#8b5cf6' },
             label: {
                 show: true,
@@ -1551,9 +1529,9 @@ function renderTbl(page = 1) {
         tbody += `<td>${g.province}</td>`;
         tbody += `<td>${g.city}</td>`;
         tbody += `<td>${g.district}</td>`;
-        tbody += `<td>${g.school}</td>`;
+        tbody += `<td class="school-name-cell" title="${g.school}">${g.school}</td>`;
         tbody += `<td>${g.grade}</td>`;
-        tbody += `<td>${g.teacherName}</td>`;
+        tbody += `<td class="teacher-name-cell" title="${g.teacherName}">${g.teacherName}</td>`;
         tbody += `<td>${g.className}</td>`;
         
         sortedWeeks.forEach(weekKey => {
@@ -1580,6 +1558,7 @@ function renderTbl(page = 1) {
     // 分别设置 thead 和 tbody
     theadEl.innerHTML = theadHtml;
     elements.tableBody.innerHTML = tbody;
+    scheduleAdaptNameCells();
     
     // 渲染分页
     renderPagination(totalPages, currentPage, totalRows, startIdx + 1, endIdx);
@@ -1812,7 +1791,7 @@ function showConfirm(message) {
 }
 
 // 响应式
-window.onresize = () => { ['comboChart', 'conversionChart'].forEach(id => { const c = echarts.getInstanceByDom(document.getElementById(id)); if (c) c.resize(); }); };
+window.onresize = () => { ['conversionChart'].forEach(id => { const el=document.getElementById(id); const c = el ? echarts.getInstanceByDom(el) : null; if (c) c.resize(); }); scheduleAdaptNameCells(); };
 
 
 function inferStageFromGrade(grade = '') {
@@ -1822,6 +1801,61 @@ function inferStageFromGrade(grade = '') {
     if (/初一|初二|初三|七年级|八年级|九年级|7年级|8年级|9年级/.test(text)) return '初中';
     if (/一年级|二年级|三年级|四年级|五年级|六年级|1年级|2年级|3年级|4年级|5年级|6年级|小学/.test(text)) return '小学';
     return '';
+}
+
+const FAVORITES_KEY = 'education-dashboard-hv-favorites';
+function loadFavorites() { try { return new Set(JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]')); } catch { return new Set(); } }
+function saveFavorites(set) { localStorage.setItem(FAVORITES_KEY, JSON.stringify([...set])); }
+function favoriteKey(g) { return `${g.province}|${g.city}|${g.district}|${g.school}|${g.grade}`; }
+function toggleFavoriteByKey(key) { const favs = loadFavorites(); if (favs.has(key)) favs.delete(key); else favs.add(key); saveFavorites(favs); applyHighValueFilter(); }
+
+function adaptNameCells(scope = document) {
+    const cells = scope.querySelectorAll('.school-name-cell, .teacher-name-cell');
+    cells.forEach(cell => {
+        cell.classList.remove('allow-one-line', 'allow-two-lines');
+        const text = (cell.textContent || '').trim();
+        if (!text) return;
+
+        const resetDisplay = cell.classList.contains('teacher-name-cell') ? 'table-cell' : 'table-cell';
+        cell.style.display = resetDisplay;
+        cell.style.whiteSpace = 'nowrap';
+        cell.style.webkitLineClamp = 'unset';
+        cell.style.overflow = 'hidden';
+
+        const fitsOneLine = cell.scrollWidth <= cell.clientWidth + 1;
+        if (fitsOneLine) {
+            cell.classList.add('allow-one-line');
+            cell.style.display = '';
+            cell.style.whiteSpace = '';
+            cell.style.webkitLineClamp = '';
+            cell.style.overflow = '';
+            return;
+        }
+
+        cell.classList.add('allow-two-lines');
+        cell.style.display = '-webkit-box';
+        cell.style.whiteSpace = 'normal';
+        cell.style.webkitBoxOrient = 'vertical';
+        cell.style.webkitLineClamp = '2';
+        cell.style.overflow = 'hidden';
+
+        const lineHeight = parseFloat(window.getComputedStyle(cell).lineHeight) || 16;
+        const maxTwoLineHeight = lineHeight * 2 + 2;
+        const fitsTwoLines = cell.scrollHeight <= maxTwoLineHeight;
+        if (!fitsTwoLines) {
+            const wrapper = cell.closest('.table-wrapper, .high-value-table-wrapper');
+            if (wrapper) wrapper.style.overflowX = 'auto';
+        }
+
+        cell.style.display = '';
+        cell.style.whiteSpace = '';
+        cell.style.webkitLineClamp = '';
+        cell.style.overflow = '';
+    });
+}
+
+function scheduleAdaptNameCells() {
+    requestAnimationFrame(() => adaptNameCells(document));
 }
 
 function parseCustomSchoolNames(input = '') {
@@ -1852,19 +1886,28 @@ function applyCustomSchoolSearch() {
         return;
     }
 
-    renderCustomSchoolSchoolView(matched, names, avgAssignFilter, completionFilter, stageFilter);
-    renderCustomSchoolClassView(matched, names, stageFilter);
-    elements.customSchoolSummary.textContent = `已匹配 ${names.length} 所目标学校，命中 ${matched.length} 条周次数据`;
+    populateCustomSchoolGradeFilter(matched);
+    const gradeFilter = elements.customSchoolGradeFilter?.value || '';
+
+    renderCustomSchoolAggregateSchoolView(matched, names, stageFilter, gradeFilter);
+    renderCustomSchoolSchoolView(matched, names, avgAssignFilter, completionFilter, stageFilter, gradeFilter);
+    renderCustomSchoolClassView(matched, names, stageFilter, gradeFilter);
+    const weekStarts = [...new Set(matched.map(r => r.weekStartDate))].sort();
+    const lastWeekStart = weekStarts[weekStarts.length - 1] || '';
+    elements.customSchoolSummary.textContent = `共 ${matched.length} 条记录 | 数据来源：${weekStarts.length}周（${lastWeekStart}）`;
     elements.customSchoolResult.style.display = 'block';
     switchCustomSchoolTab('school');
+    scheduleAdaptNameCells();
     showMsg(`✅ 已匹配 ${matched.length} 条重点校数据`, 'success');
 }
 
 function resetCustomSchoolSearch() {
+    if (elements.customSchoolGradeFilter) elements.customSchoolGradeFilter.innerHTML = '<option value="">不限</option>';
     if (elements.customSchoolInput) elements.customSchoolInput.value = '';
     if (elements.customSchoolAvgAssignFilter) elements.customSchoolAvgAssignFilter.value = '';
     if (elements.customSchoolCompletionFilter) elements.customSchoolCompletionFilter.value = '';
     if (elements.customSchoolStageFilter) elements.customSchoolStageFilter.value = '';
+    if (elements.customSchoolGradeFilter) elements.customSchoolGradeFilter.value = '';
     if (elements.customSchoolResult) elements.customSchoolResult.style.display = 'none';
     if (elements.customSchoolTableHead) elements.customSchoolTableHead.innerHTML = '';
     if (elements.customSchoolTableBody) elements.customSchoolTableBody.innerHTML = '';
@@ -1875,13 +1918,97 @@ function resetCustomSchoolSearch() {
 
 function switchCustomSchoolTab(tab) {
     const isSchool = tab === 'school';
+    const isGrade = tab === 'grade';
+    const isClass = tab === 'class';
     elements.customSchoolTabSchool?.classList.toggle('active', isSchool);
-    elements.customSchoolTabClass?.classList.toggle('active', !isSchool);
+    elements.customSchoolTabGrade?.classList.toggle('active', isGrade);
+    elements.customSchoolTabClass?.classList.toggle('active', isClass);
     if (elements.customSchoolSchoolView) elements.customSchoolSchoolView.style.display = isSchool ? 'block' : 'none';
-    if (elements.customSchoolClassView) elements.customSchoolClassView.style.display = isSchool ? 'none' : 'block';
+    if (elements.customSchoolGradeView) elements.customSchoolGradeView.style.display = isGrade ? 'block' : 'none';
+    if (elements.customSchoolClassView) elements.customSchoolClassView.style.display = isClass ? 'block' : 'none';
 }
 
-function renderCustomSchoolSchoolView(records, inputNames = [], avgAssignFilter = '', completionFilter = '', stageFilter = '') {
+
+function populateCustomSchoolGradeFilter(records) {
+    if (!elements.customSchoolGradeFilter) return;
+    const current = elements.customSchoolGradeFilter.value;
+    const grades = [...new Set(records.map(r => r['年级']).filter(Boolean))]
+        .sort((a, b) => String(a).localeCompare(String(b), 'zh-CN'));
+    elements.customSchoolGradeFilter.innerHTML = '<option value="">不限</option>' + grades.map(g => `<option value="${g}">${g}</option>`).join('');
+    if (grades.includes(current)) {
+        elements.customSchoolGradeFilter.value = current;
+    }
+}
+
+function renderCustomSchoolAggregateSchoolView(records, inputNames = [], stageFilter = '', gradeFilter = '') {
+    const schoolMap = new Map();
+    records.forEach(r => {
+        const school = r['学校名称'] || '-';
+        const grade = r['年级'] || '-';
+        const key = `${r['省份']||''}|${r['城市']||''}|${r['区县']||''}|${school}`;
+        if (!schoolMap.has(key)) schoolMap.set(key, { province:r['省份']||'-', city:r['城市']||'-', district:r['区县']||'-', school, grades:new Set(), classes:new Set(), lastWeekRows:[], allRows:[] });
+        const g = schoolMap.get(key);
+        g.grades.add(grade);
+        g.classes.add(getClassId(r) || r['班级名称'] || `${school}-${grade}-${r.weekLabel||''}`);
+        g.allRows.push(r);
+    });
+    const weekStarts = [...new Set(records.map(r => r.weekStartDate))].sort();
+    const lastWeekStart = weekStarts[weekStarts.length - 1] || '';
+    schoolMap.forEach(g => { g.lastWeekRows = g.allRows.filter(r => r.weekStartDate === lastWeekStart); });
+
+    const schoolWeeks = [...new Set(records.map(r => r.weekLabel))].sort((a, b) => {
+        const ra = records.find(x => x.weekLabel === a);
+        const rb = records.find(x => x.weekLabel === b);
+        return dayjs(ra?.weekStartDate).isBefore(dayjs(rb?.weekStartDate)) ? -1 : 1;
+    });
+    let schoolHead = '<tr><th rowspan="2">省份</th><th rowspan="2">城市</th><th rowspan="2">区县</th><th rowspan="2">学校</th><th rowspan="2">涉及年级数</th><th rowspan="2">班级总数</th>';
+    schoolWeeks.forEach(week => {
+        const wk = records.find(x => x.weekLabel === week);
+        schoolHead += `<th colspan="2" style="text-align:center;">${wk?.weekDisplay || week}</th>`;
+    });
+    schoolHead += '<th rowspan="2">未过期付费</th><th rowspan="2">未过期试用</th><th rowspan="2">转化率</th></tr><tr>';
+    schoolWeeks.forEach(() => { schoolHead += '<th>平均布置作业数</th><th>作业完成率</th>'; });
+    schoolHead += '</tr>';
+    if (elements.customSchoolSchoolTableHead) elements.customSchoolSchoolTableHead.innerHTML = schoolHead;
+
+    const rows = [...schoolMap.values()]
+        .filter(g => !stageFilter || [...g.grades].some(gr => inferStageFromGrade(gr) === stageFilter))
+        .sort((a,b)=> {
+            const ia=inputNames.findIndex(n=>a.school.includes(n));
+            const ib=inputNames.findIndex(n=>b.school.includes(n));
+            if (ia!==ib) return (ia===-1?1e9:ia)-(ib===-1?1e9:ib);
+            return a.school.localeCompare(b.school,'zh-CN');
+        })
+        .map(g => {
+            const allGrades = [...g.grades];
+            if (gradeFilter && !allGrades.includes(gradeFilter)) return '';
+            const filteredAllRows = gradeFilter ? g.allRows.filter(r => r['年级'] === gradeFilter) : g.allRows;
+            const filteredLastRows = gradeFilter ? g.lastWeekRows.filter(r => r['年级'] === gradeFilter) : g.lastWeekRows;
+            const classCount = new Set(filteredAllRows.map(r => getClassId(r) || r['班级名称'] || `${g.school}-${r['年级']}-${r.weekLabel||''}`)).size;
+            const gradeCount = gradeFilter ? (filteredAllRows.length ? 1 : 0) : g.grades.size;
+            let row = `<tr><td>${g.province}</td><td>${g.city}</td><td>${g.district}</td><td class="school-name-cell" title="${g.school}">${g.school}</td><td>${gradeCount}</td><td>${classCount}</td>`;
+            schoolWeeks.forEach(weekKey => {
+                const weekRows = filteredAllRows.filter(r => r.weekLabel === weekKey);
+                const weekClassCount = new Set(weekRows.map(r => getClassId(r) || r['班级名称'] || `${g.school}-${r['年级']}-${weekKey}`)).size;
+                const assignSum = weekRows.reduce((s,r)=>s+(+r['布置作业次数']||0),0);
+                const avgAssign = weekClassCount ? (assignSum / weekClassCount).toFixed(1) : '0.0';
+                const completionVals = weekRows.map(r => (+r['作业完成率'] || 0) * 100);
+                const completion = completionVals.length ? (completionVals.reduce((a,b)=>a+b,0)/completionVals.length).toFixed(1) : '0.0';
+                const completionClass = Number(completion) < 50 ? 'metric-bad' : 'metric-good';
+                row += `<td class="compact-number-cell">${avgAssign}</td><td class="compact-number-cell ${completionClass}">${completion}%</td>`;
+            });
+            const paid = filteredLastRows.reduce((s,r)=>s+(+r['未过期付费学生数']||0),0);
+            const trial = filteredLastRows.reduce((s,r)=>s+(+r['未过期试用学生数']||0),0);
+            const convVals = filteredLastRows.filter(r => (+r['转化率']||0) >= 0).map(r => (+r['转化率']||0)*100);
+            const conv = convVals.length ? (convVals.reduce((a,b)=>a+b,0)/convVals.length).toFixed(1) : '0.0';
+            row += `<td>${paid}</td><td>${trial}</td><td>${conv}%</td></tr>`;
+            return row;
+        }).join('');
+
+    if (elements.customSchoolSchoolTableBody) elements.customSchoolSchoolTableBody.innerHTML = rows;
+}
+
+function renderCustomSchoolSchoolView(records, inputNames = [], avgAssignFilter = '', completionFilter = '', stageFilter = '', gradeFilter = '') {
     const grouped = new Map();
     records.forEach(r => {
         const key = `${r['省份']||''}|${r['城市']||''}|${r['区县']||''}|${r['学校名称']||''}|${r['年级']||''}`;
@@ -1943,6 +2070,7 @@ function renderCustomSchoolSchoolView(records, inputNames = [], avgAssignFilter 
         const avgAssignments = lastWeek && classCount ? (lastWeek.assignments / classCount) : 0;
         const completion = lastWeek && lastWeek.completionCount ? (lastWeek.completionSum / lastWeek.completionCount) / 100 : 0;
         const stage = inferStageFromGrade(g.grade);
+        const gradePass = !gradeFilter || g.grade === gradeFilter;
 
         let stagePass = true;
         if (stageFilter) stagePass = stage === stageFilter;
@@ -1959,7 +2087,7 @@ function renderCustomSchoolSchoolView(records, inputNames = [], avgAssignFilter 
         if (completionFilter === 'lt0.5') completionPass = completion < 0.5;
         if (completionFilter === 'eq0') completionPass = completion === 0;
 
-        return stagePass && avgPass && completionPass;
+        return stagePass && gradePass && avgPass && completionPass;
     }).map(g => {
         const classCount = g.classIds.size || 0;
         let t = `<tr><td>${g.province}</td><td>${g.city}</td><td>${g.district}</td><td class="school-name-cell" title="${g.school}">${g.school}</td><td>${g.grade}</td><td>${classCount}</td>`;
@@ -1977,9 +2105,10 @@ function renderCustomSchoolSchoolView(records, inputNames = [], avgAssignFilter 
         return t + '</tr>';
     }).join('');
     elements.customSchoolTableBody.innerHTML = rows;
+    scheduleAdaptNameCells();
 }
 
-function renderCustomSchoolClassView(records, inputNames = [], stageFilter = '') {
+function renderCustomSchoolClassView(records, inputNames = [], stageFilter = '', gradeFilter = '') {
     const groupMap = new Map();
     records.forEach(r => {
         const classId = getClassId(r);
@@ -2015,10 +2144,11 @@ function renderCustomSchoolClassView(records, inputNames = [], stageFilter = '')
         if (orderDiff !== 0) return orderDiff;
         return `${a.school}${a.grade}${a.className}`.localeCompare(`${b.school}${b.grade}${b.className}`, 'zh-CN');
     }).filter(g => {
-        if (!stageFilter) return true;
-        return inferStageFromGrade(g.grade) === stageFilter;
+        const stagePass = !stageFilter || inferStageFromGrade(g.grade) === stageFilter;
+        const gradePass = !gradeFilter || g.grade === gradeFilter;
+        return stagePass && gradePass;
     }).map(g => {
-        let t = `<tr><td>${g.province}</td><td>${g.city}</td><td>${g.district}</td><td>${g.school}</td><td>${g.grade}</td><td>${g.teacherName}</td><td>${g.className}</td>`;
+        let t = `<tr><td>${g.province}</td><td>${g.city}</td><td>${g.district}</td><td class="school-name-cell" title="${g.school}">${g.school}</td><td>${g.grade}</td><td class="teacher-name-cell" title="${g.teacherName}">${g.teacherName}</td><td>${g.className}</td>`;
         sortedWeeks.forEach(weekKey => {
             const w = g.weeks.get(weekKey);
             if (!w) { t += '<td>-</td><td>-</td>'; return; }
@@ -2033,4 +2163,5 @@ function renderCustomSchoolClassView(records, inputNames = [], stageFilter = '')
         return t;
     }).join('');
     elements.customSchoolClassTableBody.innerHTML = rows;
+    scheduleAdaptNameCells();
 }

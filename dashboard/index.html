@@ -243,8 +243,8 @@
                     教育数据看板
                 </h1>
                 <p class="dashboard-subtitle">转化率与作业完成情况监测 - 基于班级 ID 关联</p>
-                <div id="debugBar" style="margin-top:8px;font-size:12px;color:#475569;display:flex;gap:12px;flex-wrap:wrap;">页面版本占位：root-20260506b</div>
-                <div id="pageVersion" style="margin-top:6px;font-size:12px;color:#0f172a;font-weight:600;background:#e2e8f0;display:inline-block;padding:4px 10px;border-radius:999px;">页面版本：v20260506b</div>
+                <div id="debugBar" style="margin-top:8px;font-size:12px;color:#475569;display:flex;gap:12px;flex-wrap:wrap;">页面版本占位：root-20260507b</div>
+                <div id="pageVersion" style="margin-top:6px;font-size:12px;color:#0f172a;font-weight:600;background:#e2e8f0;display:inline-block;padding:4px 10px;border-radius:999px;">页面版本：v20260507b</div>
             </div>
         </header>
 
@@ -667,6 +667,17 @@
                             <option value="试用校">试用校</option>
                         </select>
                     </div>
+                    <div class="filter-group">
+                        <label class="filter-label">
+                            <span class="label-icon">⭐</span>
+                            是否收藏
+                        </label>
+                        <select id="hvFavoriteSelect" class="filter-select">
+                            <option value="">不限</option>
+                            <option value="yes">是</option>
+                            <option value="no">否</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="filter-actions">
                     <button id="applyHighValueFilter" class="btn btn-primary btn-small">
@@ -695,6 +706,7 @@
                             <th>学生总数</th>
                             <th>未过期试用人数</th>
                             <th>年级付费率</th>
+                            <th>收藏</th>
                         </tr>
                     </thead>
                     <tbody id="highValueTableBody"></tbody>
@@ -741,6 +753,15 @@
                         </div>
                         <div class="filter-group">
                             <label class="filter-label">
+                                <span class="label-icon">📚</span>
+                                年级
+                            </label>
+                            <select id="customSchoolGradeFilter" class="filter-select">
+                                <option value="">不限</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label class="filter-label">
                                 <span class="label-icon">📈</span>
                                 作业平均布置数
                             </label>
@@ -780,10 +801,19 @@
                 <div class="custom-school-result" id="customSchoolResult" style="display:none;">
                     <div class="custom-school-tabs">
                         <button id="customSchoolTabSchool" class="mode-btn active">按校展示</button>
+                        <button id="customSchoolTabGrade" class="mode-btn">按年级展示</button>
                         <button id="customSchoolTabClass" class="mode-btn">按班级展示</button>
                     </div>
                     <div id="customSchoolSummary" class="high-value-info"></div>
                     <div id="customSchoolSchoolView" class="custom-school-view">
+                        <div class="high-value-table-wrapper">
+                            <table class="data-table" id="customSchoolSchoolTable">
+                                <thead id="customSchoolSchoolTableHead"></thead>
+                                <tbody id="customSchoolSchoolTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div id="customSchoolGradeView" class="custom-school-view" style="display:none;">
                         <div class="high-value-table-wrapper">
                             <table class="data-table" id="customSchoolTable">
                                 <thead id="customSchoolTableHead"></thead>
@@ -805,11 +835,11 @@
     </div>
 
     <script>
-        window.__ROOT_DEPLOY_MARKER__='root-20260506b';
+        window.__ROOT_DEPLOY_MARKER__='root-20260507b';
         document.addEventListener('DOMContentLoaded', function () {
             var input = document.getElementById('fileInput');
             var debugBar = document.getElementById('debugBar');
-            if (debugBar) debugBar.textContent = '页面版本占位：root-20260506b';
+            if (debugBar) debugBar.textContent = '页面版本占位：root-20260507b';
             if (input) {
                 input.addEventListener('change', function (e) {
                     var files = Array.from((e.target && e.target.files) || []);
@@ -824,6 +854,6 @@
             }
         });
     </script>
-    <script src="app.js?v=20260506b"></script>
+    <script src="app.js?v=20260507b"></script>
 </body>
 </html>

@@ -614,6 +614,9 @@ body {
 }
 
 .high-value-table-wrapper {
+    overflow-x: auto;
+    overflow-y: hidden;
+}
     max-height: 500px;
     overflow: auto;
     background: white;
@@ -663,7 +666,8 @@ body {
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(20px);
     border-radius: var(--radius-lg);
-    overflow: hidden;
+    overflow-x: auto;
+    overflow-y: hidden;
     box-shadow: var(--shadow);
     border: 1px solid rgba(255, 255, 255, 0.3);
 }
@@ -1127,18 +1131,136 @@ body {
     margin-top: 12px;
 }
 
-.custom-school-result {
-    margin-top: 16px;
+.custom-school-tabs {
+    flex-wrap: wrap;
+}
+
+.favorite-toggle {
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+}
+
+.favorite-toggle:hover {
+    transform: scale(1.08);
 }
 
 .custom-school-view {
     margin-top: 14px;
 }
 
+#customSchoolSchoolTable,
 #customSchoolTable,
-#customSchoolClassTable {
+#customSchoolClassTable,
+#highValueTable,
+#dataTable {
     width: max-content;
     min-width: 100%;
+    table-layout: auto;
+}
+
+#customSchoolSchoolTable th,
+#customSchoolSchoolTable td,
+#customSchoolTable th,
+#customSchoolTable td,
+#customSchoolClassTable th,
+#customSchoolClassTable td,
+#highValueTable th,
+#highValueTable td,
+#dataTable th,
+#dataTable td {
+    white-space: nowrap;
+    word-break: keep-all;
+    padding: 4px 5px;
+    font-size: 10px;
+    line-height: 1.1;
+    vertical-align: middle;
+}
+
+#customSchoolSchoolTable td.school-name-cell,
+#customSchoolTable td.school-name-cell,
+#customSchoolClassTable td.school-name-cell,
+#highValueTable td.school-name-cell,
+#dataTable td.school-name-cell,
+#customSchoolSchoolTable td.teacher-name-cell,
+#customSchoolTable td.teacher-name-cell,
+#customSchoolClassTable td.teacher-name-cell,
+#highValueTable td.teacher-name-cell,
+#dataTable td.teacher-name-cell {
+    max-width: 160px;
+    min-width: 96px;
+    overflow: hidden;
+    position: relative;
+}
+
+#customSchoolSchoolTable td.school-name-cell,
+#customSchoolTable td.school-name-cell,
+#customSchoolClassTable td.school-name-cell,
+#highValueTable td.school-name-cell,
+#dataTable td.school-name-cell,
+#customSchoolSchoolTable td.teacher-name-cell,
+#customSchoolTable td.teacher-name-cell,
+#customSchoolClassTable td.teacher-name-cell,
+#highValueTable td.teacher-name-cell,
+#dataTable td.teacher-name-cell {
+    white-space: normal;
+    word-break: break-all;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    text-align: left;
+    line-height: 1.15;
+    vertical-align: top;
+}
+
+#customSchoolSchoolTable td.school-name-cell.allow-one-line,
+#customSchoolTable td.school-name-cell.allow-one-line,
+#customSchoolClassTable td.school-name-cell.allow-one-line,
+#highValueTable td.school-name-cell.allow-one-line,
+#dataTable td.school-name-cell.allow-one-line,
+#customSchoolSchoolTable td.teacher-name-cell.allow-one-line,
+#customSchoolTable td.teacher-name-cell.allow-one-line,
+#customSchoolClassTable td.teacher-name-cell.allow-one-line,
+#highValueTable td.teacher-name-cell.allow-one-line,
+#dataTable td.teacher-name-cell.allow-one-line {
+    white-space: nowrap;
+    word-break: keep-all;
+    overflow-wrap: normal;
+}
+
+#customSchoolSchoolTable td.school-name-cell.allow-two-lines,
+#customSchoolTable td.school-name-cell.allow-two-lines,
+#customSchoolClassTable td.school-name-cell.allow-two-lines,
+#highValueTable td.school-name-cell.allow-two-lines,
+#dataTable td.school-name-cell.allow-two-lines,
+#customSchoolSchoolTable td.teacher-name-cell.allow-two-lines,
+#customSchoolTable td.teacher-name-cell.allow-two-lines,
+#customSchoolClassTable td.teacher-name-cell.allow-two-lines,
+#highValueTable td.teacher-name-cell.allow-two-lines,
+#dataTable td.teacher-name-cell.allow-two-lines {
+    word-break: break-all;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+}
+
+#customSchoolSchoolTable th,
+#customSchoolSchoolTable td,
+#customSchoolTable th,
+#customSchoolTable td,
+#customSchoolClassTable th,
+#customSchoolClassTable td,
+#highValueTable th,
+#highValueTable td,
+#dataTable th,
+#dataTable td {
+    padding: 4px 5px;
+    font-size: 10px;
+    line-height: 1.1;
 }
 
 #customSchoolTable th,
@@ -1168,28 +1290,36 @@ body {
 #customSchoolTable th {
     white-space: normal;
     word-break: break-word;
-    line-height: 1.15;
-    padding: 6px 5px;
-    font-size: 11px;
+    line-height: 1.1;
+    padding: 5px 4px;
+    font-size: 10px;
 }
 
 #customSchoolTable td.school-name-cell {
     white-space: normal;
     word-break: break-all;
+    overflow-wrap: anywhere;
     overflow: hidden;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
+    display: table-cell;
+    text-overflow: clip;
     text-align: left;
-    max-width: 180px;
-    min-width: 150px;
-    line-height: 1.2;
+    max-width: 160px;
+    min-width: 96px;
+    line-height: 1.15;
+    vertical-align: top;
+}
+
+#customSchoolSchoolTable td.teacher-name-cell,
+#customSchoolTable td.teacher-name-cell,
+#customSchoolClassTable td.teacher-name-cell,
+#highValueTable td.teacher-name-cell,
+#dataTable td.teacher-name-cell {
+    max-width: 140px;
 }
 
 .compact-number-cell {
-    font-size: 12px;
-    line-height: 1.2;
+    font-size: 10px;
+    line-height: 1.1;
 }
 
 #customSchoolTable td.metric-good,
