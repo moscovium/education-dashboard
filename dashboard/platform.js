@@ -16,7 +16,9 @@ const state = {
     subAccounts: [],
     loginLoading: false,
     dataLoading: false,
-    dashboardLoadPromise: null
+    dashboardLoadPromise: null,
+    allSchoolsLoaded: false,
+    schoolDetailCache: new Map()
 };
 
 const $ = (id) => document.getElementById(id);
@@ -263,7 +265,8 @@ function parseWeekFromName(filename = '') {
     return { weekStartDate: `${y1}-${m1}-${d1}`, weekEndDate: `${y2}-${m2}-${d2}`, weekDisplay: `${y1}-${m1}-${d1} 至 ${y2}-${m2}-${d2}` };
 }
 
-function aggregateLocalSchools(db) {
+function aggregateLocalSchools(db, options = {}) {
+    const { includeDetail = true, statusFilter = '' } = options;
     const map = new Map();
     (db.keySchools || []).forEach(s => map.set(s.key, { ...s, classes: new Set(), grades: new Map(), weeks: new Map() }));
     const nameToKey = new Map((db.keySchools || []).filter(s => s.school).map(s => [s.school, s.key]));
@@ -291,12 +294,12 @@ function aggregateLocalSchools(db) {
     });
 
     return [...map.values()].map(s => {
-        const weeks = [...s.weeks.values()].sort((a, b) => String(a.startDate).localeCompare(String(b.startDate)));
-        const latest = weeks[weeks.length - 1] || { completion: 0, paid: 0, trial: 0, students: 0 };
+        const weeks = includeDetail ? [...s.weeks.values()].sort((a, b) => String(a.startDate).localeCompare(String(b.startDate))) : [];
+        const latest = (includeDetail ? weeks[weeks.length - 1] : [...s.weeks.values()].sort((a, b) => String(a.startDate).localeCompare(String(b.startDate))).pop()) || { completion: 0, paid: 0, trial: 0, students: 0 };
         latest.completion = latest.completionCount ? latest.completionSum / latest.completionCount : 0;
         latest.avgAssignments = latest.classes?.size ? latest.assignments / latest.classes.size : 0;
         latest.payRate = latest.students > 0 ? latest.paid / latest.students * 100 : 0;
-        const gradeRows = [...s.grades.entries()].map(([grade, rows]) => {
+        const gradeRows = includeDetail ? [...s.grades.entries()].map(([grade, rows]) => {
             const latestRows = globalLatestWeek ? rows.filter(r => r.weekStartDate === globalLatestWeek) : rows;
             const classCount = new Set(rows.map(r => rowClassId(r) || `${grade}-${localSchoolName(r)}`)).size;
             const students = latestRows.reduce((sum, r) => sum + num(r['总学生数']), 0);
@@ -306,20 +309,22 @@ function aggregateLocalSchools(db) {
             const completion = latestRows.length ? latestRows.reduce((sum, r) => sum + num(r['作业完成率']) * 100, 0) / latestRows.length : 0;
             const activeClassCount = new Set(latestRows.map(r => rowClassId(r) || `${grade}-${localSchoolName(r)}`)).size;
             return { grade, classCount, students, paid, trial, paidRate: students ? paid / students * 100 : 0, assignments, avgAssignments: activeClassCount ? assignments / activeClassCount : 0, completion };
-        });
+        }) : [];
         const classRows = [];
-        s.grades.forEach((rows, grade) => rows.forEach(r => classRows.push({
-            grade,
-            teacher: r['教师姓名'] || r['老师姓名'] || r['教师'] || '',
-            className: r['班级名称'] || '',
-            classId: rowClassId(r),
-            students: num(r['总学生数']),
-            paid: num(r['未过期付费学生数']),
-            trial: num(r['未过期试用学生数']),
-            assignments: num(r['布置作业次数']),
-            completion: num(r['作业完成率']) * 100,
-            weekDisplay: r.weekDisplay || r.weekStartDate || ''
-        })));
+        if (includeDetail) {
+            s.grades.forEach((rows, grade) => rows.forEach(r => classRows.push({
+                grade,
+                teacher: r['教师姓名'] || r['老师姓名'] || r['教师'] || '',
+                className: r['班级名称'] || '',
+                classId: rowClassId(r),
+                students: num(r['总学生数']),
+                paid: num(r['未过期付费学生数']),
+                trial: num(r['未过期试用学生数']),
+                assignments: num(r['布置作业次数']),
+                completion: num(r['作业完成率']) * 100,
+                weekDisplay: r.weekDisplay || r.weekStartDate || ''
+            })));
+        }
         const hasLatestWeek = !!(globalLatestWeek && s.weeks.has(globalLatestWeek));
         const latestWeek = hasLatestWeek ? s.weeks.get(globalLatestWeek) : { completion: 0, paid: 0, trial: 0, students: 0, assignments: 0, classes: new Set() };
         latestWeek.completion = latestWeek.completionCount ? latestWeek.completionSum / latestWeek.completionCount : 0;
@@ -328,9 +333,10 @@ function aggregateLocalSchools(db) {
         const activeGradeRows = gradeRows.filter(row => row.students > 0);
         const payRate = latestWeek.students > 0 ? latestWeek.paid / latestWeek.students * 100 : 0;
         const status = payRate > 20 ? '付费校' : (payRate < 20 && latestWeek.students > 100) ? '试用校' : '未试用校';
+        if (statusFilter && status !== statusFilter) return null;
         const chargeGrades = activeGradeRows.filter(g => g.paidRate > 50).map(g => shortGrade(g.grade));
         return { key: s.key, schoolId: s.schoolId || '', province: s.province || '', city: s.city || '', district: s.district || '', school: s.school || '', owner: s.owner || '', classCount: s.classes.size, status, latest: latestWeek, weeks, gradeRows, classRows, chargeGrades, progress: db.progress[s.key] || { logs: [] }, globalLatestWeek };
-    });
+    }).filter(Boolean);
 }
 
 async function localApi(path, options = {}) {
@@ -562,30 +568,17 @@ function renderActivity(school) {
     const progress = getSchoolProgress(school.key);
     const day = todayKey();
     $('dailyProgressInput').value = progress.daily?.[day]?.text || '';
-    $('managerReplyInput').value = '';
     const dailyItems = Object.entries(progress.daily || {}).map(([date, item]) => ({ type: '销售进展', date, text: item.text || '', editable: date === day }));
     const items = dailyItems.sort((a, b) => String(b.date).localeCompare(String(a.date)));
-    $('activityEditorTitle').textContent = isManager() ? '进展回复' : '今日销售进展';
+    $('activityEditorTitle').textContent = '今日销售进展';
     $('dailyProgressInput').closest('label').hidden = isManager();
     $('saveDailyProgressBtn').hidden = isManager();
-    $('managerReplyInput').closest('label').hidden = !isManager();
-    $('saveManagerReplyBtn').hidden = !isManager();
     $('activityHistoryTitle').textContent = isManager() ? '学校进展查看' : '历史进展';
     $('activityTimeline').innerHTML = items.length ? items.map(item => `<div class="timeline-item">
         <strong>${escapeHtml(item.type)} · ${escapeHtml(item.date)}${item.editable ? ' · 可编辑' : ''}</strong>
         <div>${escapeHtml(item.text)}</div>
     </div>`).join('') : '<div class="timeline-empty">暂无进展动态</div>';
-    const replies = progress.managerReplies || [];
-    $('managerProgressView').innerHTML = `<h4>管理回复</h4>${replies.length ? replies.map((reply, index) => {
-        const replyId = reply.id || String(index);
-        return `<div class="reply-item">
-            <strong>${escapeHtml(reply.date || '')}${reply.progressDate ? ` · 对 ${escapeHtml(reply.progressDate)} 进展` : ''}</strong>
-            ${isManager()
-                ? `<textarea data-manager-reply-input="${escapeHtml(replyId)}">${escapeHtml(reply.text || '')}</textarea>
-                   <button class="secondary-btn" data-update-manager-reply="${escapeHtml(replyId)}">保存修改</button>`
-                : `<div>${escapeHtml(reply.text || '')}</div>`}
-        </div>`;
-    }).join('') : '<div class="timeline-empty">暂无管理回复</div>'}`;
+    $('managerProgressView').innerHTML = '';
     $('salesReplyView').innerHTML = '';
 }
 
@@ -620,26 +613,13 @@ function salesScopeKeys() {
 
 function renderGlobalTimelines() {
     $('globalActivityPanel').hidden = false;
-    const { progressItems, replyItems } = allProgressItems();
+    const { progressItems } = allProgressItems();
     const visibleKeys = salesScopeKeys();
     const visibleProgressItems = !isManager() ? progressItems.filter(item => visibleKeys.has(item.schoolKey)) : progressItems;
-    const visibleReplyItems = !isManager() ? replyItems.filter(item => visibleKeys.has(item.schoolKey)) : replyItems;
-    $('globalReplyPanel').hidden = false;
-    $('globalProgressTimeline').innerHTML = visibleProgressItems.length ? visibleProgressItems.map((item, index) => {
-        const textareaId = `managerGlobalReply-${index}`;
-        return `<div class="timeline-item progress-thread">
+    $('globalProgressTimeline').innerHTML = visibleProgressItems.length ? visibleProgressItems.map((item) => `<div class="timeline-item progress-thread">
         <strong>${escapeHtml(item.date)} · ${escapeHtml(item.schoolName)}${item.owner ? ` · ${escapeHtml(item.owner)}` : ''}</strong>
         <div>${escapeHtml(item.text)}</div>
-        ${isManager() ? `<div class="inline-reply-editor">
-            <textarea id="${textareaId}" placeholder="针对该进展直接回复"></textarea>
-            <button class="secondary-btn" data-save-global-reply="${escapeHtml(item.schoolKey)}" data-progress-date="${escapeHtml(item.date)}" data-reply-input="${textareaId}">回复</button>
-        </div>` : ''}
-    </div>`;
-    }).join('') : '<div class="timeline-empty">暂无销售进展</div>';
-    $('globalReplyTimeline').innerHTML = visibleReplyItems.length ? visibleReplyItems.map(item => `<div class="timeline-item">
-        <strong>${escapeHtml(item.date)} · ${escapeHtml(item.schoolName)}${item.progressDate ? ` · 对 ${escapeHtml(item.progressDate)} 进展` : ''}</strong>
-        <div>${escapeHtml(item.text)}</div>
-    </div>`).join('') : '<div class="timeline-empty">暂无管理回复</div>';
+    </div>`).join('') : '<div class="timeline-empty">暂无销售进展</div>';
 }
 
 function renderClassComparisonTable(school) {
@@ -750,10 +730,12 @@ async function refresh() {
     setDataLoading(true);
     try {
         const data = await api('/api/schools');
-        state.schools = data.schools || [];
+        state.schools = (data.schools || []).filter(canSeeSchool);
         state.imports = data.imports || [];
         state.keySchoolImports = data.keySchoolImports || [];
         state.subAccounts = data.subAccounts || [];
+        state.allSchoolsLoaded = false;
+        state.schoolDetailCache = new Map();
         saveSubAccountSnapshot(state.subAccounts);
         if (!LOCAL_MODE) {
             const rows = state.imports.reduce((sum, item) => sum + Number(item.rows || 0), 0);
@@ -763,7 +745,7 @@ async function refresh() {
         }
         render();
         if (LOCAL_MODE) {
-            ensureDashboardDatasetLoaded().then(() => refresh()).catch(() => renderImports());
+            ensureDashboardDatasetLoaded().catch(() => renderImports());
         }
     } finally {
         setDataLoading(false);
@@ -835,7 +817,7 @@ function renderSchoolTableHead(type) {
 }
 
 function actionLabel() {
-    return isManager() ? '回复' : '进展跟进';
+    return isManager() ? '查看' : '进展跟进';
 }
 
 function renderSchoolRow(s, type) {
@@ -867,29 +849,49 @@ function renderSchools(options = {}) {
         return renderSchoolRow(s, type);
     }).join('') : '<tr><td colspan="12" style="text-align:center;color:#94a3b8;padding:28px;">当前条件下暂无学校</td></tr>';
 
-    const selected = rows.find(s => s.key === state.selectedKey) || rows[0];
-    if (selected) {
-        state.selectedKey = selected.key;
-        renderDetail(selected);
-    } else {
-        state.selectedKey = '';
-        $('emptyDetail').hidden = false;
-        $('detailContent').hidden = true;
-    }
+    $('emptyDetail').hidden = false;
+    $('detailContent').hidden = true;
+    state.currentSchool = null;
     renderGlobalTimelines();
 }
 
-function selectSchool(key, nextView = '', shouldFocus = false) {
-    const school = state.schools.find(s => s.key === key);
+async function ensureStatusDataLoaded(status = '') {
+    if (!LOCAL_MODE || state.allSchoolsLoaded || !status || status === '全部') return;
+    await ensureDashboardDatasetLoaded();
+    const db = loadLocalDb();
+    const schools = aggregateLocalSchools({ ...db, records: state.dashboardRecords, imports: state.dashboardImports });
+    state.schools = schools.filter(canSeeSchool);
+    state.allSchoolsLoaded = true;
+}
+
+function findSchoolByKey(key) {
+    return state.schools.find(s => s.key === key) || state.schoolDetailCache.get(key) || null;
+}
+
+async function ensureSchoolDetailLoaded(key) {
+    if (!key) return null;
+    const existing = findSchoolByKey(key);
+    if (existing && existing.gradeRows?.length) return existing;
+    if (!LOCAL_MODE) return existing;
+    await ensureDashboardDatasetLoaded();
+    const db = loadLocalDb();
+    const detail = aggregateLocalSchools({ ...db, records: state.dashboardRecords, imports: state.dashboardImports }, { includeDetail: true }).find(s => s.key === key) || null;
+    if (detail) state.schoolDetailCache.set(key, detail);
+    return detail;
+}
+
+async function selectSchool(key, nextView = '', shouldFocus = false) {
+    const school = await ensureSchoolDetailLoaded(key);
     if (!school) return;
     state.selectedKey = key;
+    state.currentSchool = school;
     if (nextView) state.drillView = nextView;
     document.querySelectorAll('#schoolRows tr.selected').forEach(row => row.classList.remove('selected'));
     const row = document.querySelector(`#schoolRows [data-row-key="${CSS.escape(key)}"]`);
     if (row) row.classList.add('selected');
     renderDetail(school);
-    if (shouldFocus) {
-        const target = isManager() ? $('managerReplyInput') : $('dailyProgressInput');
+    if (shouldFocus && !isManager()) {
+        const target = $('dailyProgressInput');
         setTimeout(() => target?.focus(), 0);
     }
 }
@@ -1137,13 +1139,18 @@ function bindEvents() {
             renderSchools();
         };
     });
-    $('statusTabs').onclick = (e) => {
+    $('statusTabs').onclick = async (e) => {
         const tab = e.target.closest('.tab');
         if (!tab) return;
         state.status = tab.dataset.status || '';
-        renderSchools();
+        try {
+            await ensureStatusDataLoaded(state.status);
+            renderSchools();
+        } catch (err) {
+            toast(err.message);
+        }
     };
-    $('schoolRows').onclick = (e) => {
+    $('schoolRows').onclick = async (e) => {
         const fav = e.target.closest('[data-favorite-key]');
         if (fav) {
             toggleFavorite(fav.dataset.favoriteKey);
@@ -1152,7 +1159,11 @@ function bindEvents() {
         const btn = e.target.closest('[data-school-key]');
         if (!btn) return;
         const nextView = btn.dataset.openClass ? 'class' : btn.dataset.openGrade ? 'grade' : btn.dataset.openActivity ? 'activity' : '';
-        selectSchool(btn.dataset.schoolKey, nextView, !!btn.dataset.openActivity);
+        try {
+            await selectSchool(btn.dataset.schoolKey, nextView, !!btn.dataset.openActivity);
+        } catch (err) {
+            toast(err.message);
+        }
     };
     $('roleToggle').onclick = (e) => {
         const btn = e.target.closest('[data-role]');
@@ -1173,20 +1184,6 @@ function bindEvents() {
     $('syncDashboardDataBtn').onclick = () => syncDashboardData().catch(err => toast(err.message));
     $('refreshDataBtn').onclick = () => refresh().then(() => toast('已刷新最新数据看板数据')).catch(err => toast(err.message));
     $('saveDailyProgressBtn').onclick = saveDailyProgress;
-    $('saveManagerReplyBtn').onclick = saveManagerReplyLocal;
-    $('activityView').onclick = (e) => {
-        const btn = e.target.closest('[data-update-manager-reply]');
-        if (!btn) return;
-        const replyId = btn.dataset.updateManagerReply;
-        const input = document.querySelector(`[data-manager-reply-input="${CSS.escape(replyId)}"]`);
-        saveManagerReplyEdit(replyId, input?.value || '');
-    };
-    $('globalActivityPanel').onclick = (e) => {
-        const btn = e.target.closest('[data-save-global-reply]');
-        if (!btn) return;
-        const input = $(btn.dataset.replyInput);
-        saveManagerReplyForSchool(btn.dataset.saveGlobalReply, input?.value || '', btn.dataset.progressDate || '');
-    };
     setRole(state.role);
 }
 
