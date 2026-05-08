@@ -13,13 +13,18 @@ const state = {
     filters: { owner: '', province: '', city: '', district: '', students: '', trial: '' },
     currentSchool: null,
     role: 'sales',
-    subAccounts: []
+    subAccounts: [],
+    loginLoading: false,
+    dataLoading: false,
+    dashboardLoadPromise: null
 };
 
 const $ = (id) => document.getElementById(id);
 const LOCAL_MODE = location.protocol === 'file:' || location.hostname.endsWith('github.io');
 const LOCAL_DB_KEY = 'sales-platform-local-db-v2';
 const FAVORITE_KEY = 'sales-platform-favorite-schools-v1';
+const TOKEN_KEY = 'sales-platform-token';
+const SUBACCOUNT_SNAPSHOT_KEY = 'sales-platform-subaccounts-snapshot-v1';
 const ADMIN_USER = { username: 'admin', password: 'ets@admin', role: 'manager', name: '管理者', provinces: [] };
 const PROVINCES = ['北京', '天津', '河北', '山西', '内蒙古', '辽宁', '吉林', '黑龙江', '上海', '江苏', '浙江', '安徽', '福建', '江西', '山东', '河南', '湖北', '湖南', '广东', '广西', '海南', '重庆', '四川', '贵州', '云南', '西藏', '陕西', '甘肃', '青海', '宁夏', '新疆'];
 
@@ -41,6 +46,41 @@ function loadFavorites() {
 
 function saveFavorites(set) {
     localStorage.setItem(FAVORITE_KEY, JSON.stringify([...set]));
+}
+
+function loadSubAccountSnapshot() {
+    try {
+        const list = JSON.parse(localStorage.getItem(SUBACCOUNT_SNAPSHOT_KEY) || '[]');
+        return Array.isArray(list) ? list : [];
+    } catch {
+        return [];
+    }
+}
+
+function saveSubAccountSnapshot(list) {
+    localStorage.setItem(SUBACCOUNT_SNAPSHOT_KEY, JSON.stringify(Array.isArray(list) ? list : []));
+}
+
+function setLoginLoading(loading) {
+    state.loginLoading = !!loading;
+    const btn = $('loginBtn');
+    const usernameInput = $('usernameInput');
+    const passwordInput = $('passwordInput');
+    if (btn) {
+        btn.disabled = loading;
+        btn.textContent = loading ? '登录中...' : '登录';
+    }
+    if (usernameInput) usernameInput.disabled = loading;
+    if (passwordInput) passwordInput.disabled = loading;
+}
+
+function setDataLoading(loading) {
+    state.dataLoading = !!loading;
+    const btn = $('refreshDataBtn');
+    if (btn) {
+        btn.disabled = loading;
+        btn.textContent = loading ? '刷新中...' : '刷新';
+    }
 }
 
 function currentRole() {
@@ -129,6 +169,23 @@ async function loadDashboardDataset() {
         by: 'EducationDataDB'
     }));
     state.dashboardSyncText = `已引用数据看板原始数据：${files.length} 个周文件，${records.length.toLocaleString()} 行`;
+}
+
+function ensureDashboardDatasetLoaded(force = false) {
+    if (!LOCAL_MODE) return Promise.resolve();
+    if (!force && state.dashboardRecords.length) return Promise.resolve();
+    if (!force && state.dashboardLoadPromise) return state.dashboardLoadPromise;
+    state.dashboardLoadPromise = loadDashboardDataset()
+        .catch(err => {
+            state.dashboardRecords = [];
+            state.dashboardImports = [];
+            state.dashboardSyncText = `未读取到数据看板原始数据：${err.message}`;
+            throw err;
+        })
+        .finally(() => {
+            state.dashboardLoadPromise = null;
+        });
+    return state.dashboardLoadPromise;
 }
 
 async function syncDashboardData() {
@@ -279,11 +336,14 @@ function aggregateLocalSchools(db) {
 async function localApi(path, options = {}) {
     const db = loadLocalDb();
     const body = options.body ? JSON.parse(options.body) : {};
-    const tokenUser = localStorage.getItem('sales-platform-token');
-    const localUsers = [ADMIN_USER, ...(db.subAccounts || [])];
+    const tokenUser = localStorage.getItem(TOKEN_KEY);
+    const snapshotUsers = loadSubAccountSnapshot();
+    const localUsers = [ADMIN_USER, ...(db.subAccounts || []), ...snapshotUsers.filter(item => item && item.username && !(db.subAccounts || []).some(sub => sub.username === item.username))];
     const authUser = localUsers.find(u => u.username === tokenUser);
     if (path === '/api/login') {
-        const user = localUsers.find(u => u.username === body.username && u.password === body.password);
+        const username = String(body.username || '').trim();
+        const password = String(body.password || '');
+        const user = localUsers.find(u => u.username === username && String(u.password) === password);
         if (!user) throw new Error('登录失败：账号或密码错误');
         return { token: user.username, user: { username: user.username, role: user.role, name: user.name || user.username, provinces: user.provinces || [] } };
     }
@@ -296,7 +356,7 @@ async function localApi(path, options = {}) {
         const liveDb = { ...db, records: state.dashboardRecords, imports: state.dashboardImports };
         const userProvinces = (authUser.provinces || []).map(normalizeProvince);
         const schools = aggregateLocalSchools(liveDb).filter(s => authUser.role === 'manager' || !userProvinces.length || userProvinces.includes(normalizeProvince(s.province)));
-        return { schools, imports: state.dashboardImports || [], keySchoolImports: db.keySchoolImports || [], subAccounts: db.subAccounts || [] };
+        return { schools, imports: state.dashboardImports || [], keySchoolImports: db.keySchoolImports || [], subAccounts: db.subAccounts || snapshotUsers };
     }
     if (path === '/api/key-schools') {
         if (authUser.role !== 'manager') throw new Error('仅管理者可操作');
@@ -345,6 +405,7 @@ async function localApi(path, options = {}) {
         db.subAccounts = (db.subAccounts || []).filter(u => u.username !== username);
         db.subAccounts.push(next);
         saveLocalDb(db);
+        saveSubAccountSnapshot(db.subAccounts);
         return { ok: true, subAccounts: db.subAccounts };
     }
     if (path.startsWith('/api/subaccounts/') && options.method === 'DELETE') {
@@ -352,6 +413,7 @@ async function localApi(path, options = {}) {
         const username = decodeURIComponent(path.split('/').pop());
         db.subAccounts = (db.subAccounts || []).filter(u => u.username !== username);
         saveLocalDb(db);
+        saveSubAccountSnapshot(db.subAccounts);
         return { ok: true, subAccounts: db.subAccounts };
     }
     return { ok: true };
@@ -637,21 +699,31 @@ function renderClassComparisonTable(school) {
 async function login() {
     const username = $('usernameInput').value.trim();
     const password = $('passwordInput').value;
-    const data = await api('/api/login', {
-        method: 'POST',
-        body: JSON.stringify({ username, password })
-    });
-    state.token = data.token;
-    state.user = data.user;
-    state.role = data.user.role;
-    localStorage.setItem('sales-platform-token', state.token);
-    await refresh();
+    if (!username || !password) {
+        toast('请先填写账号和密码');
+        return;
+    }
+    setLoginLoading(true);
+    try {
+        const data = await api('/api/login', {
+            method: 'POST',
+            body: JSON.stringify({ username, password })
+        });
+        state.token = data.token;
+        state.user = data.user;
+        state.role = data.user.role;
+        localStorage.setItem(TOKEN_KEY, state.token);
+        $('passwordInput').value = '';
+        await refresh();
+    } finally {
+        setLoginLoading(false);
+    }
 }
 
 function logout() {
     state.token = '';
     state.user = null;
-    localStorage.removeItem('sales-platform-token');
+    localStorage.removeItem(TOKEN_KEY);
     $('loginView').hidden = false;
     $('platformView').hidden = true;
 }
@@ -675,27 +747,27 @@ function showLogin() {
 }
 
 async function refresh() {
-    if (LOCAL_MODE) {
-        try {
-            await loadDashboardDataset();
-        } catch (err) {
-            state.dashboardRecords = [];
-            state.dashboardImports = [];
-            state.dashboardSyncText = `未读取到数据看板原始数据：${err.message}`;
+    setDataLoading(true);
+    try {
+        const data = await api('/api/schools');
+        state.schools = data.schools || [];
+        state.imports = data.imports || [];
+        state.keySchoolImports = data.keySchoolImports || [];
+        state.subAccounts = data.subAccounts || [];
+        saveSubAccountSnapshot(state.subAccounts);
+        if (!LOCAL_MODE) {
+            const rows = state.imports.reduce((sum, item) => sum + Number(item.rows || 0), 0);
+            state.dashboardSyncText = state.imports.length
+                ? `已同步数据看板原始数据：${state.imports.length} 个周文件，${rows.toLocaleString()} 行`
+                : '尚未同步数据看板原始数据';
         }
+        render();
+        if (LOCAL_MODE) {
+            ensureDashboardDatasetLoaded().then(() => refresh()).catch(() => renderImports());
+        }
+    } finally {
+        setDataLoading(false);
     }
-    const data = await api('/api/schools');
-    state.schools = data.schools || [];
-    state.imports = data.imports || [];
-    state.keySchoolImports = data.keySchoolImports || [];
-    state.subAccounts = data.subAccounts || [];
-    if (!LOCAL_MODE) {
-        const rows = state.imports.reduce((sum, item) => sum + Number(item.rows || 0), 0);
-        state.dashboardSyncText = state.imports.length
-            ? `已同步数据看板原始数据：${state.imports.length} 个周文件，${rows.toLocaleString()} 行`
-            : '尚未同步数据看板原始数据';
-    }
-    render();
 }
 
 function render() {
@@ -771,10 +843,10 @@ function renderSchoolRow(s, type) {
         <td>${escapeHtml(s.owner || '-')}</td>
         <td>${escapeHtml(s.city || '-')}</td>
         <td>${escapeHtml(s.district || '-')}</td>
-        <td class="school-name-cell"><button class="school-button" data-school-key="${escapeHtml(s.key)}">${escapeHtml(s.school)}</button></td>
+        <td class="school-name-cell"><button class="school-button" data-school-key="${escapeHtml(s.key)}" title="${escapeHtml(s.school)}">${escapeHtml(s.school)}</button></td>
         <td><span class="badge ${badgeClass(s.status)}">${escapeHtml(s.status)}</span></td>`;
-    const action = `<td><button class="mini-action-btn" data-school-key="${escapeHtml(s.key)}" data-open-activity="1">${actionLabel()}</button><button class="mini-action-btn" data-school-key="${escapeHtml(s.key)}" data-open-grade="1">年级</button></td>`;
-    const fav = `<td><button class="favorite-btn" data-favorite-key="${escapeHtml(s.key)}">${isFavorite(s.key) ? '★' : '☆'}</button></td>`;
+    const action = `<td class="action-cell"><button class="mini-action-btn" data-school-key="${escapeHtml(s.key)}" data-open-activity="1">${actionLabel()}</button><button class="mini-action-btn" data-school-key="${escapeHtml(s.key)}" data-open-grade="1">年级</button></td>`;
+    const fav = `<td class="favorite-cell"><button class="favorite-btn" data-favorite-key="${escapeHtml(s.key)}" aria-label="${isFavorite(s.key) ? '取消收藏' : '收藏学校'}">${isFavorite(s.key) ? '★' : '☆'}</button></td>`;
     if (type === '付费校') {
         return `<tr data-row-key="${escapeHtml(s.key)}" class="${state.selectedKey === s.key ? 'selected' : ''}">${start}<td>${escapeHtml((s.chargeGrades || []).join('、') || '-')}</td><td>${Number(s.latest?.students || 0).toLocaleString()}</td><td>${Number(s.latest?.paid || 0).toLocaleString()}</td><td>${Number(s.latest?.trial || 0).toLocaleString()}</td><td>${formatPct(schoolPayRate(s))}</td>${action}${fav}</tr>`;
     }

@@ -358,23 +358,24 @@ textarea {
 
 .table-wrap {
     max-height: 680px;
-    overflow-x: hidden;
+    overflow-x: auto;
 }
 
 table {
     width: 100%;
+    min-width: 100%;
     border-collapse: collapse;
-    font-size: 10.5px;
+    font-size: 10px;
     table-layout: fixed;
 }
 
 th,
 td {
-    padding: 5px 5px;
+    padding: 4px 4px;
     border-bottom: 1px solid var(--border);
     text-align: left;
     white-space: normal;
-    line-height: 1.2;
+    line-height: 1.15;
 }
 
 th {
@@ -397,40 +398,57 @@ tr.selected {
     font-weight: 800;
     text-align: left;
     white-space: normal;
-    line-height: 1.18;
+    line-height: 1.12;
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
     overflow: hidden;
     padding: 0;
+    word-break: break-word;
 }
 
 .school-name-cell {
-    min-width: 120px;
+    min-width: 112px;
+}
+
+.school-board-table th,
+.school-board-table td {
+    font-size: 10px;
 }
 
 .school-board-table th:nth-child(1),
-.school-board-table td:nth-child(1) { width: 54px; }
+.school-board-table td:nth-child(1) { width: 48px; }
 .school-board-table th:nth-child(2),
-.school-board-table td:nth-child(2) { width: 54px; }
+.school-board-table td:nth-child(2) { width: 48px; }
 .school-board-table th:nth-child(3),
-.school-board-table td:nth-child(3) { width: 54px; }
+.school-board-table td:nth-child(3) { width: 50px; }
 .school-board-table th:nth-child(4),
-.school-board-table td:nth-child(4) { width: 138px; }
+.school-board-table td:nth-child(4) { width: 116px; }
 .school-board-table th:nth-child(5),
-.school-board-table td:nth-child(5) { width: 58px; }
+.school-board-table td:nth-child(5) { width: 54px; }
 .school-board-table th:nth-child(6),
 .school-board-table td:nth-child(6),
 .school-board-table th:nth-child(7),
-.school-board-table td:nth-child(7) { width: 50px; }
+.school-board-table td:nth-child(7) { width: 44px; }
 .school-board-table th:nth-child(8),
 .school-board-table td:nth-child(8),
 .school-board-table th:nth-child(9),
 .school-board-table td:nth-child(9),
 .school-board-table th:nth-child(10),
-.school-board-table td:nth-child(10) { width: 72px; }
+.school-board-table td:nth-child(10) { width: 62px; }
 .school-board-table th:nth-child(11),
-.school-board-table td:nth-child(11) { width: 68px; }
+.school-board-table td:nth-child(11) { width: 54px; }
+
+.school-board-table th:nth-child(12),
+.school-board-table td:nth-child(12) { width: 84px; }
+
+.school-board-table th:nth-child(13),
+.school-board-table td:nth-child(13) { width: 40px; }
+
+.action-cell,
+.favorite-cell {
+    white-space: nowrap;
+}
 
 .mini-action-btn {
     border: 1px solid var(--border);
@@ -439,9 +457,10 @@ tr.selected {
     color: var(--primary);
     cursor: pointer;
     font-weight: 700;
-    padding: 4px 7px;
+    padding: 3px 6px;
     white-space: nowrap;
-    margin-right: 4px;
+    margin-right: 3px;
+    font-size: 10px;
 }
 
 .favorite-btn {
@@ -449,8 +468,9 @@ tr.selected {
     background: transparent;
     color: #f59e0b;
     cursor: pointer;
-    font-size: 16px;
+    font-size: 14px;
     line-height: 1;
+    padding: 0 2px;
 }
 
 .activity-extra {
