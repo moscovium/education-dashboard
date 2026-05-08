@@ -71,7 +71,13 @@ function toggleFavorite(key) {
     const set = loadFavorites();
     if (set.has(key)) set.delete(key); else set.add(key);
     saveFavorites(set);
-    renderSchools();
+    if (state.status === '收藏校') {
+        renderSchools({ updateFilters: false });
+        return;
+    }
+    document.querySelectorAll(`[data-favorite-key="${CSS.escape(key)}"]`).forEach(btn => {
+        btn.textContent = isFavorite(key) ? '★' : '☆';
+    });
 }
 
 function openDashboardDb() {
@@ -435,6 +441,36 @@ function renderDrillView() {
     document.querySelectorAll('#drillTabs .tab').forEach(btn => btn.classList.toggle('active', btn.dataset.view === view));
 }
 
+function renderDrillData(school) {
+    const view = state.drillView || 'activity';
+    if (view === 'week') {
+        $('historyRows').innerHTML = (school.weeks || []).map(w => {
+            const completion = w.completionCount ? w.completionSum / w.completionCount : 0;
+            const classCount = w.classes?.size || w.classCount || 0;
+            const avgAssignments = classCount ? w.assignments / classCount : 0;
+            return `<tr>
+                <td>${escapeHtml(w.display || w.startDate)}</td>
+                <td>${Number(avgAssignments || 0).toFixed(1)}</td>
+                <td>${formatPct(completion)}</td>
+            </tr>`;
+        }).join('');
+    } else if (view === 'grade') {
+        $('gradeRows').innerHTML = (school.gradeRows || []).length ? school.gradeRows.map(row => `<tr>
+            <td>${escapeHtml(row.grade)}</td>
+            <td>${row.classCount || 0}</td>
+            <td>${Number(row.students || 0).toLocaleString()}</td>
+            <td>${formatPct(row.paidRate)}</td>
+            <td>${Number(row.avgAssignments || 0).toFixed(1)}</td>
+            <td>${formatPct(row.completion)}</td>
+        </tr>`).join('') : '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:24px;">暂无年级数据</td></tr>';
+    } else if (view === 'class') {
+        renderClassComparisonTable(school);
+    } else {
+        renderActivity(school);
+    }
+    renderDrillView();
+}
+
 function todayKey() {
     const d = new Date();
     const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -675,7 +711,6 @@ function render() {
     renderSummary();
     renderImports();
     renderSchools();
-    renderGlobalTimelines();
     renderSubAccounts();
 }
 
@@ -741,17 +776,18 @@ function renderSchoolRow(s, type) {
     const action = `<td><button class="mini-action-btn" data-school-key="${escapeHtml(s.key)}" data-open-activity="1">${actionLabel()}</button><button class="mini-action-btn" data-school-key="${escapeHtml(s.key)}" data-open-grade="1">年级</button></td>`;
     const fav = `<td><button class="favorite-btn" data-favorite-key="${escapeHtml(s.key)}">${isFavorite(s.key) ? '★' : '☆'}</button></td>`;
     if (type === '付费校') {
-        return `<tr class="${state.selectedKey === s.key ? 'selected' : ''}">${start}<td>${escapeHtml((s.chargeGrades || []).join('、') || '-')}</td><td>${Number(s.latest?.students || 0).toLocaleString()}</td><td>${Number(s.latest?.paid || 0).toLocaleString()}</td><td>${Number(s.latest?.trial || 0).toLocaleString()}</td><td>${formatPct(schoolPayRate(s))}</td>${action}${fav}</tr>`;
+        return `<tr data-row-key="${escapeHtml(s.key)}" class="${state.selectedKey === s.key ? 'selected' : ''}">${start}<td>${escapeHtml((s.chargeGrades || []).join('、') || '-')}</td><td>${Number(s.latest?.students || 0).toLocaleString()}</td><td>${Number(s.latest?.paid || 0).toLocaleString()}</td><td>${Number(s.latest?.trial || 0).toLocaleString()}</td><td>${formatPct(schoolPayRate(s))}</td>${action}${fav}</tr>`;
     }
     if (type === '未试用校') {
-        return `<tr class="${state.selectedKey === s.key ? 'selected' : ''}">${start}<td>${Number(s.latest?.students || 0).toLocaleString()}</td>${action}${fav}</tr>`;
+        return `<tr data-row-key="${escapeHtml(s.key)}" class="${state.selectedKey === s.key ? 'selected' : ''}">${start}<td>${Number(s.latest?.students || 0).toLocaleString()}</td>${action}${fav}</tr>`;
     }
-    return `<tr class="${state.selectedKey === s.key ? 'selected' : ''}">${start}<td>${(s.gradeRows || []).length}</td><td>${s.classCount || 0}</td><td>${Number(s.latest?.students || 0).toLocaleString()}</td><td>${Number(s.latest?.paid || 0).toLocaleString()}</td><td>${Number(s.latest?.trial || 0).toLocaleString()}</td><td>${formatPct(schoolPayRate(s))}</td>${action}${fav}</tr>`;
+    return `<tr data-row-key="${escapeHtml(s.key)}" class="${state.selectedKey === s.key ? 'selected' : ''}">${start}<td>${(s.gradeRows || []).length}</td><td>${s.classCount || 0}</td><td>${Number(s.latest?.students || 0).toLocaleString()}</td><td>${Number(s.latest?.paid || 0).toLocaleString()}</td><td>${Number(s.latest?.trial || 0).toLocaleString()}</td><td>${formatPct(schoolPayRate(s))}</td>${action}${fav}</tr>`;
 }
 
-function renderSchools() {
+function renderSchools(options = {}) {
+    const { updateFilters = true } = options;
     document.querySelectorAll('#statusTabs .tab').forEach(btn => btn.classList.toggle('active', (btn.dataset.status || '') === state.status));
-    renderFilterOptions();
+    if (updateFilters) renderFilterOptions();
     const type = currentListType();
     renderSchoolTableHead(type);
     const rows = filteredSchools();
@@ -771,6 +807,21 @@ function renderSchools() {
     renderGlobalTimelines();
 }
 
+function selectSchool(key, nextView = '', shouldFocus = false) {
+    const school = state.schools.find(s => s.key === key);
+    if (!school) return;
+    state.selectedKey = key;
+    if (nextView) state.drillView = nextView;
+    document.querySelectorAll('#schoolRows tr.selected').forEach(row => row.classList.remove('selected'));
+    const row = document.querySelector(`#schoolRows [data-row-key="${CSS.escape(key)}"]`);
+    if (row) row.classList.add('selected');
+    renderDetail(school);
+    if (shouldFocus) {
+        const target = isManager() ? $('managerReplyInput') : $('dailyProgressInput');
+        setTimeout(() => target?.focus(), 0);
+    }
+}
+
 function renderDetail(school) {
     state.currentSchool = school;
     $('emptyDetail').hidden = true;
@@ -788,30 +839,7 @@ function renderDetail(school) {
         ['付费率', formatPct(schoolPayRate(school))]
     ].map(([k, v]) => `<div><span>${k}</span><strong>${v}</strong></div>`).join('');
 
-    $('historyRows').innerHTML = (school.weeks || []).map(w => {
-        const completion = w.completionCount ? w.completionSum / w.completionCount : 0;
-        const classCount = w.classes?.size || w.classCount || 0;
-        const avgAssignments = classCount ? w.assignments / classCount : 0;
-        return `<tr>
-            <td>${escapeHtml(w.display || w.startDate)}</td>
-            <td>${Number(avgAssignments || 0).toFixed(1)}</td>
-            <td>${formatPct(completion)}</td>
-        </tr>`;
-    }).join('');
-
-    $('gradeRows').innerHTML = (school.gradeRows || []).length ? school.gradeRows.map(row => `<tr>
-        <td>${escapeHtml(row.grade)}</td>
-        <td>${row.classCount || 0}</td>
-        <td>${Number(row.students || 0).toLocaleString()}</td>
-        <td>${formatPct(row.paidRate)}</td>
-        <td>${Number(row.avgAssignments || 0).toFixed(1)}</td>
-        <td>${formatPct(row.completion)}</td>
-    </tr>`).join('') : '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:24px;">暂无年级数据</td></tr>';
-
-    renderClassComparisonTable(school);
-    renderActivity(school);
-
-    renderDrillView();
+    renderDrillData(school);
 
 }
 
@@ -903,7 +931,6 @@ function setRole(role) {
     document.querySelectorAll('#roleToggle .tab').forEach(btn => btn.classList.toggle('active', btn.dataset.role === role));
     if (state.currentSchool) renderDetail(state.currentSchool);
     renderSchools();
-    renderGlobalTimelines();
 }
 
 function renderImports() {
@@ -943,6 +970,14 @@ function renderSubAccounts() {
 
 function selectedProvinceValues() {
     return [...$('subProvinceInput').selectedOptions].map(option => option.value);
+}
+
+function debounce(fn, delay = 160) {
+    let timer = 0;
+    return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), delay);
+    };
 }
 
 async function saveSubAccount() {
@@ -996,6 +1031,7 @@ async function importKeySchoolExcel(file) {
 }
 
 function bindEvents() {
+    const renderSchoolsFromSearch = debounce(() => renderSchools({ updateFilters: false }), 180);
     if ($('loginBtn')) $('loginBtn').onclick = () => login().catch(err => toast(err.message));
     if ($('passwordInput')) $('passwordInput').onkeydown = (e) => { if (e.key === 'Enter') login().catch(err => toast(err.message)); };
     if ($('logoutBtn')) $('logoutBtn').onclick = logout;
@@ -1007,7 +1043,7 @@ function bindEvents() {
         if (!btn) return;
         deleteSubAccount(btn.dataset.deleteSubAccount).catch(err => toast(err.message));
     };
-    $('searchInput').oninput = renderSchools;
+    $('searchInput').oninput = renderSchoolsFromSearch;
     ['ownerFilter', 'provinceFilter', 'cityFilter', 'districtFilter', 'studentFilter', 'trialFilter'].forEach(id => {
         $(id).onchange = () => {
             state.filters.owner = $('ownerFilter').value;
@@ -1043,15 +1079,8 @@ function bindEvents() {
         }
         const btn = e.target.closest('[data-school-key]');
         if (!btn) return;
-        state.selectedKey = btn.dataset.schoolKey;
-        if (btn.dataset.openClass) state.drillView = 'class';
-        if (btn.dataset.openGrade) state.drillView = 'grade';
-        if (btn.dataset.openActivity) state.drillView = 'activity';
-        renderSchools();
-        if (btn.dataset.openActivity) {
-            const target = isManager() ? $('managerReplyInput') : $('dailyProgressInput');
-            setTimeout(() => target?.focus(), 0);
-        }
+        const nextView = btn.dataset.openClass ? 'class' : btn.dataset.openGrade ? 'grade' : btn.dataset.openActivity ? 'activity' : '';
+        selectSchool(btn.dataset.schoolKey, nextView, !!btn.dataset.openActivity);
     };
     $('roleToggle').onclick = (e) => {
         const btn = e.target.closest('[data-role]');
@@ -1062,7 +1091,8 @@ function bindEvents() {
         const tab = e.target.closest('.tab');
         if (!tab) return;
         state.drillView = tab.dataset.view || 'week';
-        renderDrillView();
+        if (state.currentSchool) renderDrillData(state.currentSchool);
+        else renderDrillView();
     };
     $('keySchoolFileInput').onchange = (e) => {
         importKeySchoolExcel(e.target.files?.[0]).catch(err => toast(err.message));
