@@ -22,7 +22,12 @@ const state = {
 };
 
 const $ = (id) => document.getElementById(id);
-const LOCAL_MODE = location.protocol === 'file:' || location.hostname.endsWith('github.io');
+const REMOTE_API_STORAGE_KEY = 'sales-platform-api-base';
+const PAGE_API_BASE = (window.SALES_PLATFORM_API_BASE || '').trim();
+const SAVED_API_BASE = (localStorage.getItem(REMOTE_API_STORAGE_KEY) || '').trim();
+const API_BASE = (PAGE_API_BASE || SAVED_API_BASE).replace(/\/$/, '');
+const HAS_REMOTE_API = /^https?:\/\//i.test(API_BASE);
+const LOCAL_MODE = !HAS_REMOTE_API && (location.protocol === 'file:' || location.hostname.endsWith('github.io'));
 const LOCAL_DB_KEY = 'sales-platform-local-db-v2';
 const FAVORITE_KEY = 'sales-platform-favorite-schools-v1';
 const TOKEN_KEY = 'sales-platform-token';
@@ -214,7 +219,8 @@ async function api(path, options = {}) {
     if (LOCAL_MODE) return localApi(path, options);
     const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
     if (state.token) headers.Authorization = `Bearer ${state.token}`;
-    const res = await fetch(path, { ...options, headers });
+    const url = HAS_REMOTE_API ? `${API_BASE}${path}` : path;
+    const res = await fetch(url, { ...options, headers });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || '请求失败');
     return data;
@@ -757,7 +763,8 @@ function render() {
     $('platformView').hidden = false;
     state.role = state.user?.role || state.role;
     const provinceText = state.user?.provinces?.length ? ` · ${state.user.provinces.join('、')}` : '';
-    $('userMeta').textContent = `${isManager() ? '管理者' : '销售'}：${state.user?.username || '-'}${provinceText}`;
+    const sourceText = HAS_REMOTE_API ? ` · 远程服务：${API_BASE}` : (LOCAL_MODE ? ' · 本地模式' : ' · 同源服务');
+    $('userMeta').textContent = `${isManager() ? '管理者' : '销售'}：${state.user?.username || '-'}${provinceText}${sourceText}`;
     $('managerUploadPanel').hidden = !isManager();
     $('accountManageBtn').hidden = !isManager();
     document.querySelectorAll('.manager-only').forEach(el => { el.hidden = !isManager(); });
