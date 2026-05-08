@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学校销售管理平台</title>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="platform.css">
+</head>
+<body>
+    <main class="app-shell">
+        <section id="loginView" class="login-view">
+            <div class="login-panel">
+                <h1>学校销售管理平台</h1>
+                <p>管理者使用总账号登录；销售使用管理者创建的子账号登录。</p>
+                <label>
+                    账号
+                    <input id="usernameInput" autocomplete="username" placeholder="admin">
+                </label>
+                <label>
+                    密码
+                    <input id="passwordInput" type="password" autocomplete="current-password" placeholder="请输入密码">
+                </label>
+                <button id="loginBtn" class="primary-btn">登录</button>
+                <div class="login-hint">管理者账号：admin</div>
+            </div>
+        </section>
+
+        <section id="platformView" class="platform-view" hidden>
+            <header class="topbar">
+                <div>
+                    <h1>重点校销售管理总览</h1>
+                    <p id="userMeta">管理查看模式 · 权限分配后续接入</p>
+                </div>
+                <div class="topbar-actions">
+                    <button id="accountManageBtn" class="ghost-btn">子账号管理</button>
+                    <button id="logoutBtn" class="ghost-btn">退出</button>
+                    <div class="role-toggle" id="roleToggle" hidden>
+                        <button class="tab active" data-role="manager">管理者</button>
+                        <button class="tab" data-role="sales">销售</button>
+                    </div>
+                    <a class="ghost-btn" href="index.html">返回本地看板</a>
+                </div>
+            </header>
+
+            <section id="managerUploadPanel" class="panel">
+                <div class="panel-header">
+                    <div>
+                        <h2>数据入口</h2>
+                        <p>先上传重点校清单作为母表；周数据用于识别未试用、试用、付费，并支持单校向下钻取。</p>
+                    </div>
+                    <div class="upload-actions">
+                        <label class="upload-btn">
+                            上传重点校清单
+                            <input id="keySchoolFileInput" type="file" accept=".xlsx,.xls" hidden>
+                        </label>
+                        <button id="syncDashboardDataBtn" class="upload-btn secondary-upload">同步数据看板原始数据</button>
+                        <button id="refreshDataBtn" class="ghost-btn">刷新</button>
+                    </div>
+                </div>
+                <details class="import-collapse" open>
+                    <summary>重点校清单</summary>
+                    <div id="keySchoolImportList" class="import-list"></div>
+                </details>
+                <details class="import-collapse">
+                    <summary>引用周数据</summary>
+                    <div id="dashboardDataStatus" class="import-list"></div>
+                    <div id="importList" class="import-list"></div>
+                </details>
+            </section>
+
+            <section class="summary-grid">
+                <div class="summary-card">
+                    <span>总学校数</span>
+                    <strong id="visibleCount">0</strong>
+                </div>
+                <div class="summary-card paid">
+                    <span>付费校</span>
+                    <strong id="paidCount">0</strong>
+                </div>
+                <div class="summary-card trial">
+                    <span>试用校</span>
+                    <strong id="trialCount">0</strong>
+                </div>
+                <div class="summary-card">
+                    <span>未试用校</span>
+                    <strong id="unusedCount">0</strong>
+                </div>
+            </section>
+
+            <section class="workspace-grid">
+                <div class="panel school-list-panel">
+                    <div class="panel-header compact">
+                        <h2>学校看板</h2>
+                        <input id="searchInput" class="search-input" placeholder="搜索学校">
+                    </div>
+                    <div class="tabs" id="statusTabs">
+                        <button class="tab active" data-status="">全部</button>
+                        <button class="tab" data-status="付费校">付费校</button>
+                        <button class="tab" data-status="试用校">试用校</button>
+                        <button class="tab" data-status="未试用校">未试用校</button>
+                        <button class="tab" data-status="收藏校">收藏校</button>
+                    </div>
+                    <div class="filter-strip">
+                        <select id="ownerFilter"><option value="">全部负责人</option></select>
+                        <select id="provinceFilter"><option value="">全部省份</option></select>
+                        <select id="cityFilter"><option value="">全部城市</option></select>
+                        <select id="districtFilter"><option value="">全部区县</option></select>
+                        <select id="studentFilter">
+                            <option value="">导入后台学生数</option>
+                            <option value="lt300">小于300</option>
+                            <option value="300_800">300-800</option>
+                            <option value="800_1500">800-1500</option>
+                            <option value="gte1500">1500以上</option>
+                        </select>
+                        <select id="trialFilter">
+                            <option value="">未过期试用人数</option>
+                            <option value="lt300">低于300人</option>
+                            <option value="300_500">300-500</option>
+                            <option value="500_800">500-800</option>
+                            <option value="gte800">800以上</option>
+                        </select>
+                    </div>
+                    <div class="table-wrap">
+                        <table class="school-board-table">
+                            <thead id="schoolTableHead"></thead>
+                            <tbody id="schoolRows"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <aside class="panel detail-panel">
+                    <div id="emptyDetail" class="empty-detail">选择学校查看周历史和跟进记录</div>
+                    <div id="detailContent" hidden>
+                        <div class="detail-head">
+                            <div>
+                                <h2 id="detailName">--</h2>
+                                <p id="detailMeta">--</p>
+                            </div>
+                            <span id="detailStatus" class="badge">--</span>
+                        </div>
+
+                        <div class="metric-grid" id="detailMetrics"></div>
+
+                        <div class="drill-tabs" id="drillTabs">
+                            <button class="tab active" data-view="activity">动态</button>
+                            <button class="tab" data-view="week">周使用数据</button>
+                            <button class="tab" data-view="grade">按年级展示</button>
+                            <button class="tab" data-view="class">按班级展示</button>
+                        </div>
+
+                        <h3 id="drillTitle">周历史数据</h3>
+                        <div class="mini-table-wrap">
+                            <table id="weekTable">
+                                <thead>
+                                    <tr>
+                                        <th>周次</th>
+                                        <th>平均布置数</th>
+                                        <th>作业完成率</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="historyRows"></tbody>
+                            </table>
+                            <table id="gradeTable" hidden>
+                                <thead>
+                                    <tr>
+                                        <th>年级</th>
+                                        <th>班级数</th>
+                                        <th>学生数</th>
+                                        <th>年级付费率</th>
+                                        <th>平均布置数</th>
+                                        <th>平均完成率</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="gradeRows"></tbody>
+                            </table>
+                            <table id="classTable" hidden>
+                                <thead>
+                                    <tr>
+                                        <th>周次</th>
+                                        <th>年级</th>
+                                        <th>老师</th>
+                                        <th>班级</th>
+                                        <th>学生</th>
+                                        <th>付费</th>
+                                        <th>试用</th>
+                                        <th>布置</th>
+                                        <th>完成率</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="classRows"></tbody>
+                            </table>
+                            <div id="activityView" class="activity-view" hidden>
+                                <div class="activity-editor">
+                                    <label>
+                                        <span id="activityEditorTitle">今日销售进展</span>
+                                        <textarea id="dailyProgressInput" placeholder="当天可继续编辑；过日后进入历史记录"></textarea>
+                                    </label>
+                                    <button id="saveDailyProgressBtn" class="primary-btn">保存</button>
+                                    <label>
+                                        管理回复
+                                        <textarea id="managerReplyInput" placeholder="管理者可随时回复该校最新进展"></textarea>
+                                    </label>
+                                    <button id="saveManagerReplyBtn" class="secondary-btn">保存管理回复</button>
+                                </div>
+                                <div>
+                                    <h4 id="activityHistoryTitle">历史进展</h4>
+                                    <div id="activityTimeline" class="timeline"></div>
+                                </div>
+                                <div id="managerProgressView" class="activity-extra"></div>
+                                <div id="salesReplyView" class="activity-extra"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <section id="globalActivityPanel" class="activity-global-grid">
+                        <div id="globalProgressPanel" class="activity-subpanel">
+                            <div class="panel-header compact">
+                                <h2>学校进展查看</h2>
+                            </div>
+                            <div id="globalProgressTimeline" class="timeline compact-timeline"></div>
+                        </div>
+                        <div id="globalReplyPanel" class="activity-subpanel">
+                            <div class="panel-header compact">
+                                <h2>学校动态回复查看</h2>
+                            </div>
+                            <div id="globalReplyTimeline" class="timeline compact-timeline"></div>
+                        </div>
+                    </section>
+                </aside>
+            </section>
+
+            <section id="accountPanel" class="modal-shell" hidden>
+                <div class="modal-card">
+                    <div class="panel-header compact">
+                        <h2>子账号管理</h2>
+                        <button id="closeAccountPanelBtn" class="ghost-btn">关闭</button>
+                    </div>
+                    <div class="account-form">
+                        <input id="subUsernameInput" placeholder="账号">
+                        <input id="subPasswordInput" placeholder="密码">
+                        <select id="subRoleInput">
+                            <option value="sales">销售</option>
+                            <option value="manager">管理者</option>
+                        </select>
+                        <select id="subProvinceInput" multiple size="6"></select>
+                        <button id="saveSubAccountBtn" class="primary-btn">保存账号</button>
+                    </div>
+                    <div id="subAccountList" class="sub-account-list"></div>
+                </div>
+            </section>
+        </section>
+    </main>
+    <div id="toast" class="toast" hidden></div>
+    <script src="platform.js"></script>
+</body>
+</html>
