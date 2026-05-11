@@ -243,8 +243,8 @@
                     教育数据看板
                 </h1>
                 <p class="dashboard-subtitle">转化率与作业完成情况监测 - 基于班级 ID 关联</p>
-                <div id="debugBar" style="margin-top:8px;font-size:12px;color:#475569;display:flex;gap:12px;flex-wrap:wrap;">页面版本占位：root-20260507b</div>
-                <div id="pageVersion" style="margin-top:6px;font-size:12px;color:#0f172a;font-weight:600;background:#e2e8f0;display:inline-block;padding:4px 10px;border-radius:999px;">页面版本：v20260507b</div>
+                <div id="debugBar" style="margin-top:8px;font-size:12px;color:#475569;display:flex;gap:12px;flex-wrap:wrap;">页面版本占位：root-20260511a</div>
+                <div id="pageVersion" style="margin-top:6px;font-size:12px;color:#0f172a;font-weight:600;background:#e2e8f0;display:inline-block;padding:4px 10px;border-radius:999px;">页面版本：v20260511a</div>
             </div>
         </header>
 
@@ -413,7 +413,7 @@
         <!-- 数据表格 -->
 
         <section class="table-section" id="tableSection" style="display: none;">
-            <div class="section-header">
+            <div class="section-header table-section-header">
                 <h2 class="section-title">
                     <span class="section-icon">📋</span>
                     班级数据明细
@@ -424,6 +424,9 @@
                         导出 CSV
                     </button>
                 </div>
+            </div>
+            <div class="table-section-info">
+                <span class="filter-status table-filter-status">共 <strong id="dataCount">0</strong> 条数据</span>
             </div>
             <div class="table-wrapper">
                 <table class="data-table" id="dataTable">
@@ -706,13 +709,19 @@
                             <th>学生总数</th>
                             <th>未过期试用人数</th>
                             <th>年级付费率</th>
-                            <th>收藏</th>
+                            <th class="high-value-tail-col">收藏</th>
                         </tr>
                     </thead>
                     <tbody id="highValueTableBody"></tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="11" class="high-value-footer-cell">
+                                <div class="high-value-info high-value-info-inline" id="highValueInfo"></div>
+                            </td>
+                        </tr>
+                    </tfoot>
                 </table>
             </div>
-            <div class="high-value-info" id="highValueInfo"></div>
         </section>
 
         <!-- 空状态 -->
@@ -835,11 +844,11 @@
     </div>
 
     <script>
-        window.__ROOT_DEPLOY_MARKER__='root-20260507b';
+        window.__ROOT_DEPLOY_MARKER__='root-20260511a';
         document.addEventListener('DOMContentLoaded', function () {
             var input = document.getElementById('fileInput');
             var debugBar = document.getElementById('debugBar');
-            if (debugBar) debugBar.textContent = '页面版本占位：root-20260507b';
+            if (debugBar) debugBar.textContent = '页面版本占位：root-20260511a';
             if (input) {
                 input.addEventListener('change', function (e) {
                     var files = Array.from((e.target && e.target.files) || []);

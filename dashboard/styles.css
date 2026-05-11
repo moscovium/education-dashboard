@@ -89,6 +89,18 @@ body {
     justify-content: space-between;
 }
 
+.table-section-header {
+    margin-bottom: 8px;
+}
+
+.table-section-info {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-height: 20px;
+    margin-bottom: 8px;
+}
+
 .section-title {
     font-size: 18px;
     font-weight: 600;
@@ -379,6 +391,13 @@ body {
     color: var(--text-secondary);
 }
 
+.table-filter-status {
+    margin-left: 0;
+    white-space: nowrap;
+    line-height: 1.1;
+    font-size: 12px;
+}
+
 .filter-status strong {
     color: var(--primary-color);
 }
@@ -614,11 +633,9 @@ body {
 }
 
 .high-value-table-wrapper {
-    overflow-x: auto;
-    overflow-y: hidden;
-}
     max-height: 500px;
-    overflow: auto;
+    overflow-x: auto;
+    overflow-y: auto;
     background: white;
     border-radius: var(--radius);
     border: 1px solid var(--border);
@@ -629,6 +646,21 @@ body {
     font-size: 13px;
     color: var(--text-secondary);
     text-align: right;
+}
+
+.high-value-footer-cell {
+    padding: 6px 10px !important;
+    border-top: 1px solid var(--border);
+    border-bottom: none !important;
+    background: #fafbfc;
+}
+
+.high-value-info-inline {
+    margin-top: 0;
+    font-size: 12px;
+    line-height: 1.1;
+    text-align: right;
+    white-space: nowrap;
 }
 
 /* 学校定义标签样式 */
