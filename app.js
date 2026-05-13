@@ -1264,6 +1264,9 @@ function renderDash() {
 // 指标 - 修复：Excel 中转化率和完成率是小数（0.1967），需要乘以 100 显示为百分数
 function renderMet() {
     const ta = AppState.filteredData.reduce((s, r) => s + (+r['布置作业次数'] || 0), 0);
+    const weeks = [...new Set(AppState.filteredData.map(r => r.weekStartDate))].sort();
+    const lastWeekStart = weeks[weeks.length - 1];
+    const lastWeekData = AppState.filteredData.filter(r => r.weekStartDate === lastWeekStart);
     const tc = lastWeekData.reduce((s, r) => s + (+r['作业完成率'] || 0) * 100, 0);
     const tv = lastWeekData.reduce((s, r) => s + (+r['转化率'] || 0) * 100, 0);
     const avgC = lastWeekData.length ? (tc / lastWeekData.length).toFixed(1) : 0;
@@ -1294,9 +1297,6 @@ function renderMet() {
     elements.studentCount.textContent = stu.toLocaleString();
     
     // 1.2 未过期付费学生数：基于筛选条件，仅取最后一周数据求和
-    const weeks = [...new Set(AppState.filteredData.map(r => r.weekStartDate))].sort();
-    const lastWeekStart = weeks[weeks.length - 1];
-    const lastWeekData = AppState.filteredData.filter(r => r.weekStartDate === lastWeekStart);
     const paidNotExpired = lastWeekData.reduce((s, r) => s + (+r['未过期付费学生数'] || 0), 0);
     elements.paidNotExpired.textContent = paidNotExpired.toLocaleString();
     
