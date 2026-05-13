@@ -846,8 +846,11 @@ function applyHighValueFilter() {
     // 计算年级指标
     const gradeMetrics = [];
     gradeMap.forEach((g, key) => {
-        // 基于所有周汇总计算：年级付费率 = 未过期付费学生数 / 总学生数
-        const payRate = g.totalStudents > 0 ? (g.totalPaidCount / g.totalStudents) * 100 : 0;
+        // 基于最后一周计算：年级付费率 = 最后一周未过期付费学生数 / 最后一周总学生数
+        const lastWeek = g.weeklyData.get(lastWeekStart);
+        const payRate = lastWeek && lastWeek.totalStudents > 0
+            ? (lastWeek.paidCount / lastWeek.totalStudents) * 100
+            : 0;
         
         // 每周的布置率和完成率
         const weeklyMetrics = [];
@@ -1261,10 +1264,10 @@ function renderDash() {
 // 指标 - 修复：Excel 中转化率和完成率是小数（0.1967），需要乘以 100 显示为百分数
 function renderMet() {
     const ta = AppState.filteredData.reduce((s, r) => s + (+r['布置作业次数'] || 0), 0);
-    const tc = AppState.filteredData.reduce((s, r) => s + (+r['作业完成率'] || 0) * 100, 0);
-    const tv = AppState.filteredData.reduce((s, r) => s + (+r['转化率'] || 0) * 100, 0);
-    const avgC = AppState.filteredData.length ? (tc / AppState.filteredData.length).toFixed(1) : 0;
-    const avgV = AppState.filteredData.length ? (tv / AppState.filteredData.length).toFixed(1) : 0;
+    const tc = lastWeekData.reduce((s, r) => s + (+r['作业完成率'] || 0) * 100, 0);
+    const tv = lastWeekData.reduce((s, r) => s + (+r['转化率'] || 0) * 100, 0);
+    const avgC = lastWeekData.length ? (tc / lastWeekData.length).toFixed(1) : 0;
+    const avgV = lastWeekData.length ? (tv / lastWeekData.length).toFixed(1) : 0;
     // 覆盖班级：筛选项下班级总数（按班级ID去重）- 基于实际筛选结果
     const cls = new Set(AppState.filteredData.map(r => getClassId(r)).filter(Boolean));
     const clsCount = cls.size;
