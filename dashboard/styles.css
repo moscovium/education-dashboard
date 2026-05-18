@@ -599,7 +599,89 @@ body {
     margin-bottom: 24px;
 }
 
-/* 高价值学校年级区域 */
+
+.grade-multi-select {
+    min-width: 140px;
+    min-height: 116px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+}
+
+.multi-select-hint {
+    margin-top: 6px;
+    font-size: 11px;
+    line-height: 1.4;
+    color: #64748b;
+}
+
+.custom-school-tabs {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.image-export-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.image-export-dialog {
+    width: min(1100px, 96vw);
+    max-height: 92vh;
+    background: #fff;
+    border-radius: 18px;
+    box-shadow: 0 24px 80px rgba(15, 23, 42, 0.28);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.image-export-header,
+.image-export-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.image-export-actions {
+    justify-content: flex-end;
+    gap: 12px;
+    border-bottom: none;
+    border-top: 1px solid #e2e8f0;
+}
+
+.image-export-preview-wrap {
+    padding: 16px;
+    overflow: auto;
+    background: #f8fafc;
+}
+
+.image-export-preview-wrap img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 12px;
+    background: #fff;
+}
+
+.image-export-close {
+    border: none;
+    background: transparent;
+    font-size: 28px;
+    line-height: 1;
+    cursor: pointer;
+    color: #475569;
+}
+
 .high-value-section {
     margin-bottom: 24px;
     background: rgba(255, 255, 255, 0.95);

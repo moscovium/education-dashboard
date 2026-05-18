@@ -243,8 +243,8 @@
                     教育数据看板
                 </h1>
                 <p class="dashboard-subtitle">转化率与作业完成情况监测 - 基于班级 ID 关联</p>
-                <div id="debugBar" style="margin-top:8px;font-size:12px;color:#475569;display:flex;gap:12px;flex-wrap:wrap;">页面版本占位：root-20260513b</div>
-                <div id="pageVersion" style="margin-top:6px;font-size:12px;color:#0f172a;font-weight:600;background:#e2e8f0;display:inline-block;padding:4px 10px;border-radius:999px;">页面版本：v20260513b</div>
+                <div id="debugBar" style="margin-top:8px;font-size:12px;color:#475569;display:flex;gap:12px;flex-wrap:wrap;">页面版本占位：root-20260519a</div>
+                <div id="pageVersion" style="margin-top:6px;font-size:12px;color:#0f172a;font-weight:600;background:#e2e8f0;display:inline-block;padding:4px 10px;border-radius:999px;">页面版本：v20260519a</div>
             </div>
         </header>
 
@@ -374,9 +374,8 @@
                             <span class="label-icon">📚</span>
                             年级
                         </label>
-                        <select id="gradeSelect" class="filter-select">
-                            <option value="">全部年级</option>
-                        </select>
+                        <select id="gradeSelect" class="filter-select grade-multi-select" multiple size="5"></select>
+                        <div class="multi-select-hint">可多选，按住 Ctrl / Command 选择多个年级</div>
                     </div>
                 </div>
             </div>
@@ -406,7 +405,7 @@
                     <span class="btn-icon">🗑️</span>
                     清空全部
                 </button>
-                <span class="filter-status">共 <strong id="dataCount">0</strong> 条数据</span>
+                <span class="filter-status">共 <strong id="dataCountSummary">0</strong> 条数据</span>
             </div>
         </section>
 
@@ -419,9 +418,9 @@
                     班级数据明细
                 </h2>
                 <div class="table-actions">
-                    <button class="btn btn-small btn-export" id="exportBtn">
-                        <span class="btn-icon">📥</span>
-                        导出 CSV
+                    <button class="btn btn-small btn-export-image" data-export-target="tableSection" data-export-title="班级数据明细">
+                        <span class="btn-icon">🖼️</span>
+                        导出为图片
                     </button>
                 </div>
             </div>
@@ -456,7 +455,15 @@
         <!-- 核心指标卡片 -->
 
         <section class="metrics-section" id="metricsSection" style="display: none;">
-            <div class="metrics-grid">
+            <div class="section-header">
+                <h2 class="section-title"><span class="section-icon">📊</span> 核心指标</h2>
+                <div class="table-actions">
+                    <button class="btn btn-small btn-export-image" data-export-target="metricsSection" data-export-title="核心指标">
+                        <span class="btn-icon">🖼️</span>
+                        导出为图片
+                    </button>
+                </div>
+            </div>
                 <!-- 1.1 总学生数 -->
                 <div class="metric-card">
                     <div class="metric-header">
@@ -527,6 +534,12 @@
                     <span class="section-icon">📈</span>
                     趋势分析
                 </h2>
+                <div class="table-actions">
+                    <button class="btn btn-small btn-export-image" data-export-target="chartsSection" data-export-title="趋势分析">
+                        <span class="btn-icon">🖼️</span>
+                        导出为图片
+                    </button>
+                </div>
             </div>
 
             <div class="charts-grid">
@@ -592,9 +605,8 @@
                             <span class="label-icon">📚</span>
                             年级
                         </label>
-                        <select id="hvGradeSelect" class="filter-select">
-                            <option value="">全部年级</option>
-                        </select>
+                        <select id="hvGradeSelect" class="filter-select grade-multi-select" multiple size="5"></select>
+                        <div class="multi-select-hint">可多选，按住 Ctrl / Command 选择多个年级</div>
                     </div>
                     <div class="filter-group">
                         <label class="filter-label">
@@ -629,9 +641,9 @@
                         </label>
                         <select id="hvAssignRateSelect" class="filter-select">
                             <option value="">不限</option>
-                            <option value="50">≥50%</option>
-                            <option value="80">≥80%</option>
-                            <option value="100">=100%</option>
+                            <option value="49">低于50%</option>
+                            <option value="50">大于50%</option>
+                            <option value="80">大于80%</option>
                         </select>
                     </div>
                     <div class="filter-group">
@@ -641,9 +653,9 @@
                         </label>
                         <select id="hvCompletionRateSelect" class="filter-select">
                             <option value="">不限</option>
-                            <option value="30">≥30%</option>
-                            <option value="50">≥50%</option>
-                            <option value="70">≥70%</option>
+                            <option value="49">低于50%</option>
+                            <option value="50">大于50%</option>
+                            <option value="80">大于80%</option>
                         </select>
                     </div>
                     <div class="filter-group">
@@ -690,6 +702,10 @@
                     <button id="resetHighValueFilter" class="btn btn-secondary btn-small">
                         <span class="btn-icon">🔄</span>
                         重置
+                    </button>
+                    <button class="btn btn-small btn-export-image" data-export-target="highValueSection" data-export-title="高价值学校年级">
+                        <span class="btn-icon">🖼️</span>
+                        导出为图片
                     </button>
                 </div>
             </div>
@@ -765,9 +781,8 @@
                                 <span class="label-icon">📚</span>
                                 年级
                             </label>
-                            <select id="customSchoolGradeFilter" class="filter-select">
-                                <option value="">不限</option>
-                            </select>
+                            <select id="customSchoolGradeFilter" class="filter-select grade-multi-select" multiple size="5"></select>
+                            <div class="multi-select-hint">可多选，按住 Ctrl / Command 选择多个年级</div>
                         </div>
                         <div class="filter-group">
                             <label class="filter-label">
@@ -809,9 +824,13 @@
                 </div>
                 <div class="custom-school-result" id="customSchoolResult" style="display:none;">
                     <div class="custom-school-tabs">
-                        <button id="customSchoolTabSchool" class="mode-btn active">按校展示</button>
-                        <button id="customSchoolTabGrade" class="mode-btn">按年级展示</button>
+                        <button id="customSchoolTabGrade" class="mode-btn active">按年级展示</button>
                         <button id="customSchoolTabClass" class="mode-btn">按班级展示</button>
+                        <button id="customSchoolTabSchool" class="mode-btn">按校展示</button>
+                        <button class="btn btn-small btn-export-image" data-export-target="customSchoolResult" data-export-title="自定义重点校数据">
+                            <span class="btn-icon">🖼️</span>
+                            导出为图片
+                        </button>
                     </div>
                     <div id="customSchoolSummary" class="high-value-info"></div>
                     <div id="customSchoolSchoolView" class="custom-school-view">
@@ -843,12 +862,28 @@
         </section>
     </div>
 
+    <div id="imageExportModal" class="image-export-modal" style="display:none;">
+        <div class="image-export-dialog">
+            <div class="image-export-header">
+                <h3 id="imageExportTitle">导出图片预览</h3>
+                <button id="imageExportClose" class="image-export-close">×</button>
+            </div>
+            <div class="image-export-preview-wrap">
+                <img id="imageExportPreview" alt="导出图片预览" />
+            </div>
+            <div class="image-export-actions">
+                <button id="copyImageBtn" class="btn btn-primary btn-small">复制图片</button>
+                <button id="downloadImageBtn" class="btn btn-secondary btn-small">下载到本地</button>
+            </div>
+        </div>
+    </div>
+
     <script>
-        window.__ROOT_DEPLOY_MARKER__='root-20260513b';
+        window.__ROOT_DEPLOY_MARKER__='root-20260519a';
         document.addEventListener('DOMContentLoaded', function () {
             var input = document.getElementById('fileInput');
             var debugBar = document.getElementById('debugBar');
-            if (debugBar) debugBar.textContent = '页面版本占位：root-20260513b';
+            if (debugBar) debugBar.textContent = '页面版本占位：root-20260519a';
             if (input) {
                 input.addEventListener('change', function (e) {
                     var files = Array.from((e.target && e.target.files) || []);
@@ -863,6 +898,6 @@
             }
         });
     </script>
-    <script src="app.js?v=20260513b"></script>
+    <script src="app.js?v=20260519a"></script>
 </body>
 </html>

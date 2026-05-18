@@ -6,7 +6,7 @@ const MAX_STORAGE_MB = 500; // 最大存储限制（MB）
 let db = null;
 const AppState = { files: [], filteredData: [], cache: new Map(), provinces: new Set(), cities: new Set(), districts: new Set(), schools: new Set(), grades: new Set() };
 const elements = {};
-const APP_VERSION = 'v2.4.2-root-20260513b';
+const APP_VERSION = 'v2.4.2-root-20260519a';
 const getClassId = (r = {}) => r['班级 id'] || r['班级ID'] || r['班级id'] || r['班级'] || r['classId'] || r['class_id'] || '';
 const buildWeekMetaMap = (groupMap) => {
     const weekMetaMap = new Map();
@@ -77,6 +77,7 @@ function initElements() {
     elements.applyFilter = document.getElementById('applyFilter');
     elements.resetFilter = document.getElementById('resetFilter');
     elements.dataCount = document.getElementById('dataCount');
+    elements.dataCountSummary = document.getElementById('dataCountSummary');
     elements.metricsSection = document.getElementById('metricsSection');
     elements.chartsSection = document.getElementById('chartsSection');
     elements.tableSection = document.getElementById('tableSection');
@@ -328,6 +329,12 @@ function initHandlers() {
     if (elements.customSchoolTabSchool) elements.customSchoolTabSchool.onclick = () => switchCustomSchoolTab('school');
     if (elements.customSchoolTabGrade) elements.customSchoolTabGrade.onclick = () => switchCustomSchoolTab('grade');
     if (elements.customSchoolTabClass) elements.customSchoolTabClass.onclick = () => switchCustomSchoolTab('class');
+    document.querySelectorAll('.btn-export-image').forEach(btn => {
+        btn.onclick = () => exportSectionAsImage(btn.dataset.exportTarget, btn.dataset.exportTitle || '导出图片');
+    });
+    document.getElementById('imageExportClose')?.addEventListener('click', closeImageExportModal);
+    document.getElementById('copyImageBtn')?.addEventListener('click', copyExportedImage);
+    document.getElementById('downloadImageBtn')?.addEventListener('click', downloadExportedImage);
 }
 
 
@@ -621,7 +628,7 @@ function cascade(lvl) {
     let selCity = elements.citySelect.value;
     let selDistrict = elements.districtSelect.value;
     let selSchool = elements.schoolSelect.value;
-    let selGrade = elements.gradeSelect.value;
+    let selGrades = getSelectedValues(elements.gradeSelect);
 
     const provinces = [...new Set(lastWeekRecs.map(r => r['省份']).filter(Boolean))];
     updateSel(elements.provinceSelect, new Set(provinces));
@@ -659,8 +666,7 @@ function cascade(lvl) {
     if (selSchool) gradeRecs = gradeRecs.filter(r => r['学校名称'] === selSchool);
     const grades = [...new Set(gradeRecs.map(r => r['年级']).filter(Boolean))];
     updateSel(elements.gradeSelect, new Set(grades));
-    if (!grades.includes(selGrade)) selGrade = '';
-    elements.gradeSelect.value = selGrade;
+    setSelectedValues(elements.gradeSelect, selGrades.filter(g => grades.includes(g)));
 
     elements.provinceSelect.disabled = false;
     elements.citySelect.disabled = false;
@@ -684,15 +690,17 @@ function updateHighValueSels() {
         return;
     }
     
-    // 获取最后一周的数据
     const weekStarts = [...new Set(allRecs.map(r => r.weekStartDate))].sort();
     const lastWeekStart = weekStarts[weekStarts.length - 1] || '';
     const lastWeekRecs = allRecs.filter(r => r.weekStartDate === lastWeekStart);
+    const selectedGrades = getSelectedValues(elements.hvGradeSelect);
     
     updateSel(elements.hvProvinceSelect, new Set(lastWeekRecs.map(r => r['省份']).filter(Boolean)));
     updateSel(elements.hvCitySelect, new Set(lastWeekRecs.map(r => r['城市']).filter(Boolean)));
     updateSel(elements.hvDistrictSelect, new Set(lastWeekRecs.map(r => r['区县']).filter(Boolean)));
-    updateSel(elements.hvGradeSelect, new Set(lastWeekRecs.map(r => r['年级']).filter(Boolean)));
+    const grades = [...new Set(lastWeekRecs.map(r => r['年级']).filter(Boolean))];
+    updateSel(elements.hvGradeSelect, new Set(grades));
+    setSelectedValues(elements.hvGradeSelect, selectedGrades.filter(g => grades.includes(g)));
 }
 
 // 高价值筛选级联
@@ -701,49 +709,39 @@ function cascadeHighValue(lvl) {
     AppState.cache.forEach(d => allRecs.push(...d));
     if (allRecs.length === 0) return;
     
-    // 获取最后一周的数据
     const weekStarts = [...new Set(allRecs.map(r => r.weekStartDate))].sort();
     const lastWeekStart = weekStarts[weekStarts.length - 1] || '';
-    let recs = allRecs.filter(r => r.weekStartDate === lastWeekStart);
+    const lastWeekOnly = allRecs.filter(r => r.weekStartDate === lastWeekStart);
     
     const selProvince = elements.hvProvinceSelect.value;
     const selCity = elements.hvCitySelect.value;
     const selDistrict = elements.hvDistrictSelect.value;
-    const selGrade = elements.hvGradeSelect.value;
+    const selGrades = getSelectedValues(elements.hvGradeSelect);
     
-    if (selProvince) recs = recs.filter(r => r['省份'] === selProvince);
-    if (selCity) recs = recs.filter(r => r['城市'] === selCity);
-    if (selDistrict) recs = recs.filter(r => r['区县'] === selDistrict);
-    
-    // 省份下拉框
-    let provinceRecs = allRecs.filter(r => r.weekStartDate === lastWeekStart);
-    const provinces = [...new Set(provinceRecs.map(r => r['省份']).filter(Boolean))];
+    const provinces = [...new Set(lastWeekOnly.map(r => r['省份']).filter(Boolean))];
     updateSel(elements.hvProvinceSelect, new Set(provinces));
     elements.hvProvinceSelect.value = selProvince && provinces.includes(selProvince) ? selProvince : '';
     
-    // 城市下拉框
-    let cityRecs = allRecs.filter(r => r.weekStartDate === lastWeekStart);
-    if (selProvince) cityRecs = cityRecs.filter(r => r['省份'] === selProvince);
+    let cityRecs = lastWeekOnly;
+    if (elements.hvProvinceSelect.value) cityRecs = cityRecs.filter(r => r['省份'] === elements.hvProvinceSelect.value);
     const cities = [...new Set(cityRecs.map(r => r['城市']).filter(Boolean))];
     updateSel(elements.hvCitySelect, new Set(cities));
     elements.hvCitySelect.value = selCity && cities.includes(selCity) ? selCity : '';
     
-    // 区县下拉框
-    let districtRecs = allRecs.filter(r => r.weekStartDate === lastWeekStart);
-    if (selProvince) districtRecs = districtRecs.filter(r => r['省份'] === selProvince);
-    if (selCity) districtRecs = districtRecs.filter(r => r['城市'] === selCity);
+    let districtRecs = lastWeekOnly;
+    if (elements.hvProvinceSelect.value) districtRecs = districtRecs.filter(r => r['省份'] === elements.hvProvinceSelect.value);
+    if (elements.hvCitySelect.value) districtRecs = districtRecs.filter(r => r['城市'] === elements.hvCitySelect.value);
     const districts = [...new Set(districtRecs.map(r => r['区县']).filter(Boolean))];
     updateSel(elements.hvDistrictSelect, new Set(districts));
     elements.hvDistrictSelect.value = selDistrict && districts.includes(selDistrict) ? selDistrict : '';
     
-    // 年级下拉框
-    let gradeRecs = allRecs.filter(r => r.weekStartDate === lastWeekStart);
-    if (selProvince) gradeRecs = gradeRecs.filter(r => r['省份'] === selProvince);
-    if (selCity) gradeRecs = gradeRecs.filter(r => r['城市'] === selCity);
-    if (selDistrict) gradeRecs = gradeRecs.filter(r => r['区县'] === selDistrict);
+    let gradeRecs = lastWeekOnly;
+    if (elements.hvProvinceSelect.value) gradeRecs = gradeRecs.filter(r => r['省份'] === elements.hvProvinceSelect.value);
+    if (elements.hvCitySelect.value) gradeRecs = gradeRecs.filter(r => r['城市'] === elements.hvCitySelect.value);
+    if (elements.hvDistrictSelect.value) gradeRecs = gradeRecs.filter(r => r['区县'] === elements.hvDistrictSelect.value);
     const grades = [...new Set(gradeRecs.map(r => r['年级']).filter(Boolean))];
     updateSel(elements.hvGradeSelect, new Set(grades));
-    elements.hvGradeSelect.value = selGrade && grades.includes(selGrade) ? selGrade : '';
+    setSelectedValues(elements.hvGradeSelect, selGrades.filter(g => grades.includes(g)));
 }
 
 // 计算年级指标并应用筛选
@@ -762,12 +760,12 @@ function applyHighValueFilter() {
     const selProvince = elements.hvProvinceSelect.value;
     const selCity = elements.hvCitySelect.value;
     const selDistrict = elements.hvDistrictSelect.value;
-    const selGrade = elements.hvGradeSelect.value;
+    const selGrades = getSelectedValues(elements.hvGradeSelect);
     
     if (selProvince) allRecs = allRecs.filter(r => r['省份'] === selProvince);
     if (selCity) allRecs = allRecs.filter(r => r['城市'] === selCity);
     if (selDistrict) allRecs = allRecs.filter(r => r['区县'] === selDistrict);
-    if (selGrade) allRecs = allRecs.filter(r => r['年级'] === selGrade);
+    if (selGrades.length) allRecs = allRecs.filter(r => selGrades.includes(r['年级']));
     
     const sortedWeeks = [...new Set(allRecs.map(r => r.weekStartDate))].sort();
     const lastWeekStart = sortedWeeks[sortedWeeks.length - 1] || '';
@@ -927,13 +925,17 @@ function applyHighValueFilter() {
             const avgAssignRate = g.weeklyMetrics.length > 0 
                 ? g.weeklyMetrics.reduce((a, w) => a + w.assignRate, 0) / g.weeklyMetrics.length 
                 : 0;
-            if (avgAssignRate < assignRateThreshold) return false;
+            if (assignRateThreshold === 49 && avgAssignRate >= 50) return false;
+            if (assignRateThreshold === 50 && avgAssignRate <= 50) return false;
+            if (assignRateThreshold === 80 && avgAssignRate <= 80) return false;
         }
         if (completionRateThreshold > 0) {
             const avgCompletion = g.weeklyMetrics.length > 0 
                 ? g.weeklyMetrics.reduce((a, w) => a + w.avgCompletionRate, 0) / g.weeklyMetrics.length 
                 : 0;
-            if (avgCompletion < completionRateThreshold) return false;
+            if (completionRateThreshold === 49 && avgCompletion >= 50) return false;
+            if (completionRateThreshold === 50 && avgCompletion <= 50) return false;
+            if (completionRateThreshold === 80 && avgCompletion <= 80) return false;
         }
         if (trialCountThreshold > 0 && g.trialCount < trialCountThreshold) return false;
         if (schoolCategoryFilter && g.schoolCategory !== schoolCategoryFilter) return false;
@@ -1050,7 +1052,7 @@ function resetHighValueFilter() {
     elements.hvProvinceSelect.value = '';
     elements.hvCitySelect.value = '';
     elements.hvDistrictSelect.value = '';
-    elements.hvGradeSelect.value = '';
+    elements.hvGradeSelect.selectedIndex = -1;
     elements.hvPayRateSelect.value = '';
     elements.hvStudentCountSelect.value = '';
     elements.hvAssignRateSelect.value = '';
@@ -1075,11 +1077,34 @@ function getCascadeData() {
     return recs;
 }
 
+function getSelectedValues(sel) {
+    if (!sel) return [];
+    return [...sel.options].filter(o => o.selected && o.value).map(o => o.value);
+}
+
+function setSelectedValues(sel, values = []) {
+    if (!sel) return;
+    const set = new Set(values || []);
+    [...sel.options].forEach(o => { o.selected = !!o.value && set.has(o.value); });
+}
+
+function matchesMulti(value, selectedValues) {
+    return !selectedValues?.length || selectedValues.includes(value);
+}
+
 function updateSel(sel, vals) {
-    const cur = sel.value, def = sel.querySelector('option')?.textContent || '全部';
-    sel.innerHTML = `<option value="">${def}</option>`;
-    [...vals].sort().forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v; sel.appendChild(o); });
-    sel.value = cur;
+    const prevSelected = getSelectedValues(sel);
+    const def = sel.querySelector('option')?.textContent || '全部';
+    const isMultiple = sel.multiple;
+    sel.innerHTML = isMultiple ? '' : `<option value="">${def}</option>`;
+    [...vals].sort((a, b) => String(a).localeCompare(String(b), 'zh-CN')).forEach(v => {
+        const o = document.createElement('option');
+        o.value = v;
+        o.textContent = v;
+        if (prevSelected.includes(v)) o.selected = true;
+        sel.appendChild(o);
+    });
+    if (!isMultiple && prevSelected[0]) sel.value = prevSelected[0];
 }
 
 // 应用筛选
@@ -1103,18 +1128,20 @@ async function applyFilter() {
         let all = [];
         for (const f of rel) { try { all.push(...await parseExcel(f.filename)); } catch(e) { console.error(f.filename, e); } }
         
-        const p = elements.provinceSelect.value, c = elements.citySelect.value, di = elements.districtSelect.value, s = elements.schoolSelect.value, g = elements.gradeSelect.value;
+        const p = elements.provinceSelect.value, c = elements.citySelect.value, di = elements.districtSelect.value, s = elements.schoolSelect.value;
+        const gradeValues = getSelectedValues(elements.gradeSelect);
         AppState.filteredData = all.filter(r => {
             if (p && r['省份'] !== p) return false;
             if (c && r['城市'] !== c) return false;
             if (di && r['区县'] !== di) return false;
             if (s && r['学校名称'] !== s) return false;
-            if (g && r['年级'] !== g) return false;
+            if (!matchesMulti(r['年级'], gradeValues)) return false;
             return true;
         });
         
         hideLoading();
         elements.dataCount.textContent = AppState.filteredData.length.toLocaleString();
+        if (elements.dataCountSummary) elements.dataCountSummary.textContent = AppState.filteredData.length.toLocaleString();
         renderDash();
         showMsg(AppState.filteredData.length ? `✅ 完成\n${AppState.filteredData.length.toLocaleString()} 条` : '⚠️ 无数据', AppState.filteredData.length ? 'success' : 'warning');
     } catch (e) {
@@ -1129,10 +1156,11 @@ function resetFilter() {
     elements.citySelect.value = '';
     elements.districtSelect.value = '';
     elements.schoolSelect.value = '';
-    elements.gradeSelect.value = '';
+    elements.gradeSelect.selectedIndex = -1;
     updateAllSels();
     AppState.filteredData = [];
     elements.dataCount.textContent = '0';
+    if (elements.dataCountSummary) elements.dataCountSummary.textContent = '0';
     renderDash();
     showMsg('✅ 已重置', 'success');
 }
@@ -1179,6 +1207,7 @@ async function quickSearch(keyword) {
         
         hideLoading();
         elements.dataCount.textContent = AppState.filteredData.length.toLocaleString();
+        if (elements.dataCountSummary) elements.dataCountSummary.textContent = AppState.filteredData.length.toLocaleString();
         renderDash();
         renderCharts();
         renderTbl();
@@ -1794,6 +1823,113 @@ function showConfirm(message) {
 }
 
 // 响应式
+function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+}
+
+async function exportSectionAsImage(targetId, title) {
+    const node = document.getElementById(targetId);
+    if (!node) {
+        showMsg('❌ 未找到可导出的区域', 'error');
+        return;
+    }
+    try {
+        showLoading();
+        const dataUrl = await renderNodeToImage(node);
+        AppState.lastExportImage = { dataUrl, title: title || '导出图片', filename: `${(title || 'dashboard').replace(/\s+/g, '-')}-${dayjs().format('YYYYMMDD-HHmmss')}.png` };
+        openImageExportModal(AppState.lastExportImage);
+        hideLoading();
+        showMsg('✅ 已生成图片预览', 'success');
+    } catch (error) {
+        hideLoading();
+        console.error('exportSectionAsImage failed:', error);
+        showMsg(`❌ 导出图片失败：${error.message}`, 'error');
+    }
+}
+
+async function renderNodeToImage(node) {
+    const cloned = node.cloneNode(true);
+    cloned.style.width = `${Math.ceil(node.scrollWidth)}px`;
+    cloned.style.maxWidth = 'none';
+    cloned.style.overflow = 'visible';
+    cloned.querySelectorAll('.btn, .btn-export-image, .table-actions, .filter-actions').forEach(el => el.remove());
+
+    const wrapper = document.createElement('div');
+    wrapper.style.position = 'fixed';
+    wrapper.style.left = '-100000px';
+    wrapper.style.top = '0';
+    wrapper.style.padding = '24px';
+    wrapper.style.background = '#f8fafc';
+    wrapper.style.zIndex = '-1';
+    wrapper.appendChild(cloned);
+    document.body.appendChild(wrapper);
+
+    try {
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        const width = Math.ceil(cloned.scrollWidth + 48);
+        const height = Math.ceil(cloned.scrollHeight + 48);
+        const serialized = new XMLSerializer().serializeToString(wrapper);
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><foreignObject width="100%" height="100%">${serialized}</foreignObject></svg>`;
+        const img = new Image();
+        img.decoding = 'async';
+        img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+        await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = () => reject(new Error('图片渲染失败')); });
+        const canvas = document.createElement('canvas');
+        canvas.width = width * EXPORT_IMAGE_SCALE;
+        canvas.height = height * EXPORT_IMAGE_SCALE;
+        const ctx = canvas.getContext('2d');
+        ctx.scale(EXPORT_IMAGE_SCALE, EXPORT_IMAGE_SCALE);
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+        return canvas.toDataURL('image/png');
+    } finally {
+        document.body.removeChild(wrapper);
+    }
+}
+
+function openImageExportModal({ dataUrl, title }) {
+    const modal = document.getElementById('imageExportModal');
+    const img = document.getElementById('imageExportPreview');
+    const titleEl = document.getElementById('imageExportTitle');
+    if (!modal || !img || !titleEl) return;
+    titleEl.textContent = `${title} 图片预览`;
+    img.src = dataUrl;
+    modal.style.display = 'flex';
+}
+
+function closeImageExportModal() {
+    const modal = document.getElementById('imageExportModal');
+    if (modal) modal.style.display = 'none';
+}
+
+async function copyExportedImage() {
+    if (!AppState.lastExportImage?.dataUrl) return;
+    try {
+        const blob = await (await fetch(AppState.lastExportImage.dataUrl)).blob();
+        await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+        showMsg('✅ 图片已复制到剪贴板', 'success');
+    } catch (error) {
+        console.error('copyExportedImage failed:', error);
+        showMsg('❌ 当前浏览器不支持直接复制图片', 'error');
+    }
+}
+
+async function downloadExportedImage() {
+    if (!AppState.lastExportImage?.dataUrl) return;
+    const link = document.createElement('a');
+    link.href = AppState.lastExportImage.dataUrl;
+    link.download = AppState.lastExportImage.filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
 window.onresize = () => { ['conversionChart'].forEach(id => { const el=document.getElementById(id); const c = el ? echarts.getInstanceByDom(el) : null; if (c) c.resize(); }); scheduleAdaptNameCells(); };
 
 
@@ -1807,10 +1943,14 @@ function inferStageFromGrade(grade = '') {
 }
 
 const FAVORITES_KEY = 'education-dashboard-hv-favorites';
+const CUSTOM_SCHOOL_TAB_KEY = 'education-dashboard-custom-school-tab';
+const EXPORT_IMAGE_SCALE = 2;
 function loadFavorites() { try { return new Set(JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]')); } catch { return new Set(); } }
 function saveFavorites(set) { localStorage.setItem(FAVORITES_KEY, JSON.stringify([...set])); }
 function favoriteKey(g) { return `${g.province}|${g.city}|${g.district}|${g.school}|${g.grade}`; }
 function toggleFavoriteByKey(key) { const favs = loadFavorites(); if (favs.has(key)) favs.delete(key); else favs.add(key); saveFavorites(favs); applyHighValueFilter(); }
+function getCustomSchoolTab() { return localStorage.getItem(CUSTOM_SCHOOL_TAB_KEY) || 'grade'; }
+function setCustomSchoolTab(tab) { localStorage.setItem(CUSTOM_SCHOOL_TAB_KEY, tab); }
 
 function adaptNameCells(scope = document) {
     const cells = scope.querySelectorAll('.school-name-cell, .teacher-name-cell');
@@ -1890,7 +2030,7 @@ function applyCustomSchoolSearch() {
     }
 
     populateCustomSchoolGradeFilter(matched);
-    const gradeFilter = elements.customSchoolGradeFilter?.value || '';
+    const gradeFilter = getSelectedValues(elements.customSchoolGradeFilter);
 
     renderCustomSchoolAggregateSchoolView(matched, names, stageFilter, gradeFilter);
     renderCustomSchoolSchoolView(matched, names, avgAssignFilter, completionFilter, stageFilter, gradeFilter);
@@ -1899,7 +2039,7 @@ function applyCustomSchoolSearch() {
     const lastWeekStart = weekStarts[weekStarts.length - 1] || '';
     elements.customSchoolSummary.textContent = `共 ${matched.length} 条记录 | 数据来源：${weekStarts.length}周（${lastWeekStart}）`;
     elements.customSchoolResult.style.display = 'block';
-    switchCustomSchoolTab('school');
+    switchCustomSchoolTab(getCustomSchoolTab());
     scheduleAdaptNameCells();
     showMsg(`✅ 已匹配 ${matched.length} 条重点校数据`, 'success');
 }
@@ -1910,7 +2050,7 @@ function resetCustomSchoolSearch() {
     if (elements.customSchoolAvgAssignFilter) elements.customSchoolAvgAssignFilter.value = '';
     if (elements.customSchoolCompletionFilter) elements.customSchoolCompletionFilter.value = '';
     if (elements.customSchoolStageFilter) elements.customSchoolStageFilter.value = '';
-    if (elements.customSchoolGradeFilter) elements.customSchoolGradeFilter.value = '';
+    if (elements.customSchoolGradeFilter) elements.customSchoolGradeFilter.selectedIndex = -1;
     if (elements.customSchoolResult) elements.customSchoolResult.style.display = 'none';
     if (elements.customSchoolTableHead) elements.customSchoolTableHead.innerHTML = '';
     if (elements.customSchoolTableBody) elements.customSchoolTableBody.innerHTML = '';
@@ -1920,6 +2060,7 @@ function resetCustomSchoolSearch() {
 }
 
 function switchCustomSchoolTab(tab) {
+    setCustomSchoolTab(tab);
     const isSchool = tab === 'school';
     const isGrade = tab === 'grade';
     const isClass = tab === 'class';
@@ -1934,16 +2075,14 @@ function switchCustomSchoolTab(tab) {
 
 function populateCustomSchoolGradeFilter(records) {
     if (!elements.customSchoolGradeFilter) return;
-    const current = elements.customSchoolGradeFilter.value;
+    const current = getSelectedValues(elements.customSchoolGradeFilter);
     const grades = [...new Set(records.map(r => r['年级']).filter(Boolean))]
         .sort((a, b) => String(a).localeCompare(String(b), 'zh-CN'));
-    elements.customSchoolGradeFilter.innerHTML = '<option value="">不限</option>' + grades.map(g => `<option value="${g}">${g}</option>`).join('');
-    if (grades.includes(current)) {
-        elements.customSchoolGradeFilter.value = current;
-    }
+    updateSel(elements.customSchoolGradeFilter, new Set(grades));
+    setSelectedValues(elements.customSchoolGradeFilter, current.filter(g => grades.includes(g)));
 }
 
-function renderCustomSchoolAggregateSchoolView(records, inputNames = [], stageFilter = '', gradeFilter = '') {
+function renderCustomSchoolAggregateSchoolView(records, inputNames = [], stageFilter = '', gradeFilters = []) {
     const schoolMap = new Map();
     records.forEach(r => {
         const school = r['学校名称'] || '-';
@@ -1984,11 +2123,11 @@ function renderCustomSchoolAggregateSchoolView(records, inputNames = [], stageFi
         })
         .map(g => {
             const allGrades = [...g.grades];
-            if (gradeFilter && !allGrades.includes(gradeFilter)) return '';
-            const filteredAllRows = gradeFilter ? g.allRows.filter(r => r['年级'] === gradeFilter) : g.allRows;
-            const filteredLastRows = gradeFilter ? g.lastWeekRows.filter(r => r['年级'] === gradeFilter) : g.lastWeekRows;
+            if (gradeFilters.length && !allGrades.some(grade => gradeFilters.includes(grade))) return '';
+            const filteredAllRows = gradeFilters.length ? g.allRows.filter(r => gradeFilters.includes(r['年级'])) : g.allRows;
+            const filteredLastRows = gradeFilters.length ? g.lastWeekRows.filter(r => gradeFilters.includes(r['年级'])) : g.lastWeekRows;
             const classCount = new Set(filteredAllRows.map(r => getClassId(r) || r['班级名称'] || `${g.school}-${r['年级']}-${r.weekLabel||''}`)).size;
-            const gradeCount = gradeFilter ? (filteredAllRows.length ? 1 : 0) : g.grades.size;
+            const gradeCount = gradeFilters.length ? new Set(filteredAllRows.map(r => r['年级']).filter(Boolean)).size : g.grades.size;
             let row = `<tr><td>${g.province}</td><td>${g.city}</td><td>${g.district}</td><td class="school-name-cell" title="${g.school}">${g.school}</td><td>${gradeCount}</td><td>${classCount}</td>`;
             schoolWeeks.forEach(weekKey => {
                 const weekRows = filteredAllRows.filter(r => r.weekLabel === weekKey);
@@ -2011,7 +2150,7 @@ function renderCustomSchoolAggregateSchoolView(records, inputNames = [], stageFi
     if (elements.customSchoolSchoolTableBody) elements.customSchoolSchoolTableBody.innerHTML = rows;
 }
 
-function renderCustomSchoolSchoolView(records, inputNames = [], avgAssignFilter = '', completionFilter = '', stageFilter = '', gradeFilter = '') {
+function renderCustomSchoolSchoolView(records, inputNames = [], avgAssignFilter = '', completionFilter = '', stageFilter = '', gradeFilters = []) {
     const grouped = new Map();
     records.forEach(r => {
         const key = `${r['省份']||''}|${r['城市']||''}|${r['区县']||''}|${r['学校名称']||''}|${r['年级']||''}`;
@@ -2073,7 +2212,7 @@ function renderCustomSchoolSchoolView(records, inputNames = [], avgAssignFilter 
         const avgAssignments = lastWeek && classCount ? (lastWeek.assignments / classCount) : 0;
         const completion = lastWeek && lastWeek.completionCount ? (lastWeek.completionSum / lastWeek.completionCount) / 100 : 0;
         const stage = inferStageFromGrade(g.grade);
-        const gradePass = !gradeFilter || g.grade === gradeFilter;
+        const gradePass = !gradeFilters.length || gradeFilters.includes(g.grade);
 
         let stagePass = true;
         if (stageFilter) stagePass = stage === stageFilter;
@@ -2111,7 +2250,7 @@ function renderCustomSchoolSchoolView(records, inputNames = [], avgAssignFilter 
     scheduleAdaptNameCells();
 }
 
-function renderCustomSchoolClassView(records, inputNames = [], stageFilter = '', gradeFilter = '') {
+function renderCustomSchoolClassView(records, inputNames = [], stageFilter = '', gradeFilters = []) {
     const groupMap = new Map();
     records.forEach(r => {
         const classId = getClassId(r);
@@ -2148,7 +2287,7 @@ function renderCustomSchoolClassView(records, inputNames = [], stageFilter = '',
         return `${a.school}${a.grade}${a.className}`.localeCompare(`${b.school}${b.grade}${b.className}`, 'zh-CN');
     }).filter(g => {
         const stagePass = !stageFilter || inferStageFromGrade(g.grade) === stageFilter;
-        const gradePass = !gradeFilter || g.grade === gradeFilter;
+        const gradePass = !gradeFilters.length || gradeFilters.includes(g.grade);
         return stagePass && gradePass;
     }).map(g => {
         let t = `<tr><td>${g.province}</td><td>${g.city}</td><td>${g.district}</td><td class="school-name-cell" title="${g.school}">${g.school}</td><td>${g.grade}</td><td class="teacher-name-cell" title="${g.teacherName}">${g.teacherName}</td><td>${g.className}</td>`;
