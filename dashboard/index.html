@@ -8,6 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/dayjs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/locale/zh-cn.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <link rel="stylesheet" href="styles.css">
     <style>
         /* 进度条样式 */
@@ -243,21 +244,26 @@
                     教育数据看板
                 </h1>
                 <p class="dashboard-subtitle">转化率与作业完成情况监测 - 基于班级 ID 关联</p>
-                <div id="debugBar" style="margin-top:8px;font-size:12px;color:#475569;display:flex;gap:12px;flex-wrap:wrap;">页面版本占位：root-20260519a</div>
-                <div id="pageVersion" style="margin-top:6px;font-size:12px;color:#0f172a;font-weight:600;background:#e2e8f0;display:inline-block;padding:4px 10px;border-radius:999px;">页面版本：v20260519a</div>
+                <div id="debugBar" style="margin-top:8px;font-size:12px;color:#475569;display:flex;gap:12px;flex-wrap:wrap;">页面版本占位：root-20260519b</div>
+                <div id="pageVersion" style="margin-top:6px;font-size:12px;color:#0f172a;font-weight:600;background:#e2e8f0;display:inline-block;padding:4px 10px;border-radius:999px;">页面版本：v20260519b</div>
             </div>
         </header>
 
         <!-- 上传与已上传周次 -->
         <section class="upload-section">
-            <div class="section-header">
+            <div class="section-header upload-section-header">
                 <h2 class="section-title">
                     <span class="section-icon">📁</span>
                     每周数据上传
                 </h2>
+                <button id="toggleUploadSection" class="btn btn-secondary btn-small" type="button" aria-expanded="false">
+                    <span class="btn-icon">📦</span>
+                    展开
+                </button>
             </div>
             
-            <div class="upload-panel-grid">
+            <div id="uploadSectionBody" class="upload-section-body is-collapsed">
+                <div class="upload-panel-grid">
                 <div class="upload-entry-card">
                     <h3 class="subsection-title">上传入口</h3>
                     <div style="text-align: center; padding: 20px 0;">
@@ -405,6 +411,10 @@
                     <span class="btn-icon">🗑️</span>
                     清空全部
                 </button>
+                <button id="exportFilterExcelBtn" class="btn btn-export">
+                    <span class="btn-icon">📥</span>
+                    导出为Excel
+                </button>
                 <span class="filter-status">共 <strong id="dataCountSummary">0</strong> 条数据</span>
             </div>
         </section>
@@ -464,6 +474,7 @@
                     </button>
                 </div>
             </div>
+            <div class="metrics-grid">
                 <!-- 1.1 总学生数 -->
                 <div class="metric-card">
                     <div class="metric-header">
@@ -703,6 +714,10 @@
                         <span class="btn-icon">🔄</span>
                         重置
                     </button>
+                    <button id="exportHighValueExcelBtn" class="btn btn-small btn-export">
+                        <span class="btn-icon">📥</span>
+                        导出为Excel
+                    </button>
                     <button class="btn btn-small btn-export-image" data-export-target="highValueSection" data-export-title="高价值学校年级">
                         <span class="btn-icon">🖼️</span>
                         导出为图片
@@ -879,11 +894,11 @@
     </div>
 
     <script>
-        window.__ROOT_DEPLOY_MARKER__='root-20260519a';
+        window.__ROOT_DEPLOY_MARKER__='root-20260519b';
         document.addEventListener('DOMContentLoaded', function () {
             var input = document.getElementById('fileInput');
             var debugBar = document.getElementById('debugBar');
-            if (debugBar) debugBar.textContent = '页面版本占位：root-20260519a';
+            if (debugBar) debugBar.textContent = '页面版本占位：root-20260519b';
             if (input) {
                 input.addEventListener('change', function (e) {
                     var files = Array.from((e.target && e.target.files) || []);
@@ -898,6 +913,6 @@
             }
         });
     </script>
-    <script src="app.js?v=20260519a"></script>
+    <script src="app.js?v=20260519b"></script>
 </body>
 </html>

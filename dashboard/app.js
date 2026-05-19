@@ -6,7 +6,7 @@ const MAX_STORAGE_MB = 500; // 最大存储限制（MB）
 let db = null;
 const AppState = { files: [], filteredData: [], cache: new Map(), provinces: new Set(), cities: new Set(), districts: new Set(), schools: new Set(), grades: new Set() };
 const elements = {};
-const APP_VERSION = 'v2.4.2-root-20260519a';
+const APP_VERSION = 'v2.4.2-root-20260519b';
 const getClassId = (r = {}) => r['班级 id'] || r['班级ID'] || r['班级id'] || r['班级'] || r['classId'] || r['class_id'] || '';
 const buildWeekMetaMap = (groupMap) => {
     const weekMetaMap = new Map();
@@ -90,6 +90,10 @@ function initElements() {
     elements.avgAssignments = document.getElementById('avgAssignments');
     elements.tableBody = document.getElementById('tableBody');
     elements.exportBtn = document.getElementById('exportBtn');
+    elements.exportFilterExcelBtn = document.getElementById('exportFilterExcelBtn');
+    elements.exportHighValueExcelBtn = document.getElementById('exportHighValueExcelBtn');
+    elements.toggleUploadSection = document.getElementById('toggleUploadSection');
+    elements.uploadSectionBody = document.getElementById('uploadSectionBody');
     
     // 高价值筛选元素
     elements.highValueSection = document.getElementById('highValueSection');
@@ -214,6 +218,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     initHandlers();
     setDefaultDate();
+    applyUploadSectionCollapsedState(getUploadSectionCollapsed());
 });
 
 function updateStatus(text, ok) {
@@ -317,6 +322,8 @@ function initHandlers() {
     if (elements.applyFilter) elements.applyFilter.onclick = applyFilter;
     if (elements.resetFilter) elements.resetFilter.onclick = resetFilter;
     if (elements.exportBtn) elements.exportBtn.onclick = exportCSV;
+    if (elements.exportFilterExcelBtn) elements.exportFilterExcelBtn.onclick = exportFilteredExcel;
+    if (elements.toggleUploadSection) elements.toggleUploadSection.onclick = toggleUploadSectionCollapsed;
     
     // 高价值筛选事件
     if (elements.hvProvinceSelect) elements.hvProvinceSelect.onchange = () => { cascadeHighValue('province'); };
@@ -324,6 +331,7 @@ function initHandlers() {
     if (elements.hvDistrictSelect) elements.hvDistrictSelect.onchange = () => { cascadeHighValue('district'); };
     if (elements.applyHighValueFilter) elements.applyHighValueFilter.onclick = applyHighValueFilter;
     if (elements.resetHighValueFilter) elements.resetHighValueFilter.onclick = resetHighValueFilter;
+    if (elements.exportHighValueExcelBtn) elements.exportHighValueExcelBtn.onclick = exportHighValueExcel;
     if (elements.customSchoolSearchBtn) elements.customSchoolSearchBtn.onclick = applyCustomSchoolSearch;
     if (elements.customSchoolResetBtn) elements.customSchoolResetBtn.onclick = resetCustomSchoolSearch;
     if (elements.customSchoolTabSchool) elements.customSchoolTabSchool.onclick = () => switchCustomSchoolTab('school');
@@ -1675,99 +1683,35 @@ function exportCSV() {
         showMsg('⚠️ 无数据可导出', 'warning');
         return;
     }
-    
-    const groupMap = new Map();
-    AppState.filteredData.forEach(r => {
-        const classId = getClassId(r);
-        const key = `${r['省份']||''}|${r['城市']||''}|${r['区县']||''}|${r['学校名称']||''}|${r['年级']||''}|${r['班级名称']||''}|${classId}`;
-        if (!groupMap.has(key)) {
-            groupMap.set(key, {
-                province: r['省份'] || '-',
-                city: r['城市'] || '-',
-                district: r['区县'] || '-',
-                school: r['学校名称'] || '-',
-                grade: r['年级'] || '-',
-                className: r['班级名称'] || '-',
-                classId: classId || '-',
-                weeks: new Map()
-            });
-        }
-        const g = groupMap.get(key);
-        const weekKey = r.weekLabel;
-        if (!g.weeks.has(weekKey)) {
-            g.weeks.set(weekKey, {
-                display: r.weekDisplay,
-                startDate: r.weekStartDate,
-                assignments: 0,
-                completionRate: 0,
-                completionSum: 0,
-                count: 0,
-                paidCount: +r['未过期付费学生数'] || 0,
-                trialCount: +r['未过期试用学生数'] || 0,
-                conversionSum: 0,
-                conversionCount: 0,
-                conversionRate: 0
-            });
-        }
-        const w = g.weeks.get(weekKey);
-        w.assignments += +r['布置作业次数'] || 0;
-        w.completionSum += (+r['作业完成率'] || 0) * 100;
-        if ((+r['转化率'] || 0) > 0) {
-            w.conversionSum += (+r['转化率'] || 0) * 100;
-            w.conversionCount += 1;
-        }
-        w.count += 1;
-        w.completionRate = w.count ? (w.completionSum / w.count).toFixed(1) : '0.0';
-        w.conversionRate = w.conversionCount ? (w.conversionSum / w.conversionCount).toFixed(1) : '0.0';
-        w.paidCount = +r['未过期付费学生数'] || 0;
-        w.trialCount = +r['未过期试用学生数'] || 0;
-    });
-    
-    const weekMetaMap = buildWeekMetaMap(groupMap);
-    const sortedWeeks = sortWeekKeys(weekMetaMap);
-    
-    const headers = ['省份', '城市', '区县', '学校', '年级', '班级'];
-    sortedWeeks.forEach(week => {
-        const w = weekMetaMap.get(week) || { display: week };
-        headers.push(`${w.display}_布置次数`, `${w.display}_完成率`);
-    });
-    headers.push('未过期付费学生数', '未过期试用学生数', '转化率');
-    
-    const rows = [headers.join(',')];
-    const sortedGroups = [...groupMap.values()].sort((a, b) => {
-        const pCmp = String(a.province).localeCompare(String(b.province), 'zh-CN');
-        if (pCmp !== 0) return pCmp;
-        const cCmp = String(a.city).localeCompare(String(b.city), 'zh-CN');
-        if (cCmp !== 0) return cCmp;
-        const dCmp = String(a.district).localeCompare(String(b.district), 'zh-CN');
-        if (dCmp !== 0) return dCmp;
-        const schCmp = String(a.school).localeCompare(String(b.school), 'zh-CN');
-        if (schCmp !== 0) return schCmp;
-        return String(a.grade).localeCompare(String(b.grade), 'zh-CN');
-    });
-    
-    sortedGroups.forEach(g => {
-        const row = [g.province, g.city, g.district, g.school, g.grade, g.className];
-        sortedWeeks.forEach(weekKey => {
-            if (g.weeks.has(weekKey)) {
-                const w = g.weeks.get(weekKey);
-                row.push(w.assignments.toString(), w.completionRate);
-            } else {
-                row.push('-', '-');
-            }
-        });
-        const lastWeek = sortedWeeks.length ? g.weeks.get(sortedWeeks[sortedWeeks.length - 1]) : null;
-        row.push((lastWeek?.paidCount || 0).toString(), (lastWeek?.trialCount || 0).toString(), `${lastWeek?.conversionRate || '0.0'}%`);
-        rows.push(row.join(','));
-    });
-    
-    const csv = rows.join('\n');
-    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `导出_${dayjs().format('YYYYMMDD_HHmmss')}.csv`;
-    link.click();
+    downloadSheetFromTable('dataTable', `班级数据明细_${dayjs().format('YYYYMMDD_HHmmss')}.xlsx`, '班级数据明细');
+}
+
+function downloadSheetFromTable(tableId, filename, sheetName = 'Sheet1') {
+    const table = document.getElementById(tableId);
+    if (!table) {
+        showMsg('❌ 未找到可导出的表格', 'error');
+        return;
+    }
+    const workbook = XLSX.utils.table_to_book(table, { sheet: sheetName, raw: true });
+    XLSX.writeFile(workbook, filename);
     showMsg('✅ 导出成功', 'success');
+}
+
+function exportFilteredExcel() {
+    if (!AppState.filteredData.length) {
+        showMsg('⚠️ 当前筛选结果为空', 'warning');
+        return;
+    }
+    downloadSheetFromTable('dataTable', `数据筛选_${dayjs().format('YYYYMMDD_HHmmss')}.xlsx`, '数据筛选');
+}
+
+function exportHighValueExcel() {
+    const rows = document.querySelectorAll('#highValueTableBody tr');
+    if (!rows.length) {
+        showMsg('⚠️ 当前高价值筛选结果为空', 'warning');
+        return;
+    }
+    downloadSheetFromTable('highValueTable', `高价值学校年级_${dayjs().format('YYYYMMDD_HHmmss')}.xlsx`, '高价值学校年级');
 }
 
 // 提示函数
@@ -1853,43 +1797,21 @@ async function exportSectionAsImage(targetId, title) {
 }
 
 async function renderNodeToImage(node) {
-    const cloned = node.cloneNode(true);
-    cloned.style.width = `${Math.ceil(node.scrollWidth)}px`;
-    cloned.style.maxWidth = 'none';
-    cloned.style.overflow = 'visible';
-    cloned.querySelectorAll('.btn, .btn-export-image, .table-actions, .filter-actions').forEach(el => el.remove());
-
-    const wrapper = document.createElement('div');
-    wrapper.style.position = 'fixed';
-    wrapper.style.left = '-100000px';
-    wrapper.style.top = '0';
-    wrapper.style.padding = '24px';
-    wrapper.style.background = '#f8fafc';
-    wrapper.style.zIndex = '-1';
-    wrapper.appendChild(cloned);
-    document.body.appendChild(wrapper);
-
+    const actionNodes = node.querySelectorAll('.btn-export-image, #exportFilterExcelBtn, #exportHighValueExcelBtn, #toggleUploadSection, .image-export-modal');
+    const hiddenStates = [...actionNodes].map(el => ({ el, display: el.style.display }));
+    hiddenStates.forEach(({ el }) => { el.style.display = 'none'; });
     try {
-        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-        const width = Math.ceil(cloned.scrollWidth + 48);
-        const height = Math.ceil(cloned.scrollHeight + 48);
-        const serialized = new XMLSerializer().serializeToString(wrapper);
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><foreignObject width="100%" height="100%">${serialized}</foreignObject></svg>`;
-        const img = new Image();
-        img.decoding = 'async';
-        img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-        await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = () => reject(new Error('图片渲染失败')); });
-        const canvas = document.createElement('canvas');
-        canvas.width = width * EXPORT_IMAGE_SCALE;
-        canvas.height = height * EXPORT_IMAGE_SCALE;
-        const ctx = canvas.getContext('2d');
-        ctx.scale(EXPORT_IMAGE_SCALE, EXPORT_IMAGE_SCALE);
-        ctx.fillStyle = '#f8fafc';
-        ctx.fillRect(0, 0, width, height);
-        ctx.drawImage(img, 0, 0, width, height);
+        const canvas = await html2canvas(node, {
+            backgroundColor: '#f8fafc',
+            scale: EXPORT_IMAGE_SCALE,
+            useCORS: true,
+            logging: false,
+            windowWidth: Math.max(document.documentElement.scrollWidth, node.scrollWidth),
+            windowHeight: Math.max(document.documentElement.scrollHeight, node.scrollHeight)
+        });
         return canvas.toDataURL('image/png');
     } finally {
-        document.body.removeChild(wrapper);
+        hiddenStates.forEach(({ el, display }) => { el.style.display = display; });
     }
 }
 
@@ -1945,12 +1867,27 @@ function inferStageFromGrade(grade = '') {
 const FAVORITES_KEY = 'education-dashboard-hv-favorites';
 const CUSTOM_SCHOOL_TAB_KEY = 'education-dashboard-custom-school-tab';
 const EXPORT_IMAGE_SCALE = 2;
+const UPLOAD_SECTION_COLLAPSED_KEY = 'education-dashboard-upload-collapsed';
 function loadFavorites() { try { return new Set(JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]')); } catch { return new Set(); } }
 function saveFavorites(set) { localStorage.setItem(FAVORITES_KEY, JSON.stringify([...set])); }
 function favoriteKey(g) { return `${g.province}|${g.city}|${g.district}|${g.school}|${g.grade}`; }
 function toggleFavoriteByKey(key) { const favs = loadFavorites(); if (favs.has(key)) favs.delete(key); else favs.add(key); saveFavorites(favs); applyHighValueFilter(); }
 function getCustomSchoolTab() { return localStorage.getItem(CUSTOM_SCHOOL_TAB_KEY) || 'grade'; }
 function setCustomSchoolTab(tab) { localStorage.setItem(CUSTOM_SCHOOL_TAB_KEY, tab); }
+function getUploadSectionCollapsed() {
+    try { return localStorage.getItem(UPLOAD_SECTION_COLLAPSED_KEY) !== 'false'; } catch { return true; }
+}
+function applyUploadSectionCollapsedState(collapsed) {
+    if (!elements.uploadSectionBody || !elements.toggleUploadSection) return;
+    elements.uploadSectionBody.classList.toggle('is-collapsed', collapsed);
+    elements.toggleUploadSection.setAttribute('aria-expanded', String(!collapsed));
+    elements.toggleUploadSection.innerHTML = collapsed ? '<span class="btn-icon">📦</span>展开' : '<span class="btn-icon">📂</span>收起';
+}
+function toggleUploadSectionCollapsed() {
+    const collapsed = !elements.uploadSectionBody || !elements.uploadSectionBody.classList.contains('is-collapsed');
+    applyUploadSectionCollapsedState(collapsed);
+    try { localStorage.setItem(UPLOAD_SECTION_COLLAPSED_KEY, String(collapsed)); } catch {}
+}
 
 function adaptNameCells(scope = document) {
     const cells = scope.querySelectorAll('.school-name-cell, .teacher-name-cell');
