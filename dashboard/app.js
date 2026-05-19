@@ -6,7 +6,7 @@ const MAX_STORAGE_MB = 500; // 最大存储限制（MB）
 let db = null;
 const AppState = { files: [], filteredData: [], cache: new Map(), provinces: new Set(), cities: new Set(), districts: new Set(), schools: new Set(), grades: new Set() };
 const elements = {};
-const APP_VERSION = 'v2.4.2-root-20260519b';
+const APP_VERSION = 'v2.4.2-root-20260519c';
 const getClassId = (r = {}) => r['班级 id'] || r['班级ID'] || r['班级id'] || r['班级'] || r['classId'] || r['class_id'] || '';
 const buildWeekMetaMap = (groupMap) => {
     const weekMetaMap = new Map();
@@ -67,8 +67,6 @@ function initElements() {
     elements.progressETA = document.getElementById('progressETA');
     elements.weeksGrid = document.getElementById('weeksGrid');
     elements.clearAllBtn = document.getElementById('clearAllBtn');
-    elements.startDate = document.getElementById('startDate');
-    elements.endDate = document.getElementById('endDate');
     elements.provinceSelect = document.getElementById('provinceSelect');
     elements.citySelect = document.getElementById('citySelect');
     elements.districtSelect = document.getElementById('districtSelect');
@@ -217,7 +215,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         showMsg('❌ 数据库初始化失败：' + e.message, 'error');
     }
     initHandlers();
-    setDefaultDate();
+    initMultiSelects();
     applyUploadSectionCollapsedState(getUploadSectionCollapsed());
 });
 
@@ -574,26 +572,7 @@ function getWeekLabel(ds) {
 }
 
 function setDefaultDate() {
-    // 根据已上传文件设置默认日期范围
-    if (AppState.files && AppState.files.length > 0) {
-        const startDates = AppState.files.map(f => f.dateInfo.startDate).sort();
-        const endDates = AppState.files.map(f => f.dateInfo.endDate).sort();
-        const minDate = startDates[0];
-        const maxDate = endDates[endDates.length - 1];
-        
-        if (minDate && maxDate) {
-            elements.startDate.value = minDate;
-            elements.endDate.value = maxDate;
-            document.getElementById('dateRangeInfo').innerHTML = `<small>📊 可筛选范围：${minDate} ~ ${maxDate}</small>`;
-            return;
-        }
-    }
-    // 默认最近一周
-    const t = dayjs();
-    const s = t.subtract(7, 'day');
-    elements.startDate.value = s.format('YYYY-MM-DD');
-    elements.endDate.value = t.format('YYYY-MM-DD');
-    document.getElementById('dateRangeInfo').innerHTML = '<small>📊 暂无数据，请先上传 Excel 文件</small>';
+    return;
 }
 
 // 学校下拉框模糊搜索
@@ -1094,6 +1073,7 @@ function setSelectedValues(sel, values = []) {
     if (!sel) return;
     const set = new Set(values || []);
     [...sel.options].forEach(o => { o.selected = !!o.value && set.has(o.value); });
+    syncMultiSelectUI(sel);
 }
 
 function matchesMulti(value, selectedValues) {
@@ -1113,6 +1093,56 @@ function updateSel(sel, vals) {
         sel.appendChild(o);
     });
     if (!isMultiple && prevSelected[0]) sel.value = prevSelected[0];
+    syncMultiSelectUI(sel);
+}
+
+function initMultiSelects() {
+    document.querySelectorAll('[data-multi-select]').forEach(wrapper => {
+        const key = wrapper.dataset.multiSelect;
+        const select = document.getElementById(key);
+        const trigger = wrapper.querySelector(`[data-multi-select-trigger="${key}"]`);
+        const panel = wrapper.querySelector(`[data-multi-select-panel="${key}"]`);
+        if (!select || !trigger || !panel) return;
+        trigger.onclick = (e) => {
+            e.preventDefault();
+            const willOpen = !wrapper.classList.contains('is-open');
+            document.querySelectorAll('.multi-select.is-open').forEach(el => { if (el !== wrapper) el.classList.remove('is-open'); });
+            wrapper.classList.toggle('is-open', willOpen);
+        };
+        select.addEventListener('change', () => syncMultiSelectUI(select));
+        syncMultiSelectUI(select);
+    });
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.multi-select')) {
+            document.querySelectorAll('.multi-select.is-open').forEach(el => el.classList.remove('is-open'));
+        }
+    });
+}
+
+function syncMultiSelectUI(sel) {
+    if (!sel) return;
+    const wrapper = document.querySelector(`[data-multi-select="${sel.id}"]`);
+    if (!wrapper) return;
+    const panel = wrapper.querySelector(`[data-multi-select-panel="${sel.id}"]`);
+    const valueEl = wrapper.querySelector(`[data-multi-select-value="${sel.id}"]`);
+    if (!panel || !valueEl) return;
+    const options = [...sel.options].filter(o => o.value);
+    const selected = options.filter(o => o.selected).map(o => o.value);
+    valueEl.textContent = selected.length ? `${selected.slice(0, 2).join(' ')}${selected.length > 2 ? ` +${selected.length - 2}` : ''}` : '请选择';
+    panel.innerHTML = options.map(option => {
+        const selectedClass = option.selected ? ' is-selected' : '';
+        const checked = option.selected ? '☑' : '☐';
+        return `<button type="button" class="multi-select-option${selectedClass}" data-select-id="${sel.id}" data-value="${option.value}"><span class="multi-select-checkbox">${checked}</span><span>${option.textContent}</span></button>`;
+    }).join('');
+    panel.querySelectorAll('.multi-select-option').forEach(btn => {
+        btn.onclick = () => {
+            const opt = [...sel.options].find(o => o.value === btn.dataset.value);
+            if (!opt) return;
+            opt.selected = !opt.selected;
+            syncMultiSelectUI(sel);
+            sel.dispatchEvent(new Event('change', { bubbles: true }));
+        };
+    });
 }
 
 // 应用筛选
@@ -1125,16 +1155,10 @@ async function applyFilter() {
         return;
     }
 
-    const sd = elements.startDate.value, ed = elements.endDate.value;
-    if (!sd || !ed) { alert('请选择日期范围'); return; }
-    const st = dayjs(sd), en = dayjs(ed);
-    if (st.isAfter(en)) { alert('开始日期不能晚于结束日期'); return; }
-    
     showLoading();
     try {
-        const rel = AppState.files.filter(f => !dayjs(f.dateInfo.endDate).isBefore(st) && !dayjs(f.dateInfo.startDate).isAfter(en));
         let all = [];
-        for (const f of rel) { try { all.push(...await parseExcel(f.filename)); } catch(e) { console.error(f.filename, e); } }
+        for (const f of AppState.files) { try { all.push(...await parseExcel(f.filename)); } catch(e) { console.error(f.filename, e); } }
         
         const p = elements.provinceSelect.value, c = elements.citySelect.value, di = elements.districtSelect.value, s = elements.schoolSelect.value;
         const gradeValues = getSelectedValues(elements.gradeSelect);
@@ -1159,12 +1183,12 @@ async function applyFilter() {
 }
 
 function resetFilter() {
-    setDefaultDate();
     elements.provinceSelect.value = '';
     elements.citySelect.value = '';
     elements.districtSelect.value = '';
     elements.schoolSelect.value = '';
     elements.gradeSelect.selectedIndex = -1;
+    syncMultiSelectUI(elements.gradeSelect);
     updateAllSels();
     AppState.filteredData = [];
     elements.dataCount.textContent = '0';
@@ -1280,6 +1304,8 @@ function renderDash() {
         elements.metricsSection.style.display = 'none';
         elements.chartsSection.style.display = 'none';
         elements.tableSection.style.display = 'none';
+        const filterExport = document.getElementById('filterResultExport');
+        if (filterExport) filterExport.style.display = 'none';
         elements.highValueSection.style.display = 'none';
         if (elements.customSchoolSection) elements.customSchoolSection.style.display = 'none';
         elements.emptyState.style.display = 'block';
@@ -1289,6 +1315,8 @@ function renderDash() {
     elements.metricsSection.style.display = 'block';
     elements.chartsSection.style.display = 'block';
     elements.tableSection.style.display = 'block';
+    const filterExport = document.getElementById('filterResultExport');
+    if (filterExport) filterExport.style.display = 'block';
     // 有数据时默认显示高价值筛选区域（仅显示筛选项，不自动统计）
     elements.highValueSection.style.display = 'block';
     if (elements.customSchoolSection) elements.customSchoolSection.style.display = 'block';
@@ -1697,12 +1725,41 @@ function downloadSheetFromTable(tableId, filename, sheetName = 'Sheet1') {
     showMsg('✅ 导出成功', 'success');
 }
 
+function downloadSheetFromJson(rows, filename, sheetName = 'Sheet1') {
+    if (!rows?.length) {
+        showMsg('⚠️ 当前没有可导出的数据', 'warning');
+        return;
+    }
+    const workbook = XLSX.utils.book_new();
+    const sheet = XLSX.utils.json_to_sheet(rows);
+    XLSX.utils.book_append_sheet(workbook, sheet, sheetName);
+    XLSX.writeFile(workbook, filename);
+    showMsg('✅ 导出成功', 'success');
+}
+
 function exportFilteredExcel() {
     if (!AppState.filteredData.length) {
         showMsg('⚠️ 当前筛选结果为空', 'warning');
         return;
     }
-    downloadSheetFromTable('dataTable', `数据筛选_${dayjs().format('YYYYMMDD_HHmmss')}.xlsx`, '数据筛选');
+    downloadSheetFromJson(AppState.filteredData.map(r => ({
+        周次: r.weekLabel || '',
+        日期范围: r.weekFullDisplay || r.weekDisplay || '',
+        省份: r['省份'] || '',
+        城市: r['城市'] || '',
+        区县: r['区县'] || '',
+        学校: r['学校名称'] || '',
+        年级: r['年级'] || '',
+        老师: r['老师姓名'] || r['老师'] || '',
+        班级: r['班级名称'] || '',
+        班级ID: getClassId(r),
+        学生数: +r['学生数'] || +r['总学生数'] || 0,
+        转化率: +r['转化率'] || 0,
+        布置作业次数: +r['布置作业次数'] || 0,
+        作业完成率: +r['作业完成率'] || 0,
+        未过期付费学生数: +r['未过期付费学生数'] || 0,
+        未过期试用学生数: +r['未过期试用学生数'] || 0
+    })), `数据筛选_全量明细_${dayjs().format('YYYYMMDD_HHmmss')}.xlsx`, '数据筛选全量明细');
 }
 
 function exportHighValueExcel() {

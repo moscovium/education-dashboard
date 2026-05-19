@@ -244,8 +244,8 @@
                     教育数据看板
                 </h1>
                 <p class="dashboard-subtitle">转化率与作业完成情况监测 - 基于班级 ID 关联</p>
-                <div id="debugBar" style="margin-top:8px;font-size:12px;color:#475569;display:flex;gap:12px;flex-wrap:wrap;">页面版本占位：root-20260519b</div>
-                <div id="pageVersion" style="margin-top:6px;font-size:12px;color:#0f172a;font-weight:600;background:#e2e8f0;display:inline-block;padding:4px 10px;border-radius:999px;">页面版本：v20260519b</div>
+                <div id="debugBar" style="margin-top:8px;font-size:12px;color:#475569;display:flex;gap:12px;flex-wrap:wrap;">页面版本占位：root-20260519c</div>
+                <div id="pageVersion" style="margin-top:6px;font-size:12px;color:#0f172a;font-weight:600;background:#e2e8f0;display:inline-block;padding:4px 10px;border-radius:999px;">页面版本：v20260519c</div>
             </div>
         </header>
 
@@ -312,22 +312,6 @@
 
             <!-- 条件筛选模式 -->
             <div id="filterMode" class="filter-mode">
-                <!-- 时间段独立区域 -->
-                <div class="filter-section-title">
-                    <span class="section-icon">📅</span>
-                    时间段
-                </div>
-                <div class="date-range-wrapper">
-                    <div class="date-range-inputs">
-                        <input type="date" id="startDate" class="date-input">
-                        <span class="date-separator">至</span>
-                        <input type="date" id="endDate" class="date-input">
-                    </div>
-                    <div class="date-range-info" id="dateRangeInfo">
-                        <small>📊 可筛选范围： -- ~ --</small>
-                    </div>
-                </div>
-
                 <!-- 条件筛选独立区域 -->
                 <div class="filter-section-title">
                     <span class="section-icon">🔍</span>
@@ -380,8 +364,14 @@
                             <span class="label-icon">📚</span>
                             年级
                         </label>
-                        <select id="gradeSelect" class="filter-select grade-multi-select" multiple size="5"></select>
-                        <div class="multi-select-hint">可多选，按住 Ctrl / Command 选择多个年级</div>
+                        <div class="multi-select" data-multi-select="gradeSelect">
+                            <button type="button" class="multi-select-trigger filter-select" data-multi-select-trigger="gradeSelect">
+                                <span class="multi-select-value" data-multi-select-value="gradeSelect">请选择</span>
+                                <span class="multi-select-arrow">▼</span>
+                            </button>
+                            <div class="multi-select-panel" data-multi-select-panel="gradeSelect"></div>
+                            <select id="gradeSelect" class="multi-select-native" multiple size="5"></select>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -414,6 +404,10 @@
                 <button id="exportFilterExcelBtn" class="btn btn-export">
                     <span class="btn-icon">📥</span>
                     导出为Excel
+                </button>
+                <button class="btn btn-export btn-export-image" data-export-target="filterResultExport" data-export-title="数据筛选结果明细">
+                    <span class="btn-icon">🖼️</span>
+                    导出为图片
                 </button>
                 <span class="filter-status">共 <strong id="dataCountSummary">0</strong> 条数据</span>
             </div>
@@ -464,6 +458,7 @@
 
         <!-- 核心指标卡片 -->
 
+        <div id="filterResultExport" class="export-result-stack" style="display:none;">
         <section class="metrics-section" id="metricsSection" style="display: none;">
             <div class="section-header">
                 <h2 class="section-title"><span class="section-icon">📊</span> 核心指标</h2>
@@ -616,8 +611,14 @@
                             <span class="label-icon">📚</span>
                             年级
                         </label>
-                        <select id="hvGradeSelect" class="filter-select grade-multi-select" multiple size="5"></select>
-                        <div class="multi-select-hint">可多选，按住 Ctrl / Command 选择多个年级</div>
+                        <div class="multi-select" data-multi-select="hvGradeSelect">
+                            <button type="button" class="multi-select-trigger filter-select" data-multi-select-trigger="hvGradeSelect">
+                                <span class="multi-select-value" data-multi-select-value="hvGradeSelect">请选择</span>
+                                <span class="multi-select-arrow">▼</span>
+                            </button>
+                            <div class="multi-select-panel" data-multi-select-panel="hvGradeSelect"></div>
+                            <select id="hvGradeSelect" class="multi-select-native" multiple size="5"></select>
+                        </div>
                     </div>
                     <div class="filter-group">
                         <label class="filter-label">
@@ -754,6 +755,7 @@
                 </table>
             </div>
         </section>
+        </div>
 
         <!-- 空状态 -->
         <section class="empty-state" id="emptyState">
@@ -796,8 +798,14 @@
                                 <span class="label-icon">📚</span>
                                 年级
                             </label>
-                            <select id="customSchoolGradeFilter" class="filter-select grade-multi-select" multiple size="5"></select>
-                            <div class="multi-select-hint">可多选，按住 Ctrl / Command 选择多个年级</div>
+                            <div class="multi-select" data-multi-select="customSchoolGradeFilter">
+                                <button type="button" class="multi-select-trigger filter-select" data-multi-select-trigger="customSchoolGradeFilter">
+                                    <span class="multi-select-value" data-multi-select-value="customSchoolGradeFilter">请选择</span>
+                                    <span class="multi-select-arrow">▼</span>
+                                </button>
+                                <div class="multi-select-panel" data-multi-select-panel="customSchoolGradeFilter"></div>
+                                <select id="customSchoolGradeFilter" class="multi-select-native" multiple size="5"></select>
+                            </div>
                         </div>
                         <div class="filter-group">
                             <label class="filter-label">
@@ -894,11 +902,11 @@
     </div>
 
     <script>
-        window.__ROOT_DEPLOY_MARKER__='root-20260519b';
+        window.__ROOT_DEPLOY_MARKER__='root-20260519c';
         document.addEventListener('DOMContentLoaded', function () {
             var input = document.getElementById('fileInput');
             var debugBar = document.getElementById('debugBar');
-            if (debugBar) debugBar.textContent = '页面版本占位：root-20260519b';
+            if (debugBar) debugBar.textContent = '页面版本占位：root-20260519c';
             if (input) {
                 input.addEventListener('change', function (e) {
                     var files = Array.from((e.target && e.target.files) || []);
@@ -913,6 +921,6 @@
             }
         });
     </script>
-    <script src="app.js?v=20260519b"></script>
+    <script src="app.js?v=20260519c"></script>
 </body>
 </html>
