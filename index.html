@@ -244,8 +244,8 @@
                     教育数据看板
                 </h1>
                 <p class="dashboard-subtitle">转化率与作业完成情况监测 - 基于班级 ID 关联</p>
-                <div id="debugBar" style="margin-top:8px;font-size:12px;color:#475569;display:flex;gap:12px;flex-wrap:wrap;">页面版本占位：root-20260519d</div>
-                <div id="pageVersion" style="margin-top:6px;font-size:12px;color:#0f172a;font-weight:600;background:#e2e8f0;display:inline-block;padding:4px 10px;border-radius:999px;">页面版本：v20260519d</div>
+                <div id="debugBar" style="margin-top:8px;font-size:12px;color:#475569;display:flex;gap:12px;flex-wrap:wrap;">页面版本占位：root-20260519e</div>
+                <div id="pageVersion" style="margin-top:6px;font-size:12px;color:#0f172a;font-weight:600;background:#e2e8f0;display:inline-block;padding:4px 10px;border-radius:999px;">页面版本：v20260519e</div>
             </div>
         </header>
 
@@ -405,10 +405,6 @@
                     <span class="btn-icon">📥</span>
                     导出为Excel
                 </button>
-                <button class="btn btn-export btn-export-image" data-export-target="filterResultExport" data-export-title="数据筛选结果明细">
-                    <span class="btn-icon">🖼️</span>
-                    导出为图片
-                </button>
                 <span class="filter-status">共 <strong id="dataCountSummary">0</strong> 条数据</span>
             </div>
         </section>
@@ -422,10 +418,6 @@
                     班级数据明细
                 </h2>
                 <div class="table-actions">
-                    <button class="btn btn-small btn-export-image" data-export-target="tableSection" data-export-title="班级数据明细">
-                        <span class="btn-icon">🖼️</span>
-                        导出为图片
-                    </button>
                 </div>
             </div>
             <div class="table-section-info">
@@ -463,10 +455,6 @@
             <div class="section-header">
                 <h2 class="section-title"><span class="section-icon">📊</span> 核心指标</h2>
                 <div class="table-actions">
-                    <button class="btn btn-small btn-export-image" data-export-target="metricsSection" data-export-title="核心指标">
-                        <span class="btn-icon">🖼️</span>
-                        导出为图片
-                    </button>
                 </div>
             </div>
             <div class="metrics-grid">
@@ -540,12 +528,7 @@
                     <span class="section-icon">📈</span>
                     趋势分析
                 </h2>
-                <div class="table-actions">
-                    <button class="btn btn-small btn-export-image" data-export-target="chartsSection" data-export-title="趋势分析">
-                        <span class="btn-icon">🖼️</span>
-                        导出为图片
-                    </button>
-                </div>
+                <div class="table-actions"></div>
             </div>
 
             <div class="charts-grid">
@@ -902,11 +885,11 @@
     </div>
 
     <script>
-        window.__ROOT_DEPLOY_MARKER__='root-20260519d';
+        window.__ROOT_DEPLOY_MARKER__='root-20260519e';
         document.addEventListener('DOMContentLoaded', function () {
             var input = document.getElementById('fileInput');
             var debugBar = document.getElementById('debugBar');
-            if (debugBar) debugBar.textContent = '页面版本占位：root-20260519d';
+            if (debugBar) debugBar.textContent = '页面版本占位：root-20260519e';
             if (input) {
                 input.addEventListener('change', function (e) {
                     var files = Array.from((e.target && e.target.files) || []);
@@ -921,6 +904,6 @@
             }
         });
     </script>
-    <script src="app.js?v=20260519d"></script>
+    <script src="app.js?v=20260519e"></script>
 </body>
 </html>

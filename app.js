@@ -6,7 +6,7 @@ const MAX_STORAGE_MB = 500; // 最大存储限制（MB）
 let db = null;
 const AppState = { files: [], filteredData: [], cache: new Map(), provinces: new Set(), cities: new Set(), districts: new Set(), schools: new Set(), grades: new Set() };
 const elements = {};
-const APP_VERSION = 'v2.4.2-root-20260519d';
+const APP_VERSION = 'v2.4.2-root-20260519e';
 const getClassId = (r = {}) => r['班级 id'] || r['班级ID'] || r['班级id'] || r['班级'] || r['classId'] || r['class_id'] || '';
 const buildWeekMetaMap = (groupMap) => {
     const weekMetaMap = new Map();
@@ -1746,7 +1746,7 @@ function exportFilteredExcel() {
         showMsg('⚠️ 当前筛选结果为空', 'warning');
         return;
     }
-    downloadSheetFromJson(AppState.filteredData.map(r => ({
+    const rows = AppState.filteredData.map(r => ({
         周次: r.weekLabel || '',
         日期范围: r.weekFullDisplay || r.weekDisplay || '',
         省份: r['省份'] || '',
@@ -1760,10 +1760,9 @@ function exportFilteredExcel() {
         学生数: +r['学生数'] || +r['总学生数'] || 0,
         转化率: +r['转化率'] || 0,
         布置作业次数: +r['布置作业次数'] || 0,
-        作业完成率: +r['作业完成率'] || 0,
-        未过期付费学生数: +r['未过期付费学生数'] || 0,
-        未过期试用学生数: +r['未过期试用学生数'] || 0
-    })), `数据筛选_全量明细_${dayjs().format('YYYYMMDD_HHmmss')}.xlsx`, '数据筛选全量明细');
+        作业完成率: +r['作业完成率'] || 0
+    }));
+    downloadSheetFromJson(rows, `数据筛选_全量明细_${dayjs().format('YYYYMMDD_HHmmss')}.xlsx`, '数据筛选');
 }
 
 function exportHighValueExcel() {
@@ -1843,6 +1842,13 @@ async function exportSectionAsImage(targetId, title) {
         showMsg('❌ 未找到可导出的区域', 'error');
         return;
     }
+    if (targetId === 'highValueSection') {
+        const rowCount = [...document.querySelectorAll('#highValueTableBody tr')].filter(tr => tr.querySelectorAll('td').length > 1).length;
+        if (rowCount > 100) {
+            showMsg(`⚠️ 当前结果共 ${rowCount} 行，图片预览建议控制在 100 行内，请优先下载 Excel。`, 'warning');
+            return;
+        }
+    }
     try {
         showLoading();
         const dataUrl = await renderNodeToImage(node, targetId);
@@ -1859,6 +1865,7 @@ async function exportSectionAsImage(targetId, title) {
 
 async function renderNodeToImage(node, targetId = '') {
     const hiddenStates = [];
+    const styleStates = [];
     const hideSelectors = ['.btn-export-image', '#exportFilterExcelBtn', '#exportHighValueExcelBtn', '#toggleUploadSection', '.image-export-modal'];
     if (targetId === 'filterResultExport') hideSelectors.push('.section-header', '.table-section-info');
     if (targetId === 'highValueSection') hideSelectors.push('.section-header', '.high-value-filters');
@@ -1866,18 +1873,33 @@ async function renderNodeToImage(node, targetId = '') {
         hiddenStates.push({ el, display: el.style.display });
         el.style.display = 'none';
     });
+    if (targetId === 'highValueSection') {
+        node.querySelectorAll('.high-value-table-wrapper, .table-wrapper').forEach(el => {
+            styleStates.push({ el, overflowX: el.style.overflowX, overflowY: el.style.overflowY, maxHeight: el.style.maxHeight, height: el.style.height });
+            el.style.overflowX = 'visible';
+            el.style.overflowY = 'visible';
+            el.style.maxHeight = 'none';
+            el.style.height = 'auto';
+        });
+    }
     try {
         const canvas = await html2canvas(node, {
             backgroundColor: '#f8fafc',
             scale: EXPORT_IMAGE_SCALE,
             useCORS: true,
             logging: false,
-            windowWidth: Math.max(document.documentElement.scrollWidth, node.scrollWidth),
-            windowHeight: Math.max(document.documentElement.scrollHeight, node.scrollHeight)
+            windowWidth: Math.max(document.documentElement.scrollWidth, node.scrollWidth, node.offsetWidth),
+            windowHeight: Math.max(document.documentElement.scrollHeight, node.scrollHeight, node.offsetHeight)
         });
         return canvas.toDataURL('image/png');
     } finally {
         hiddenStates.forEach(({ el, display }) => { el.style.display = display; });
+        styleStates.forEach(({ el, overflowX, overflowY, maxHeight, height }) => {
+            el.style.overflowX = overflowX;
+            el.style.overflowY = overflowY;
+            el.style.maxHeight = maxHeight;
+            el.style.height = height;
+        });
     }
 }
 
