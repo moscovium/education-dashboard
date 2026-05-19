@@ -659,7 +659,7 @@ body {
     border: 1px solid #cbd5e1;
     border-radius: 0;
     box-shadow: 0 16px 40px rgba(15, 23, 42, 0.14);
-    padding: 10px 0;
+    padding: 6px 0;
     display: none;
     z-index: 40;
 }
@@ -671,13 +671,14 @@ body {
 .multi-select-option {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     width: 100%;
-    padding: 9px 14px;
+    padding: 6px 14px;
     background: #fff;
     border: none;
     cursor: pointer;
     font-size: 14px;
+    line-height: 1.2;
     color: #1e293b;
     text-align: left;
 }
@@ -687,7 +688,8 @@ body {
 }
 
 .multi-select-checkbox {
-    width: 16px;
+    width: 20px;
+    font-size: 18px;
     display: inline-flex;
     justify-content: center;
     color: #334155;

@@ -6,7 +6,7 @@ const MAX_STORAGE_MB = 500; // 最大存储限制（MB）
 let db = null;
 const AppState = { files: [], filteredData: [], cache: new Map(), provinces: new Set(), cities: new Set(), districts: new Set(), schools: new Set(), grades: new Set() };
 const elements = {};
-const APP_VERSION = 'v2.4.2-root-20260519c';
+const APP_VERSION = 'v2.4.2-root-20260519d';
 const getClassId = (r = {}) => r['班级 id'] || r['班级ID'] || r['班级id'] || r['班级'] || r['classId'] || r['class_id'] || '';
 const buildWeekMetaMap = (groupMap) => {
     const weekMetaMap = new Map();
@@ -1103,6 +1103,7 @@ function initMultiSelects() {
         const trigger = wrapper.querySelector(`[data-multi-select-trigger="${key}"]`);
         const panel = wrapper.querySelector(`[data-multi-select-panel="${key}"]`);
         if (!select || !trigger || !panel) return;
+        panel.addEventListener('mousedown', (e) => e.preventDefault());
         trigger.onclick = (e) => {
             e.preventDefault();
             const willOpen = !wrapper.classList.contains('is-open');
@@ -1135,10 +1136,13 @@ function syncMultiSelectUI(sel) {
         return `<button type="button" class="multi-select-option${selectedClass}" data-select-id="${sel.id}" data-value="${option.value}"><span class="multi-select-checkbox">${checked}</span><span>${option.textContent}</span></button>`;
     }).join('');
     panel.querySelectorAll('.multi-select-option').forEach(btn => {
-        btn.onclick = () => {
+        btn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
             const opt = [...sel.options].find(o => o.value === btn.dataset.value);
             if (!opt) return;
             opt.selected = !opt.selected;
+            wrapper.classList.add('is-open');
             syncMultiSelectUI(sel);
             sel.dispatchEvent(new Event('change', { bubbles: true }));
         };
@@ -1841,7 +1845,7 @@ async function exportSectionAsImage(targetId, title) {
     }
     try {
         showLoading();
-        const dataUrl = await renderNodeToImage(node);
+        const dataUrl = await renderNodeToImage(node, targetId);
         AppState.lastExportImage = { dataUrl, title: title || '导出图片', filename: `${(title || 'dashboard').replace(/\s+/g, '-')}-${dayjs().format('YYYYMMDD-HHmmss')}.png` };
         openImageExportModal(AppState.lastExportImage);
         hideLoading();
@@ -1853,10 +1857,15 @@ async function exportSectionAsImage(targetId, title) {
     }
 }
 
-async function renderNodeToImage(node) {
-    const actionNodes = node.querySelectorAll('.btn-export-image, #exportFilterExcelBtn, #exportHighValueExcelBtn, #toggleUploadSection, .image-export-modal');
-    const hiddenStates = [...actionNodes].map(el => ({ el, display: el.style.display }));
-    hiddenStates.forEach(({ el }) => { el.style.display = 'none'; });
+async function renderNodeToImage(node, targetId = '') {
+    const hiddenStates = [];
+    const hideSelectors = ['.btn-export-image', '#exportFilterExcelBtn', '#exportHighValueExcelBtn', '#toggleUploadSection', '.image-export-modal'];
+    if (targetId === 'filterResultExport') hideSelectors.push('.section-header', '.table-section-info');
+    if (targetId === 'highValueSection') hideSelectors.push('.section-header', '.high-value-filters');
+    node.querySelectorAll(hideSelectors.join(', ')).forEach(el => {
+        hiddenStates.push({ el, display: el.style.display });
+        el.style.display = 'none';
+    });
     try {
         const canvas = await html2canvas(node, {
             backgroundColor: '#f8fafc',
