@@ -89,6 +89,18 @@ body {
     justify-content: space-between;
 }
 
+.table-section-header {
+    margin-bottom: 8px;
+}
+
+.table-section-info {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-height: 20px;
+    margin-bottom: 8px;
+}
+
 .section-title {
     font-size: 18px;
     font-weight: 600;
@@ -111,6 +123,18 @@ body {
     margin-bottom: 24px;
     box-shadow: var(--shadow-lg);
     border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.upload-section-header {
+    margin-bottom: 0;
+}
+
+.upload-section-body {
+    margin-top: 20px;
+}
+
+.upload-section-body.is-collapsed {
+    display: none;
 }
 
 .upload-area {
@@ -379,6 +403,13 @@ body {
     color: var(--text-secondary);
 }
 
+.table-filter-status {
+    margin-left: 0;
+    white-space: nowrap;
+    line-height: 1.1;
+    font-size: 12px;
+}
+
 .filter-status strong {
     color: var(--primary-color);
 }
@@ -457,7 +488,7 @@ body {
 
 .metrics-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 16px;
 }
 
@@ -554,6 +585,60 @@ body {
     grid-column: 1 / -1;
 }
 
+.school-insight-bar {
+    flex: 1 1 0;
+    min-width: 0;
+    margin: 0 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--text-secondary);
+}
+
+.school-insight-bar[hidden] {
+    display: none;
+}
+
+.school-insight-bar .sib-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.school-insight-bar .sib-tag {
+    flex: 0 0 auto;
+    font-weight: 700;
+    color: var(--text-primary);
+    background: rgba(37, 99, 235, 0.08);
+    border-radius: 6px;
+    padding: 1px 7px;
+}
+
+.school-insight-bar .sib-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.school-insight-bar .sib-strong { color: var(--primary-color); font-weight: 700; }
+.school-insight-bar .sib-up { color: var(--success-color); font-weight: 700; }
+.school-insight-bar .sib-down { color: var(--danger-color); font-weight: 700; }
+.school-insight-bar .sib-muted { color: var(--text-muted); }
+
+.high-value-pagination {
+    margin-top: 16px;
+}
+
+.high-value-trend-grid {
+    margin-top: 24px;
+}
+
 .chart-header {
     margin-bottom: 16px;
 }
@@ -580,7 +665,181 @@ body {
     margin-bottom: 24px;
 }
 
-/* 高价值学校年级区域 */
+.export-result-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.multi-select {
+    position: relative;
+    width: 100%;
+}
+
+.multi-select-trigger {
+    width: 100%;
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.multi-select-value {
+    flex: 1;
+    min-width: 0;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.multi-select-arrow {
+    flex: 0 0 auto;
+    color: #334155;
+    font-size: 12px;
+}
+
+.multi-select-panel {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    width: min(320px, 100%);
+    max-height: 240px;
+    overflow: auto;
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    border-radius: 0;
+    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.14);
+    padding: 6px 0;
+    display: none;
+    z-index: 40;
+}
+
+.multi-select.is-open .multi-select-panel {
+    display: block;
+}
+
+.multi-select-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 6px 14px;
+    background: #fff;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1.2;
+    color: #1e293b;
+    text-align: left;
+}
+
+.multi-select-option:hover {
+    background: #f8fafc;
+}
+
+.multi-select-checkbox {
+    width: 20px;
+    font-size: 18px;
+    display: inline-flex;
+    justify-content: center;
+    color: #334155;
+}
+
+.multi-select-option.is-selected .multi-select-checkbox {
+    color: #0f172a;
+}
+
+.multi-select-native {
+    position: absolute;
+    pointer-events: none;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.grade-multi-select {
+    min-width: 140px;
+}
+
+.multi-select-hint {
+    margin-top: 6px;
+    font-size: 11px;
+    line-height: 1.4;
+    color: #64748b;
+}
+
+.custom-school-tabs {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.image-export-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.image-export-dialog {
+    width: min(1100px, 96vw);
+    max-height: 92vh;
+    background: #fff;
+    border-radius: 18px;
+    box-shadow: 0 24px 80px rgba(15, 23, 42, 0.28);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.image-export-header,
+.image-export-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.image-export-actions {
+    justify-content: flex-end;
+    gap: 12px;
+    border-bottom: none;
+    border-top: 1px solid #e2e8f0;
+}
+
+.image-export-preview-wrap {
+    padding: 16px;
+    overflow: auto;
+    background: #f8fafc;
+}
+
+.image-export-preview-wrap img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 12px;
+    background: #fff;
+}
+
+.image-export-close {
+    border: none;
+    background: transparent;
+    font-size: 28px;
+    line-height: 1;
+    cursor: pointer;
+    color: #475569;
+}
+
 .high-value-section {
     margin-bottom: 24px;
     background: rgba(255, 255, 255, 0.95);
@@ -615,7 +874,8 @@ body {
 
 .high-value-table-wrapper {
     max-height: 500px;
-    overflow: auto;
+    overflow-x: auto;
+    overflow-y: auto;
     background: white;
     border-radius: var(--radius);
     border: 1px solid var(--border);
@@ -626,6 +886,21 @@ body {
     font-size: 13px;
     color: var(--text-secondary);
     text-align: right;
+}
+
+.high-value-footer-cell {
+    padding: 6px 10px !important;
+    border-top: 1px solid var(--border);
+    border-bottom: none !important;
+    background: #fafbfc;
+}
+
+.high-value-info-inline {
+    margin-top: 0;
+    font-size: 12px;
+    line-height: 1.1;
+    text-align: right;
+    white-space: nowrap;
 }
 
 /* 学校定义标签样式 */
@@ -663,7 +938,8 @@ body {
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(20px);
     border-radius: var(--radius-lg);
-    overflow: hidden;
+    overflow-x: auto;
+    overflow-y: hidden;
     box-shadow: var(--shadow);
     border: 1px solid rgba(255, 255, 255, 0.3);
 }
@@ -919,7 +1195,7 @@ body {
 .search-input-wrapper {
     display: flex;
     gap: 12px;
-    align-items: center;
+    align-items: stretch;
 }
 
 .search-input {
@@ -930,6 +1206,12 @@ body {
     font-size: 15px;
     transition: all 0.2s;
     background: var(--surface);
+    min-height: 46px;
+    box-sizing: border-box;
+}
+
+.search-input-wrapper .btn {
+    min-height: 46px;
 }
 
 .search-input:focus {
@@ -1033,4 +1315,327 @@ body {
 
 .date-range-info small {
     font-size: 12px;
+}
+
+
+#highValueTable {
+    table-layout: auto;
+    width: max-content;
+    min-width: 100%;
+}
+
+#highValueTable th,
+#highValueTable td {
+    white-space: nowrap;
+    width: auto;
+    padding: 8px 10px;
+}
+
+#highValueTable th {
+    font-size: 11px;
+}
+
+#highValueTable td {
+    font-size: 12px;
+}
+
+
+.upload-panel-grid {
+    display: grid;
+    grid-template-columns: minmax(320px, 420px) 1fr;
+    gap: 20px;
+    align-items: start;
+}
+
+.upload-entry-card,
+.upload-weeks-card,
+.custom-school-panel {
+    background: rgba(248, 250, 252, 0.75);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+}
+
+.subsection-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.custom-school-section {
+    margin-bottom: 24px;
+}
+
+.custom-school-textarea {
+    width: 100%;
+    min-height: 110px;
+    resize: vertical;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 13px;
+    line-height: 1.6;
+    background: var(--surface);
+    color: var(--text-primary);
+}
+
+.custom-school-textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.custom-school-filter-grid {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 12px;
+    margin-top: 12px;
+    align-items: end;
+}
+
+.custom-school-filter-grid .filter-group {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.custom-school-filter-grid .filter-select {
+    width: 100%;
+}
+
+.custom-school-actions,
+.custom-school-tabs {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.custom-school-tabs {
+    flex-wrap: wrap;
+}
+
+.favorite-toggle {
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+}
+
+.favorite-toggle:hover {
+    transform: scale(1.08);
+}
+
+.custom-school-view {
+    margin-top: 14px;
+}
+
+#customSchoolSchoolTable,
+#customSchoolTable,
+#customSchoolClassTable,
+#highValueTable,
+#dataTable {
+    width: max-content;
+    min-width: 100%;
+    table-layout: auto;
+}
+
+#customSchoolSchoolTable th,
+#customSchoolSchoolTable td,
+#customSchoolTable th,
+#customSchoolTable td,
+#customSchoolClassTable th,
+#customSchoolClassTable td,
+#highValueTable th,
+#highValueTable td,
+#dataTable th,
+#dataTable td {
+    white-space: nowrap;
+    word-break: keep-all;
+    padding: 4px 5px;
+    font-size: 10px;
+    line-height: 1.1;
+    vertical-align: middle;
+}
+
+#customSchoolSchoolTable td.school-name-cell,
+#customSchoolTable td.school-name-cell,
+#customSchoolClassTable td.school-name-cell,
+#highValueTable td.school-name-cell,
+#dataTable td.school-name-cell,
+#customSchoolSchoolTable td.teacher-name-cell,
+#customSchoolTable td.teacher-name-cell,
+#customSchoolClassTable td.teacher-name-cell,
+#highValueTable td.teacher-name-cell,
+#dataTable td.teacher-name-cell {
+    max-width: 160px;
+    min-width: 96px;
+    overflow: hidden;
+    position: relative;
+}
+
+#customSchoolSchoolTable td.school-name-cell,
+#customSchoolTable td.school-name-cell,
+#customSchoolClassTable td.school-name-cell,
+#highValueTable td.school-name-cell,
+#dataTable td.school-name-cell,
+#customSchoolSchoolTable td.teacher-name-cell,
+#customSchoolTable td.teacher-name-cell,
+#customSchoolClassTable td.teacher-name-cell,
+#highValueTable td.teacher-name-cell,
+#dataTable td.teacher-name-cell {
+    white-space: normal;
+    word-break: break-all;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    text-align: left;
+    line-height: 1.15;
+    vertical-align: top;
+}
+
+#customSchoolSchoolTable td.school-name-cell.allow-one-line,
+#customSchoolTable td.school-name-cell.allow-one-line,
+#customSchoolClassTable td.school-name-cell.allow-one-line,
+#highValueTable td.school-name-cell.allow-one-line,
+#dataTable td.school-name-cell.allow-one-line,
+#customSchoolSchoolTable td.teacher-name-cell.allow-one-line,
+#customSchoolTable td.teacher-name-cell.allow-one-line,
+#customSchoolClassTable td.teacher-name-cell.allow-one-line,
+#highValueTable td.teacher-name-cell.allow-one-line,
+#dataTable td.teacher-name-cell.allow-one-line {
+    white-space: nowrap;
+    word-break: keep-all;
+    overflow-wrap: normal;
+}
+
+#customSchoolSchoolTable td.school-name-cell.allow-two-lines,
+#customSchoolTable td.school-name-cell.allow-two-lines,
+#customSchoolClassTable td.school-name-cell.allow-two-lines,
+#highValueTable td.school-name-cell.allow-two-lines,
+#dataTable td.school-name-cell.allow-two-lines,
+#customSchoolSchoolTable td.teacher-name-cell.allow-two-lines,
+#customSchoolTable td.teacher-name-cell.allow-two-lines,
+#customSchoolClassTable td.teacher-name-cell.allow-two-lines,
+#highValueTable td.teacher-name-cell.allow-two-lines,
+#dataTable td.teacher-name-cell.allow-two-lines {
+    word-break: break-all;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+}
+
+#customSchoolSchoolTable th,
+#customSchoolSchoolTable td,
+#customSchoolTable th,
+#customSchoolTable td,
+#customSchoolClassTable th,
+#customSchoolClassTable td,
+#highValueTable th,
+#highValueTable td,
+#dataTable th,
+#dataTable td {
+    padding: 4px 5px;
+    font-size: 10px;
+    line-height: 1.1;
+}
+
+#customSchoolTable th,
+#customSchoolTable td,
+#customSchoolClassTable th,
+#customSchoolClassTable td {
+    white-space: nowrap;
+    padding: 8px 10px;
+}
+
+#customSchoolTable {
+    width: max-content;
+    min-width: 100%;
+    table-layout: auto;
+}
+
+#customSchoolTable th,
+#customSchoolTable td {
+    white-space: nowrap;
+    word-break: keep-all;
+    text-align: center;
+    line-height: 1.2;
+    padding: 5px 6px;
+    font-size: 12px;
+}
+
+#customSchoolTable th {
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.1;
+    padding: 5px 4px;
+    font-size: 10px;
+}
+
+#customSchoolTable td.school-name-cell {
+    white-space: normal;
+    word-break: break-all;
+    overflow-wrap: anywhere;
+    overflow: hidden;
+    display: table-cell;
+    text-overflow: clip;
+    text-align: left;
+    max-width: 160px;
+    min-width: 96px;
+    line-height: 1.15;
+    vertical-align: top;
+}
+
+#customSchoolSchoolTable td.teacher-name-cell,
+#customSchoolTable td.teacher-name-cell,
+#customSchoolClassTable td.teacher-name-cell,
+#highValueTable td.teacher-name-cell,
+#dataTable td.teacher-name-cell {
+    max-width: 140px;
+}
+
+.compact-number-cell {
+    font-size: 10px;
+    line-height: 1.1;
+}
+
+#customSchoolTable td.metric-good,
+#customSchoolClassTable td.metric-good,
+#customSchoolTable .metric-good,
+#customSchoolClassTable .metric-good {
+    color: #16a34a !important;
+    font-weight: 700;
+}
+
+#customSchoolTable td.metric-bad,
+#customSchoolClassTable td.metric-bad,
+#customSchoolTable .metric-bad,
+#customSchoolClassTable .metric-bad {
+    color: #dc2626 !important;
+    font-weight: 700;
+}
+
+@media (max-width: 1100px) {
+    .upload-panel-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 1400px) {
+    .metrics-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 900px) {
+    .metrics-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 640px) {
+    .metrics-grid {
+        grid-template-columns: 1fr;
+    }
 }
