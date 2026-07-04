@@ -244,8 +244,8 @@
                     教育数据看板
                 </h1>
                 <p class="dashboard-subtitle">转化率与作业完成情况监测 - 基于班级 ID 关联</p>
-                <div id="debugBar" style="margin-top:8px;font-size:12px;color:#475569;display:flex;gap:12px;flex-wrap:wrap;">页面版本占位：root-20260704a</div>
-                <div id="pageVersion" style="margin-top:6px;font-size:12px;color:#0f172a;font-weight:600;background:#e2e8f0;display:inline-block;padding:4px 10px;border-radius:999px;">页面版本：v20260704a</div>
+                <div id="debugBar" style="margin-top:8px;font-size:12px;color:#475569;display:flex;gap:12px;flex-wrap:wrap;">页面版本占位：root-20260704b</div>
+                <div id="pageVersion" style="margin-top:6px;font-size:12px;color:#0f172a;font-weight:600;background:#e2e8f0;display:inline-block;padding:4px 10px;border-radius:999px;">页面版本：v20260704b</div>
             </div>
         </header>
 
@@ -419,6 +419,7 @@
                 </h2>
                 <div class="table-actions">
                 </div>
+                <div class="school-insight-bar" id="schoolInsightBar" hidden></div>
             </div>
             <div class="table-section-info">
                 <span class="filter-status table-filter-status">共 <strong id="dataCount">0</strong> 条数据</span>
@@ -737,6 +738,23 @@
                     </tfoot>
                 </table>
             </div>
+            <div class="pagination-wrapper high-value-pagination" id="highValuePagination"></div>
+            <div class="charts-grid high-value-trend-grid">
+                <div class="chart-card chart-card-wide">
+                    <div class="chart-header">
+                        <h3 class="chart-title">筛选结果年级趋势</h3>
+                        <p class="chart-subtitle">柱状图：未过期付费/试用学生数 | 折线图：付费率</p>
+                    </div>
+                    <div class="chart-container" id="highValueConversionChart"></div>
+                </div>
+                <div class="chart-card chart-card-wide">
+                    <div class="chart-header">
+                        <h3 class="chart-title">收藏校趋势</h3>
+                        <p class="chart-subtitle">基于当前高价值筛选范围内已收藏年级</p>
+                    </div>
+                    <div class="chart-container" id="favoriteConversionChart"></div>
+                </div>
+            </div>
         </section>
         </div>
 
@@ -885,11 +903,11 @@
     </div>
 
     <script>
-        window.__ROOT_DEPLOY_MARKER__='root-20260704a';
+        window.__ROOT_DEPLOY_MARKER__='root-20260704b';
         document.addEventListener('DOMContentLoaded', function () {
             var input = document.getElementById('fileInput');
             var debugBar = document.getElementById('debugBar');
-            if (debugBar) debugBar.textContent = '页面版本占位：root-20260704a';
+            if (debugBar) debugBar.textContent = '页面版本占位：root-20260704b';
             if (input) {
                 input.addEventListener('change', function (e) {
                     var files = Array.from((e.target && e.target.files) || []);
@@ -904,6 +922,6 @@
             }
         });
     </script>
-    <script src="app.js?v=20260704a"></script>
+    <script src="app.js?v=20260704b"></script>
 </body>
 </html>

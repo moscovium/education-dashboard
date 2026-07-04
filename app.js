@@ -6,9 +6,16 @@ const MAX_STORAGE_MB = 500; // 最大存储限制（MB）
 let db = null;
 const AppState = { files: [], filteredData: [], cache: new Map(), provinces: new Set(), cities: new Set(), districts: new Set(), schools: new Set(), grades: new Set() };
 const elements = {};
-const APP_VERSION = 'v2.4.2-root-20260704a';
+const APP_VERSION = 'v2.4.2-root-20260704b';
 const getClassId = (r = {}) => r['班级 id'] || r['班级ID'] || r['班级id'] || r['班级'] || r['classId'] || r['class_id'] || '';
 const calcConvRate = (paid, students) => (students > 0 ? (paid / students * 100).toFixed(1) : '0.0');
+const HIGH_VALUE_ROWS_PER_PAGE = 100;
+let highValuePageState = { page: 1, pageSize: HIGH_VALUE_ROWS_PER_PAGE, total: 0, pages: 0, rows: [], weeks: [] };
+let highValueTrendRecords = [];
+let favoriteTrendRecordsState = [];
+function escapeHtml(value = '') {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
 const buildWeekMetaMap = (groupMap) => {
     const weekMetaMap = new Map();
     groupMap.forEach(g => {
@@ -109,6 +116,9 @@ function initElements() {
     elements.hvFavoriteSelect = document.getElementById('hvFavoriteSelect');
     elements.highValueTableBody = document.getElementById('highValueTableBody');
     elements.highValueInfo = document.getElementById('highValueInfo');
+    elements.highValuePagination = document.getElementById('highValuePagination');
+    elements.highValueConversionChart = document.getElementById('highValueConversionChart');
+    elements.favoriteConversionChart = document.getElementById('favoriteConversionChart');
     elements.applyHighValueFilter = document.getElementById('applyHighValueFilter');
     elements.resetHighValueFilter = document.getElementById('resetHighValueFilter');
     elements.customSchoolSection = document.getElementById('customSchoolSection');
@@ -733,7 +743,7 @@ function cascadeHighValue(lvl) {
 }
 
 // 计算年级指标并应用筛选
-function applyHighValueFilter() {
+function applyHighValueFilter(page = 1) {
     // 获取所有周的数据
     let allRecs = [];
     AppState.cache.forEach(d => allRecs.push(...d));
@@ -933,17 +943,31 @@ function applyHighValueFilter() {
         return true;
     });
     
+    const filteredKeys = new Set(filteredGrades.map(favoriteKey));
+    highValueTrendRecords = allRecs.filter(r => filteredKeys.has(recordFavoriteKey(r)));
+    favoriteTrendRecordsState = highValueTrendRecords.filter(r => favoriteSet.has(recordFavoriteKey(r)));
+    highValuePageState = {
+        page: Math.max(1, Number(page) || 1),
+        pageSize: HIGH_VALUE_ROWS_PER_PAGE,
+        total: filteredGrades.length,
+        pages: Math.max(1, Math.ceil(filteredGrades.length / HIGH_VALUE_ROWS_PER_PAGE)),
+        rows: filteredGrades,
+        weeks: sortedWeeks
+    };
+    if (highValuePageState.page > highValuePageState.pages) highValuePageState.page = highValuePageState.pages;
+
     // 显示结果
-    renderHighValueTable(filteredGrades, sortedWeeks);
+    renderHighValueTable(filteredGrades, sortedWeeks, highValuePageState.page);
+    renderHighValueTrendCharts();
     
     if (filteredGrades.length === 0) {
         showMsg('⚠️ 筛选后无数据', 'warning');
     } else {
-        showMsg(`✅ 找到 ${filteredGrades.length} 条高价值年级数据`, 'success');
+        showMsg(`✅ 找到 ${filteredGrades.length} 条高价值年级数据，当前第 ${highValuePageState.page}/${highValuePageState.pages} 页`, 'success');
     }
 }
 
-function renderHighValueTable(grades, sortedWeeks) {
+function renderHighValueTable(grades, sortedWeeks, page = 1) {
     if (grades.length === 0) {
         elements.highValueTableBody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:40px;color:#999;">请点击"应用筛选"查看结果</td></tr>';
         document.getElementById('highValueTableHead').innerHTML = `
@@ -961,7 +985,9 @@ function renderHighValueTable(grades, sortedWeeks) {
             <th>收藏</th>
             </tr>`;
         elements.highValueInfo.textContent = '';
+        if (elements.highValuePagination) elements.highValuePagination.innerHTML = '';
         elements.highValueSection.style.display = 'block';
+        renderHighValueTrendCharts();
         return;
     }
     
@@ -999,8 +1025,15 @@ function renderHighValueTable(grades, sortedWeeks) {
     theadHtml += '</tr>';
     document.getElementById('highValueTableHead').innerHTML = theadHtml;
     
+    const total = grades.length;
+    const pageSize = HIGH_VALUE_ROWS_PER_PAGE;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const currentPage = Math.min(Math.max(1, Number(page) || 1), totalPages);
+    const startIdx = (currentPage - 1) * pageSize;
+    const pageGrades = grades.slice(startIdx, startIdx + pageSize);
+
     // 生成数据行
-    elements.highValueTableBody.innerHTML = grades.map(g => {
+    elements.highValueTableBody.innerHTML = pageGrades.map(g => {
         let cells = `
             <td>${g.province}</td>
             <td>${g.city}</td>
@@ -1030,10 +1063,143 @@ function renderHighValueTable(grades, sortedWeeks) {
     }).join('');
     
     const lastWeek = sortedWeeks.length > 0 ? sortedWeeks[sortedWeeks.length - 1] : '';
-    elements.highValueInfo.textContent = `共 ${grades.length} 条记录 | 数据来源：${sortedWeeks.length}周（${lastWeek}）`;
+    elements.highValueInfo.textContent = `共 ${grades.length} 条记录 | 当前第 ${startIdx + 1}-${Math.min(startIdx + pageGrades.length, total)} 条 | 数据来源：${sortedWeeks.length}周（${lastWeek}）`;
+    renderHighValuePagination(currentPage, totalPages, total);
     elements.highValueSection.style.display = 'block';
     document.querySelectorAll('.favorite-toggle').forEach(btn => { btn.onclick = () => toggleFavoriteByKey(btn.dataset.favKey); });
     scheduleAdaptNameCells();
+}
+
+function recordFavoriteKey(r = {}) {
+    return `${r['省份'] || ''}|${r['城市'] || ''}|${r['区县'] || ''}|${r['学校名称'] || r['学校'] || ''}|${r['年级'] || ''}`;
+}
+
+function renderHighValuePagination(page, pages, total) {
+    if (!elements.highValuePagination) return;
+    if (total <= HIGH_VALUE_ROWS_PER_PAGE) {
+        elements.highValuePagination.innerHTML = '';
+        return;
+    }
+    let startPage = Math.max(1, page - 3);
+    let endPage = Math.min(pages, startPage + 6);
+    startPage = Math.max(1, Math.min(startPage, endPage - 6));
+    let html = `<div class="pagination-info">共 ${total.toLocaleString()} 条，每页 ${HIGH_VALUE_ROWS_PER_PAGE} 条，第 ${page}/${pages} 页</div><div class="pagination-controls">`;
+    html += `<button class="pagination-btn" onclick="goToHighValuePage(1)" ${page <= 1 ? 'disabled' : ''}>首页</button>`;
+    html += `<button class="pagination-btn" onclick="goToHighValuePage(${page - 1})" ${page <= 1 ? 'disabled' : ''}>上一页</button>`;
+    for (let i = startPage; i <= endPage; i++) {
+        html += `<button class="pagination-btn ${i === page ? 'active' : ''}" onclick="goToHighValuePage(${i})">${i}</button>`;
+    }
+    html += `<button class="pagination-btn" onclick="goToHighValuePage(${page + 1})" ${page >= pages ? 'disabled' : ''}>下一页</button>`;
+    html += `<button class="pagination-btn" onclick="goToHighValuePage(${pages})" ${page >= pages ? 'disabled' : ''}>末页</button>`;
+    html += '</div>';
+    elements.highValuePagination.innerHTML = html;
+}
+
+function goToHighValuePage(page) {
+    const targetPage = Math.min(Math.max(1, Number(page) || 1), highValuePageState.pages || 1);
+    highValuePageState.page = targetPage;
+    renderHighValueTable(highValuePageState.rows || [], highValuePageState.weeks || [], targetPage);
+}
+
+function buildTrendDataset(rows = []) {
+    const weekMap = new Map();
+    rows.forEach(r => {
+        const label = r.weekLabel || r.weekDisplay || r.weekStartDate || '';
+        if (!weekMap.has(label)) weekMap.set(label, { label, paid: 0, trial: 0, student: 0, startDate: r.weekStartDate || '' });
+        const bucket = weekMap.get(label);
+        bucket.paid += +r['未过期付费学生数'] || +r.paidCount || 0;
+        bucket.trial += +r['未过期试用学生数'] || +r.trialCount || 0;
+        bucket.student += +r['总学生数'] || +r.studentCount || 0;
+    });
+    const sorted = [...weekMap.values()].sort((a, b) => {
+        const at = a.startDate ? dayjs(a.startDate).valueOf() : 0;
+        const bt = b.startDate ? dayjs(b.startDate).valueOf() : 0;
+        return at - bt || String(a.label).localeCompare(String(b.label), 'zh-CN');
+    });
+    return {
+        labels: sorted.map(item => item.label),
+        paid: sorted.map(item => item.paid),
+        trial: sorted.map(item => item.trial),
+        rate: sorted.map(item => Number(calcConvRate(item.paid, item.student)))
+    };
+}
+
+function renderEmptyTrendChart(container, text) {
+    if (!container || !window.echarts) return;
+    const old = echarts.getInstanceByDom(container);
+    if (old) old.dispose();
+    echarts.init(container).setOption({
+        title: { text, left: 'center', top: 'middle', textStyle: { color: '#94a3b8', fontSize: 14, fontWeight: 500 } },
+        xAxis: { show: false },
+        yAxis: { show: false },
+        series: []
+    });
+}
+
+function renderTrendChart(container, rows = [], emptyText = '暂无趋势数据') {
+    if (!container || !window.echarts) return;
+    const old = echarts.getInstanceByDom(container);
+    if (old) old.dispose();
+    if (!rows.length) {
+        renderEmptyTrendChart(container, emptyText);
+        return;
+    }
+    const data = buildTrendDataset(rows);
+    echarts.init(container).setOption({
+        tooltip: {
+            trigger: 'axis',
+            formatter(params) {
+                let result = `${params[0].name}<br/>`;
+                params.forEach(item => {
+                    result += `${item.marker}${item.seriesName}: ${item.value}${item.seriesName.includes('率') ? '%' : '人'}<br/>`;
+                });
+                return result;
+            }
+        },
+        legend: { data: ['未过期付费学生数', '未过期试用学生数', '付费率'], top: 0 },
+        grid: { left: '3%', right: '4%', bottom: '3%', top: '16%', containLabel: true },
+        xAxis: { type: 'category', data: data.labels, axisLabel: { rotate: 35, color: '#64748b' } },
+        yAxis: [{
+            type: 'value',
+            name: '人数',
+            axisLabel: { color: '#2563eb' },
+            position: 'left'
+        }, {
+            type: 'value',
+            name: '付费率',
+            axisLabel: { color: '#8b5cf6', formatter: '{value}%' },
+            position: 'right',
+            min: 0,
+            max: 100
+        }],
+        series: [{
+            name: '未过期付费学生数',
+            type: 'bar',
+            stack: 'students',
+            data: data.paid,
+            itemStyle: { color: '#2563eb' }
+        }, {
+            name: '未过期试用学生数',
+            type: 'bar',
+            stack: 'students',
+            data: data.trial,
+            itemStyle: { color: '#f59e0b' }
+        }, {
+            name: '付费率',
+            type: 'line',
+            yAxisIndex: 1,
+            data: data.rate,
+            smooth: true,
+            lineStyle: { color: '#8b5cf6', width: 3 },
+            itemStyle: { color: '#8b5cf6' },
+            label: { show: true, position: 'top', color: '#8b5cf6', fontSize: 11, formatter: '{c}%' }
+        }]
+    });
+}
+
+function renderHighValueTrendCharts() {
+    renderTrendChart(elements.highValueConversionChart, highValueTrendRecords, '当前高价值筛选结果暂无趋势数据');
+    renderTrendChart(elements.favoriteConversionChart, favoriteTrendRecordsState, loadFavorites().size ? '当前筛选范围内暂无收藏校趋势数据' : '请先收藏年级后查看趋势');
 }
 
 function resetHighValueFilter() {
@@ -1050,6 +1216,10 @@ function resetHighValueFilter() {
     if (elements.hvFavoriteSelect) elements.hvFavoriteSelect.value = '';
     updateHighValueSels();
     renderHighValueTable([], []);
+    highValueTrendRecords = [];
+    favoriteTrendRecordsState = [];
+    highValuePageState = { page: 1, pageSize: HIGH_VALUE_ROWS_PER_PAGE, total: 0, pages: 0, rows: [], weeks: [] };
+    renderHighValueTrendCharts();
     elements.highValueSection.style.display = AppState.filteredData.length ? 'block' : 'none';
     showMsg('✅ 已重置', 'success');
 }
@@ -1406,12 +1576,12 @@ function renderCharts() {
     const wm = new Map();
     AppState.filteredData.forEach(r => {
         const k = r.weekLabel;
-        if (!wm.has(k)) wm.set(k, { label: r.weekFullDisplay, v: 0, n: 0, vSum: 0, paidSum: 0 });
+        if (!wm.has(k)) wm.set(k, { label: r.weekFullDisplay, v: 0, n: 0, paidSum: 0, studentSum: 0 });
         const w = wm.get(k);
-        w.vSum += (+r['转化率'] || 0) * 100;
         w.paidSum += +r['未过期付费学生数'] || 0;
+        w.studentSum += +r['总学生数'] || 0;
         w.n++;
-        w.v = w.n ? (w.vSum / w.n).toFixed(1) : 0;
+        w.v = calcConvRate(w.paidSum, w.studentSum);
     });
     const sw = [...wm.entries()].sort((a, b) => {
         const aStart = a[1].label.split('至')[0].trim();
@@ -1639,6 +1809,13 @@ function renderTbl(page = 1) {
     
     // 渲染分页
     renderPagination(totalPages, currentPage, totalRows, startIdx + 1, endIdx);
+    try {
+        renderSchoolInsight(groupMap, sortedWeeks);
+    } catch (err) {
+        console.warn('school insight failed', err);
+        const bar = document.getElementById('schoolInsightBar');
+        if (bar) { bar.hidden = true; bar.innerHTML = ''; }
+    }
     } catch (err) {
         console.error('renderTbl failed', err, {
             version: APP_VERSION,
@@ -1652,6 +1829,135 @@ function renderTbl(page = 1) {
         theadEl.innerHTML = '';
         elements.tableBody.innerHTML = `<tr><td colspan="20" style="text-align:center;padding:40px;color:#dc2626;">班级数据明细渲染失败：${err.message}</td></tr>`;
     }
+}
+
+function gradeClassLabel(g = {}) {
+    const grade = String(g.grade || '').replace(/年级$/, '');
+    const cls = String(g.className || g.classId || '').replace(/班级$/, '');
+    return [grade, cls].filter(Boolean).join('.');
+}
+
+function renderSchoolInsight(groupMap, sortedWeeks = []) {
+    const bar = document.getElementById('schoolInsightBar');
+    if (!bar) return;
+    const groups = [...groupMap.values()];
+    const weeks = sortedWeeks || [];
+    const latestKey = weeks[weeks.length - 1];
+    const prevKey = weeks[weeks.length - 2] || null;
+    if (!groups.length || !latestKey) {
+        bar.hidden = true;
+        bar.innerHTML = '';
+        return;
+    }
+
+    const schoolSet = new Set(groups.map(g => `${g.province}|${g.city}|${g.district}|${g.school}`));
+    const paidOf = (g, k) => (k && g.weeks.has(k)) ? (g.weeks.get(k).paidCount || 0) : 0;
+    const stuOf = (g, k) => (k && g.weeks.has(k)) ? (g.weeks.get(k).studentCount || 0) : 0;
+
+    if (schoolSet.size > 1) {
+        let payHtml;
+        if (!prevKey) {
+            payHtml = '<span class="sib-muted">数据不足（需至少 2 周）</span>';
+        } else {
+            const schoolGradeMap = new Map();
+            groups.forEach(g => {
+                const key = `${g.province}|${g.city}|${g.district}|${g.school}|${g.grade}`;
+                if (!schoolGradeMap.has(key)) {
+                    schoolGradeMap.set(key, { school: g.school, grade: g.grade, latestPaid: 0, prevPaid: 0, latestStu: 0 });
+                }
+                const item = schoolGradeMap.get(key);
+                item.latestPaid += paidOf(g, latestKey);
+                item.prevPaid += paidOf(g, prevKey);
+                item.latestStu += stuOf(g, latestKey);
+            });
+            const rows = [...schoolGradeMap.values()];
+            const newPaidTotal = rows.reduce((sum, item) => sum + (item.latestPaid - item.prevPaid), 0);
+            const newPaidHtml = newPaidTotal > 0 ? `<span class="sib-up">+${newPaidTotal}</span>` : newPaidTotal < 0 ? `<span class="sib-down">${newPaidTotal}</span>` : '<span class="sib-muted">0</span>';
+            const topRows = rows.filter(item => item.latestPaid > 0)
+                .map(item => ({ ...item, rate: item.latestStu > 0 ? item.latestPaid / item.latestStu : 0 }))
+                .sort((a, b) => b.rate - a.rate)
+                .slice(0, 3);
+            const topHtml = topRows.length
+                ? topRows.map(item => `${escapeHtml(item.school)}（${escapeHtml(item.grade)} ${calcConvRate(item.latestPaid, item.latestStu)}%）`).join('、')
+                : '<span class="sib-muted">无</span>';
+            payHtml = `本周新增付费 ${newPaidHtml} 人 ｜ Top3 付费校及年级：${topHtml}`;
+        }
+        bar.innerHTML = `<div class="sib-row"><span class="sib-tag">多校付费</span><span class="sib-text" title="按当前筛选结果聚合：净增付费、Top3 付费校及年级">${payHtml}</span></div>`;
+        bar.hidden = false;
+        return;
+    }
+
+    const last3Weeks = weeks.slice(-3);
+    const has3Weeks = last3Weeks.length >= 3;
+    const assignmentsOf = (g, k) => (k && g.weeks.has(k)) ? (g.weeks.get(k).assignments || 0) : 0;
+    const labelOf = g => gradeClassLabel(g);
+
+    const latestAssigned = groups.filter(g => assignmentsOf(g, latestKey) >= 1).length;
+    let assignDeltaHtml = '<span class="sib-muted">—</span>';
+    if (prevKey) {
+        const prevAssigned = groups.filter(g => assignmentsOf(g, prevKey) >= 1).length;
+        const delta = latestAssigned - prevAssigned;
+        assignDeltaHtml = delta > 0 ? `<span class="sib-up">+${delta}</span>` : delta < 0 ? `<span class="sib-down">${delta}</span>` : '<span class="sib-muted">持平</span>';
+    }
+
+    let silentHtml = '<span class="sib-muted">数据不足 3 周</span>';
+    if (has3Weeks) {
+        const byTeacher = new Map();
+        groups.forEach(g => {
+            if (!last3Weeks.every(week => assignmentsOf(g, week) === 0)) return;
+            const teacher = g.teacherName || '-';
+            if (!byTeacher.has(teacher)) byTeacher.set(teacher, []);
+            byTeacher.get(teacher).push(labelOf(g));
+        });
+        silentHtml = byTeacher.size
+            ? [...byTeacher].map(([teacher, classes]) => `${escapeHtml(teacher)}（${classes.map(escapeHtml).join('、')}）`).join('，')
+            : '<span class="sib-muted">无</span>';
+    }
+
+    let fanHtml = '<span class="sib-muted">数据不足 3 周</span>';
+    if (has3Weeks) {
+        const byTeacher = new Map();
+        groups.forEach(g => {
+            if (!last3Weeks.every(week => assignmentsOf(g, week) >= 1)) return;
+            const rates = last3Weeks.map(week => parseFloat(g.weeks.get(week)?.completionRate) || 0);
+            const avgRate = rates.reduce((sum, value) => sum + value, 0) / rates.length;
+            if (avgRate <= 60) return;
+            const teacher = g.teacherName || '-';
+            if (!byTeacher.has(teacher)) byTeacher.set(teacher, []);
+            byTeacher.get(teacher).push(labelOf(g));
+        });
+        fanHtml = byTeacher.size
+            ? [...byTeacher].map(([teacher, classes]) => `<span class="sib-strong">${escapeHtml(teacher)}</span>（${classes.map(escapeHtml).join('、')}）`).join('，')
+            : '<span class="sib-muted">无</span>';
+    }
+
+    let payHtml = '<span class="sib-muted">数据不足（需至少 2 周）</span>';
+    if (prevKey) {
+        const classRows = groups.map(g => ({
+            name: labelOf(g),
+            newPaid: paidOf(g, latestKey) - paidOf(g, prevKey),
+            paid: paidOf(g, latestKey),
+            student: stuOf(g, latestKey)
+        }));
+        const newPaidTotal = classRows.reduce((sum, row) => sum + row.newPaid, 0);
+        const newPaidHtml = newPaidTotal > 0 ? `<span class="sib-up">+${newPaidTotal}</span>` : newPaidTotal < 0 ? `<span class="sib-down">${newPaidTotal}</span>` : '<span class="sib-muted">0</span>';
+        const involved = classRows.filter(row => row.newPaid > 0).sort((a, b) => b.newPaid - a.newPaid);
+        const involvedHtml = newPaidTotal > 0 && involved.length
+            ? `${involved.length} 个：${involved.slice(0, 3).map(row => escapeHtml(row.name)).join('、')}${involved.length > 3 ? ' 等' : ''}`
+            : '<span class="sib-muted">无</span>';
+        const topPaid = classRows.filter(row => row.paid > 0)
+            .map(row => ({ ...row, rate: row.student > 0 ? row.paid / row.student : 0 }))
+            .sort((a, b) => b.rate - a.rate)
+            .slice(0, 3);
+        const topHtml = topPaid.length ? topPaid.map(row => `${escapeHtml(row.name)}（${calcConvRate(row.paid, row.student)}%）`).join('、') : '<span class="sib-muted">无</span>';
+        payHtml = `本周新增付费 ${newPaidHtml} 人 ｜ 净增班级 ${involvedHtml} ｜ Top3付费班级：${topHtml}`;
+    }
+
+    bar.innerHTML =
+        `<div class="sib-row"><span class="sib-tag">布置</span><span class="sib-text">总涉及班级 <b>${groups.length}</b>｜最新周布置 <b>${latestAssigned}</b>（较上周 ${assignDeltaHtml}）｜连续3周未布置：${silentHtml}</span></div>` +
+        `<div class="sib-row"><span class="sib-tag">粉丝老师</span><span class="sib-text">${fanHtml}</span></div>` +
+        `<div class="sib-row"><span class="sib-tag">付费</span><span class="sib-text">${payHtml}</span></div>`;
+    bar.hidden = false;
 }
 
 function renderPagination(totalPages, currentPage, totalRows, startRow, endRow) {
@@ -1945,7 +2251,7 @@ async function downloadExportedImage() {
     document.body.removeChild(link);
 }
 
-window.onresize = () => { ['conversionChart'].forEach(id => { const el=document.getElementById(id); const c = el ? echarts.getInstanceByDom(el) : null; if (c) c.resize(); }); scheduleAdaptNameCells(); };
+window.onresize = () => { ['conversionChart', 'highValueConversionChart', 'favoriteConversionChart'].forEach(id => { const el=document.getElementById(id); const c = el ? echarts.getInstanceByDom(el) : null; if (c) c.resize(); }); scheduleAdaptNameCells(); };
 
 
 function inferStageFromGrade(grade = '') {
@@ -1981,7 +2287,7 @@ function toggleFavoriteByKey(key) {
     if (!normalizedKey) return;
     if (favs.has(normalizedKey)) favs.delete(normalizedKey); else favs.add(normalizedKey);
     saveFavorites(favs);
-    applyHighValueFilter();
+    applyHighValueFilter(highValuePageState.page || 1);
 }
 function getCustomSchoolTab() { return localStorage.getItem(CUSTOM_SCHOOL_TAB_KEY) || 'grade'; }
 function setCustomSchoolTab(tab) { localStorage.setItem(CUSTOM_SCHOOL_TAB_KEY, tab); }

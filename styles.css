@@ -585,6 +585,60 @@ body {
     grid-column: 1 / -1;
 }
 
+.school-insight-bar {
+    flex: 1 1 0;
+    min-width: 0;
+    margin: 0 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--text-secondary);
+}
+
+.school-insight-bar[hidden] {
+    display: none;
+}
+
+.school-insight-bar .sib-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.school-insight-bar .sib-tag {
+    flex: 0 0 auto;
+    font-weight: 700;
+    color: var(--text-primary);
+    background: rgba(37, 99, 235, 0.08);
+    border-radius: 6px;
+    padding: 1px 7px;
+}
+
+.school-insight-bar .sib-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.school-insight-bar .sib-strong { color: var(--primary-color); font-weight: 700; }
+.school-insight-bar .sib-up { color: var(--success-color); font-weight: 700; }
+.school-insight-bar .sib-down { color: var(--danger-color); font-weight: 700; }
+.school-insight-bar .sib-muted { color: var(--text-muted); }
+
+.high-value-pagination {
+    margin-top: 16px;
+}
+
+.high-value-trend-grid {
+    margin-top: 24px;
+}
+
 .chart-header {
     margin-bottom: 16px;
 }
