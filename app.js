@@ -6,8 +6,9 @@ const MAX_STORAGE_MB = 500; // 最大存储限制（MB）
 let db = null;
 const AppState = { files: [], filteredData: [], cache: new Map(), provinces: new Set(), cities: new Set(), districts: new Set(), schools: new Set(), grades: new Set() };
 const elements = {};
-const APP_VERSION = 'v2.4.2-root-20260519e';
+const APP_VERSION = 'v2.4.2-root-20260704a';
 const getClassId = (r = {}) => r['班级 id'] || r['班级ID'] || r['班级id'] || r['班级'] || r['classId'] || r['class_id'] || '';
+const calcConvRate = (paid, students) => (students > 0 ? (paid / students * 100).toFixed(1) : '0.0');
 const buildWeekMetaMap = (groupMap) => {
     const weekMetaMap = new Map();
     groupMap.forEach(g => {
@@ -1187,6 +1188,10 @@ async function applyFilter() {
 }
 
 function resetFilter() {
+    const schoolFilterInput = document.getElementById('schoolFilterInput');
+    const schoolSearchInput = document.getElementById('schoolSearchInput');
+    if (schoolFilterInput) schoolFilterInput.value = '';
+    if (schoolSearchInput) schoolSearchInput.value = '';
     elements.provinceSelect.value = '';
     elements.citySelect.value = '';
     elements.districtSelect.value = '';
@@ -1337,9 +1342,7 @@ function renderMet() {
     const lastWeekStart = weeks[weeks.length - 1];
     const lastWeekData = AppState.filteredData.filter(r => r.weekStartDate === lastWeekStart);
     const tc = lastWeekData.reduce((s, r) => s + (+r['作业完成率'] || 0) * 100, 0);
-    const tv = lastWeekData.reduce((s, r) => s + (+r['转化率'] || 0) * 100, 0);
     const avgC = lastWeekData.length ? (tc / lastWeekData.length).toFixed(1) : 0;
-    const avgV = lastWeekData.length ? (tv / lastWeekData.length).toFixed(1) : 0;
     // 覆盖班级：筛选项下班级总数（按班级ID去重）- 基于实际筛选结果
     const cls = new Set(AppState.filteredData.map(r => getClassId(r)).filter(Boolean));
     const clsCount = cls.size;
@@ -1369,8 +1372,8 @@ function renderMet() {
     const paidNotExpired = lastWeekData.reduce((s, r) => s + (+r['未过期付费学生数'] || 0), 0);
     elements.paidNotExpired.textContent = paidNotExpired.toLocaleString();
     
-    // 1.3 转化率
-    elements.conversionRate.textContent = avgV + '%';
+    // 1.3 转化率：未过期付费学生数 / 总学生数
+    elements.conversionRate.textContent = calcConvRate(paidNotExpired, stu) + '%';
     
     // 1.4 覆盖班级
     const displayClsCount = clsCount.toLocaleString();
@@ -1525,6 +1528,7 @@ function renderTbl(page = 1) {
                 count: 0,
                 paidCount: +r['未过期付费学生数'] || 0,
                 trialCount: +r['未过期试用学生数'] || 0,
+                studentCount: +r['总学生数'] || 0,
                 conversionSum: (+r['转化率'] || 0) * 100,
                 conversionCount: (+r['转化率'] || 0) > 0 ? 1 : 0
             });
@@ -1538,9 +1542,10 @@ function renderTbl(page = 1) {
         }
         w.count++;
         w.completionRate = w.count ? (w.completionSum / w.count).toFixed(1) : 0;
-        w.conversionRate = w.conversionCount ? (w.conversionSum / w.conversionCount).toFixed(1) : 0;
         w.paidCount = +r['未过期付费学生数'] || 0;
         w.trialCount = +r['未过期试用学生数'] || 0;
+        w.studentCount = +r['总学生数'] || 0;
+        w.conversionRate = calcConvRate(w.paidCount, w.studentCount);
     });
     
     // 获取所有周次（按时间排序）
@@ -1956,10 +1961,28 @@ const FAVORITES_KEY = 'education-dashboard-hv-favorites';
 const CUSTOM_SCHOOL_TAB_KEY = 'education-dashboard-custom-school-tab';
 const EXPORT_IMAGE_SCALE = 2;
 const UPLOAD_SECTION_COLLAPSED_KEY = 'education-dashboard-upload-collapsed';
-function loadFavorites() { try { return new Set(JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]')); } catch { return new Set(); } }
-function saveFavorites(set) { localStorage.setItem(FAVORITES_KEY, JSON.stringify([...set])); }
-function favoriteKey(g) { return `${g.province}|${g.city}|${g.district}|${g.school}|${g.grade}`; }
-function toggleFavoriteByKey(key) { const favs = loadFavorites(); if (favs.has(key)) favs.delete(key); else favs.add(key); saveFavorites(favs); applyHighValueFilter(); }
+function normalizeFavoriteKey(key = '') {
+    const parts = String(key || '').split('|');
+    if (parts.length < 5) return '';
+    return parts.slice(0, 5).join('|');
+}
+function loadFavorites() {
+    try {
+        return new Set((JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]') || []).map(normalizeFavoriteKey).filter(Boolean));
+    } catch {
+        return new Set();
+    }
+}
+function saveFavorites(set) { localStorage.setItem(FAVORITES_KEY, JSON.stringify([...set].map(normalizeFavoriteKey).filter(Boolean))); }
+function favoriteKey(g) { return `${g.province}|${g.city}|${g.district}|${g.school}|${g.grade || ''}`; }
+function toggleFavoriteByKey(key) {
+    const favs = loadFavorites();
+    const normalizedKey = normalizeFavoriteKey(key);
+    if (!normalizedKey) return;
+    if (favs.has(normalizedKey)) favs.delete(normalizedKey); else favs.add(normalizedKey);
+    saveFavorites(favs);
+    applyHighValueFilter();
+}
 function getCustomSchoolTab() { return localStorage.getItem(CUSTOM_SCHOOL_TAB_KEY) || 'grade'; }
 function setCustomSchoolTab(tab) { localStorage.setItem(CUSTOM_SCHOOL_TAB_KEY, tab); }
 function getUploadSectionCollapsed() {
@@ -2166,8 +2189,8 @@ function renderCustomSchoolAggregateSchoolView(records, inputNames = [], stageFi
             });
             const paid = filteredLastRows.reduce((s,r)=>s+(+r['未过期付费学生数']||0),0);
             const trial = filteredLastRows.reduce((s,r)=>s+(+r['未过期试用学生数']||0),0);
-            const convVals = filteredLastRows.filter(r => (+r['转化率']||0) >= 0).map(r => (+r['转化率']||0)*100);
-            const conv = convVals.length ? (convVals.reduce((a,b)=>a+b,0)/convVals.length).toFixed(1) : '0.0';
+            const student = filteredLastRows.reduce((s,r)=>s+(+r['总学生数']||0),0);
+            const conv = calcConvRate(paid, student);
             row += `<td>${paid}</td><td>${trial}</td><td>${conv}%</td></tr>`;
             return row;
         }).join('');
@@ -2201,7 +2224,8 @@ function renderCustomSchoolSchoolView(records, inputNames = [], avgAssignFilter 
             conversionSum: 0,
             conversionCount: 0,
             paid: 0,
-            trial: 0
+            trial: 0,
+            student: 0
         });
         const w = g.weeks.get(wk);
         w.assignments += +r['布置作业次数'] || 0;
@@ -2213,6 +2237,7 @@ function renderCustomSchoolSchoolView(records, inputNames = [], avgAssignFilter 
         }
         w.paid += +r['未过期付费学生数'] || 0;
         w.trial += +r['未过期试用学生数'] || 0;
+        w.student += +r['总学生数'] || 0;
     });
     const weekMetaMap = buildWeekMetaMap(grouped);
     const sortedWeeks = sortWeekKeys(weekMetaMap);
@@ -2267,7 +2292,7 @@ function renderCustomSchoolSchoolView(records, inputNames = [], avgAssignFilter 
             t += `<td class="compact-number-cell">${avgAssignments}</td><td class="compact-number-cell ${completionClass}">${completion}%</td>`;
         });
         const lastWeek = g.weeks.get(lastWeekKey);
-        const conversion = lastWeek?.conversionCount ? (lastWeek.conversionSum / lastWeek.conversionCount).toFixed(1) : '0.0';
+        const conversion = calcConvRate(lastWeek?.paid || 0, lastWeek?.student || 0);
         t += `<td>${lastWeek?.paid || 0}</td><td>${lastWeek?.trial || 0}</td><td>${conversion}%</td>`;
         return t + '</tr>';
     }).join('');
@@ -2285,13 +2310,14 @@ function renderCustomSchoolClassView(records, inputNames = [], stageFilter = '',
         });
         const g = groupMap.get(key);
         const weekKey = r.weekLabel;
-        if (!g.weeks.has(weekKey)) g.weeks.set(weekKey, { display: r.weekDisplay, startDate: r.weekStartDate, assignments: 0, completionSum: 0, count: 0, paidCount: 0, trialCount: 0, conversionSum: 0, conversionCount: 0 });
+        if (!g.weeks.has(weekKey)) g.weeks.set(weekKey, { display: r.weekDisplay, startDate: r.weekStartDate, assignments: 0, completionSum: 0, count: 0, paidCount: 0, trialCount: 0, studentCount: 0, conversionSum: 0, conversionCount: 0 });
         const w = g.weeks.get(weekKey);
         w.assignments += +r['布置作业次数'] || 0;
         w.completionSum += (+r['作业完成率'] || 0) * 100;
         w.count += 1;
         w.paidCount += +r['未过期付费学生数'] || 0;
         w.trialCount += +r['未过期试用学生数'] || 0;
+        w.studentCount += +r['总学生数'] || 0;
         if ((+r['转化率'] || 0) > 0) { w.conversionSum += (+r['转化率'] || 0) * 100; w.conversionCount += 1; }
     });
     const weekMetaMap = buildWeekMetaMap(groupMap);
@@ -2325,7 +2351,7 @@ function renderCustomSchoolClassView(records, inputNames = [], stageFilter = '',
         });
         const lastWeekKey = sortedWeeks[sortedWeeks.length - 1];
         const lastWeek = g.weeks.get(lastWeekKey);
-        const conversion = lastWeek?.conversionCount ? (lastWeek.conversionSum / lastWeek.conversionCount).toFixed(1) : '0.0';
+        const conversion = calcConvRate(lastWeek?.paidCount || 0, lastWeek?.studentCount || 0);
         t += `<td>${lastWeek?.paidCount || 0}</td><td>${lastWeek?.trialCount || 0}</td><td>${conversion}%</td></tr>`;
         return t;
     }).join('');

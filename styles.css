@@ -1141,7 +1141,7 @@ body {
 .search-input-wrapper {
     display: flex;
     gap: 12px;
-    align-items: center;
+    align-items: stretch;
 }
 
 .search-input {
@@ -1152,6 +1152,12 @@ body {
     font-size: 15px;
     transition: all 0.2s;
     background: var(--surface);
+    min-height: 46px;
+    box-sizing: border-box;
+}
+
+.search-input-wrapper .btn {
+    min-height: 46px;
 }
 
 .search-input:focus {
