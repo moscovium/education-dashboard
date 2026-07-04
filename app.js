@@ -818,7 +818,7 @@ function applyHighValueFilter(page = 1) {
         if ((+r['布置作业次数'] || 0) >= 1) {
             w.assignedClassCount++;
         }
-        
+
         // 收集作业完成率
         const completionRate = +r['作业完成率'] || 0;
         if (completionRate > 0) {
@@ -831,7 +831,7 @@ function applyHighValueFilter(page = 1) {
         g.totalPaidCount += +r['未过期付费学生数'] || 0;
         g.totalTrialCount += +r['未过期试用学生数'] || 0;
         g.totalStudents += +r['总学生数'] || 0;
-        
+
         if (r.weekStartDate === lastWeekStart) {
             g.lastWeekClassCount++;
             g.lastWeekStudentCount += +r['总学生数'] || 0;
