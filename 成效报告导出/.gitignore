@@ -1,0 +1,8 @@
+__pycache__/
+tmp/
+tmp_pdf_text/
+chart_debug/
+*.pdf
+*.docx
+*.html
+*.xlsx
