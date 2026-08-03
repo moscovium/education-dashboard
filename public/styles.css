@@ -631,6 +631,29 @@ body {
 .school-insight-bar .sib-down { color: var(--danger-color); font-weight: 700; }
 .school-insight-bar .sib-muted { color: var(--text-muted); }
 
+.school-link {
+    border: none;
+    background: transparent;
+    color: var(--primary-color);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 0;
+    text-align: left;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.school-link:hover {
+    color: var(--primary-hover);
+}
+
+.detail-total-row {
+    background: #f1f5f9;
+    font-weight: 800;
+    color: #0f172a;
+}
+
 .high-value-pagination {
     margin-top: 16px;
 }
@@ -838,6 +861,93 @@ body {
     line-height: 1;
     cursor: pointer;
     color: #475569;
+}
+
+.modal-open {
+    overflow: hidden;
+}
+
+.modal-shell[hidden] {
+    display: none;
+}
+
+.modal-shell {
+    position: fixed;
+    inset: 0;
+    z-index: 9998;
+    background: rgba(15, 23, 42, 0.56);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.modal-card {
+    width: min(1180px, 96vw);
+    max-height: 92vh;
+    background: #fff;
+    border-radius: 18px;
+    box-shadow: 0 24px 80px rgba(15, 23, 42, 0.28);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.modal-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 18px 20px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.modal-head h2 {
+    margin: 0;
+    font-size: 18px;
+    color: #0f172a;
+}
+
+.modal-subtitle {
+    margin: 6px 0 0;
+    color: #64748b;
+    font-size: 13px;
+}
+
+.school-detail-metrics {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 12px;
+    padding: 16px 20px 0;
+}
+
+.school-detail-metric {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 12px;
+}
+
+.school-detail-metric span {
+    display: block;
+    font-size: 12px;
+    color: #64748b;
+    margin-bottom: 6px;
+}
+
+.school-detail-metric b {
+    font-size: 18px;
+    color: #0f172a;
+}
+
+.school-detail-table-wrapper {
+    margin: 16px 20px 20px;
+    overflow: auto;
+}
+
+.school-detail-table th,
+.school-detail-table td {
+    white-space: nowrap;
 }
 
 .high-value-section {
