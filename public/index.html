@@ -9,7 +9,7 @@
     <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/dayjs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/locale/zh-cn.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=20260803e">
     <style>
         /* 进度条样式 */
         #uploadProgress {
@@ -244,8 +244,8 @@
                     教育数据看板
                 </h1>
                 <p class="dashboard-subtitle">转化率与作业完成情况监测 - 基于班级 ID 关联</p>
-                <div id="debugBar" style="margin-top:8px;font-size:12px;color:#475569;display:flex;gap:12px;flex-wrap:wrap;">页面版本占位：root-20260803d</div>
-                <div id="pageVersion" style="margin-top:6px;font-size:12px;color:#0f172a;font-weight:600;background:#e2e8f0;display:inline-block;padding:4px 10px;border-radius:999px;">页面版本：v20260803d</div>
+                <div id="debugBar" style="margin-top:8px;font-size:12px;color:#475569;display:flex;gap:12px;flex-wrap:wrap;">页面版本占位：root-20260803e</div>
+                <div id="pageVersion" style="margin-top:6px;font-size:12px;color:#0f172a;font-weight:600;background:#e2e8f0;display:inline-block;padding:4px 10px;border-radius:999px;">页面版本：v20260803e</div>
             </div>
         </header>
 
@@ -954,11 +954,11 @@
     </div>
 
     <script>
-        window.__ROOT_DEPLOY_MARKER__='root-20260803d';
+        window.__ROOT_DEPLOY_MARKER__='root-20260803e';
         document.addEventListener('DOMContentLoaded', function () {
             var input = document.getElementById('fileInput');
             var debugBar = document.getElementById('debugBar');
-            if (debugBar) debugBar.textContent = '页面版本占位：root-20260803d';
+            if (debugBar) debugBar.textContent = '页面版本占位：root-20260803e';
             if (input) {
                 input.addEventListener('change', function (e) {
                     var files = Array.from((e.target && e.target.files) || []);
@@ -973,6 +973,6 @@
             }
         });
     </script>
-    <script src="app.js?v=20260803d"></script>
+    <script src="app.js?v=20260803e"></script>
 </body>
 </html>

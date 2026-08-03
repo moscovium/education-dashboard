@@ -6,7 +6,7 @@ const MAX_STORAGE_MB = 500; // 最大存储限制（MB）
 let db = null;
 const AppState = { files: [], filteredData: [], cache: new Map(), provinces: new Set(), cities: new Set(), districts: new Set(), schools: new Set(), grades: new Set() };
 const elements = {};
-const APP_VERSION = 'v2.4.2-root-20260803d';
+const APP_VERSION = 'v2.4.2-root-20260803e';
 const getClassId = (r = {}) => r['班级 id'] || r['班级ID'] || r['班级id'] || r['班级'] || r['classId'] || r['class_id'] || '';
 const getWeekKey = (r = {}) => r.weekStartDate || r.weekLabel || r.weekDisplay || '';
 const getAssignmentValue = (r = {}) => +r['布置作业数'] || +r['布置作业次数'] || 0;
