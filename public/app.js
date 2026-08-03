@@ -6,7 +6,7 @@ const MAX_STORAGE_MB = 500; // 最大存储限制（MB）
 let db = null;
 const AppState = { files: [], filteredData: [], cache: new Map(), provinces: new Set(), cities: new Set(), districts: new Set(), schools: new Set(), grades: new Set() };
 const elements = {};
-const APP_VERSION = 'v2.4.2-root-20260803b';
+const APP_VERSION = 'v2.4.2-root-20260803c';
 const getClassId = (r = {}) => r['班级 id'] || r['班级ID'] || r['班级id'] || r['班级'] || r['classId'] || r['class_id'] || '';
 const getWeekKey = (r = {}) => r.weekStartDate || r.weekLabel || r.weekDisplay || '';
 const getAssignmentValue = (r = {}) => +r['布置作业数'] || +r['布置作业次数'] || 0;
@@ -1974,7 +1974,7 @@ function renderTbl(page = 1) {
     const endIdx = Math.min(startIdx + ROWS_PER_PAGE, totalRows);
     const pageGroups = sortedGroups.slice(startIdx, endIdx);
     
-    let tbody = renderDetailTotalRow(sortedGroups, sortedWeeks);
+    let tbody = '';
     pageGroups.forEach(g => {
         tbody += '<tr>';
         tbody += `<td>${escapeHtml(g.province)}</td>`;
@@ -2005,6 +2005,7 @@ function renderTbl(page = 1) {
         
         tbody += '</tr>';
     });
+    tbody += renderDetailTotalRow(sortedGroups, sortedWeeks);
     
     // 分别设置 thead 和 tbody
     theadEl.innerHTML = theadHtml;
@@ -2037,52 +2038,37 @@ function renderTbl(page = 1) {
 
 function renderDetailTotalRow(groups, sortedWeeks = [], fixedColSpan = 7) {
     if (!groups.length) return '';
-    const latestKey = sortedWeeks[sortedWeeks.length - 1];
-    const total = {
-        assignmentsByWeek: new Map(),
-        completionByWeek: new Map(),
-        paid: 0,
-        trial: 0,
-        students: 0
-    };
-    sortedWeeks.forEach(week => {
-        total.assignmentsByWeek.set(week, 0);
-        total.completionByWeek.set(week, { sum: 0, count: 0 });
-    });
-    groups.forEach(g => {
-        sortedWeeks.forEach(week => {
-            const w = g.weeks.get(week);
-            if (!w) return;
-            total.assignmentsByWeek.set(week, (total.assignmentsByWeek.get(week) || 0) + (w.assignments || 0));
-            const rate = parseFloat(w.completionRate);
-            if (!Number.isNaN(rate) && rate > 0) {
-                const item = total.completionByWeek.get(week) || { sum: 0, count: 0 };
-                item.sum += rate;
-                item.count += 1;
-                total.completionByWeek.set(week, item);
-            }
-        });
-        const latest = g.weeks.get(latestKey);
-        if (latest) {
-            total.paid += latest.paidCount || 0;
-            total.trial += latest.trialCount || 0;
-            total.students += latest.studentCount || 0;
-        }
-    });
+    const latestKey = sortedWeeks[sortedWeeks.length - 1] || '';
+    const schoolCount = new Set(groups.map(group => `${group.province}|${group.city}|${group.district}|${group.school}`)).size;
+    const classCount = new Set(groups.map(group => {
+        const classKey = group.classId && group.classId !== '-' ? group.classId : group.className;
+        return `${group.province}|${group.city}|${group.district}|${group.school}|${group.grade}|${classKey}`;
+    })).size;
+    const latestRows = groups.map(group => group.weeks.get(latestKey)).filter(Boolean);
+    const paidTotal = latestRows.reduce((sum, row) => sum + (+row.paidCount || 0), 0);
+    const trialTotal = latestRows.reduce((sum, row) => sum + (+row.trialCount || 0), 0);
+    const conversionValues = latestRows.map(row => parseFloat(row.conversionRate)).filter(Number.isFinite);
+    const avgConversion = conversionValues.length
+        ? conversionValues.reduce((sum, value) => sum + value, 0) / conversionValues.length
+        : 0;
 
-    let html = '<tr class="detail-total-row">';
-    html += `<td colspan="${fixedColSpan}">当前筛选汇总（${groups.length.toLocaleString()} 个班级）</td>`;
-    sortedWeeks.forEach(week => {
-        const completion = total.completionByWeek.get(week) || { sum: 0, count: 0 };
-        const avgCompletion = completion.count ? (completion.sum / completion.count).toFixed(1) : '--';
-        html += `<td style="text-align:center;">${(total.assignmentsByWeek.get(week) || 0).toLocaleString()}</td>`;
-        html += `<td style="text-align:center;">${avgCompletion}${avgCompletion === '--' ? '' : '%'}</td>`;
+    let cells = fixedColSpan === 3
+        ? `<td>总计</td><td>涉及学校数 ${schoolCount.toLocaleString()}</td><td>班级数 ${classCount.toLocaleString()}</td>`
+        : `<td>总计</td><td></td><td></td><td>涉及学校数 ${schoolCount.toLocaleString()}</td><td></td><td></td><td>班级数 ${classCount.toLocaleString()}</td>`;
+    sortedWeeks.forEach(weekKey => {
+        const weekRows = groups.map(group => group.weeks.get(weekKey)).filter(Boolean);
+        const assignedRows = weekRows.filter(row => (+row.assignments || 0) >= 1);
+        const completionValues = assignedRows.map(row => parseFloat(row.completionRate)).filter(Number.isFinite);
+        const avgCompletion = completionValues.length
+            ? completionValues.reduce((sum, value) => sum + value, 0) / completionValues.length
+            : 0;
+        cells += `<td style="text-align:center;">${assignedRows.length.toLocaleString()}</td>`;
+        cells += `<td style="text-align:center;">${avgCompletion.toFixed(1)}%</td>`;
     });
-    html += `<td style="text-align:center;">${total.paid.toLocaleString()}</td>`;
-    html += `<td style="text-align:center;">${total.trial.toLocaleString()}</td>`;
-    html += `<td style="text-align:center;">${calcConvRate(total.paid, total.students)}%</td>`;
-    html += '</tr>';
-    return html;
+    cells += `<td style="text-align:center;">${paidTotal.toLocaleString()}</td>`;
+    cells += `<td style="text-align:center;">${trialTotal.toLocaleString()}</td>`;
+    cells += `<td style="text-align:center;">${avgConversion.toFixed(1)}%</td>`;
+    return `<tr class="detail-total-row">${cells}</tr>`;
 }
 
 function buildDetailGroupBundle(records = []) {
