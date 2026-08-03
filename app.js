@@ -6,7 +6,7 @@ const MAX_STORAGE_MB = 500; // 最大存储限制（MB）
 let db = null;
 const AppState = { files: [], filteredData: [], cache: new Map(), provinces: new Set(), cities: new Set(), districts: new Set(), schools: new Set(), grades: new Set() };
 const elements = {};
-const APP_VERSION = 'v2.4.2-root-20260803a';
+const APP_VERSION = 'v2.4.2-root-20260803b';
 const getClassId = (r = {}) => r['班级 id'] || r['班级ID'] || r['班级id'] || r['班级'] || r['classId'] || r['class_id'] || '';
 const getWeekKey = (r = {}) => r.weekStartDate || r.weekLabel || r.weekDisplay || '';
 const getAssignmentValue = (r = {}) => +r['布置作业数'] || +r['布置作业次数'] || 0;
@@ -156,6 +156,14 @@ function initElements() {
     elements.schoolDetailMetrics = document.getElementById('schoolDetailMetrics');
     elements.schoolDetailTableHead = document.getElementById('schoolDetailTableHead');
     elements.schoolDetailTableBody = document.getElementById('schoolDetailTableBody');
+    elements.schoolNoteBox = document.getElementById('schoolNoteBox');
+    elements.schoolNoteInput = document.getElementById('schoolNoteInput');
+    elements.schoolNoteCount = document.getElementById('schoolNoteCount');
+    elements.schoolNoteSaveBtn = document.getElementById('schoolNoteSaveBtn');
+    elements.schoolNoteList = document.getElementById('schoolNoteList');
+    elements.highValueNotesSection = document.getElementById('highValueNotesSection');
+    elements.highValueNotesInfo = document.getElementById('highValueNotesInfo');
+    elements.highValueNotesFeed = document.getElementById('highValueNotesFeed');
 }
 
 
@@ -335,11 +343,7 @@ function initHandlers() {
     if (elements.districtSelect) elements.districtSelect.onchange = () => { cascade('district'); };
     if (elements.schoolSelect) elements.schoolSelect.onchange = () => { cascade('school'); };
     if (elements.gradeSelect) elements.gradeSelect.onchange = () => { cascade('grade'); };
-    // 学校模糊搜索（条件筛选区域的搜索框）
-    const schoolFilterInput = document.getElementById('schoolFilterInput');
-    if (schoolFilterInput) {
-        schoolFilterInput.oninput = () => filterSchoolOptions(schoolFilterInput.value);
-    }
+    enhanceSearchableSelect('schoolSelect', 'schoolSelectSearch', 'schoolSelectPopup', 'schoolSelectWrap');
     
     if (elements.applyFilter) elements.applyFilter.onclick = applyFilter;
     if (elements.resetFilter) elements.resetFilter.onclick = resetFilter;
@@ -366,6 +370,12 @@ function initHandlers() {
     document.getElementById('copyImageBtn')?.addEventListener('click', copyExportedImage);
     document.getElementById('downloadImageBtn')?.addEventListener('click', downloadExportedImage);
     if (elements.closeSchoolDetailModal) elements.closeSchoolDetailModal.onclick = closeSchoolDetailModal;
+    if (elements.schoolNoteInput) {
+        elements.schoolNoteInput.oninput = () => {
+            if (elements.schoolNoteCount) elements.schoolNoteCount.textContent = `${elements.schoolNoteInput.value.length}/200`;
+        };
+    }
+    if (elements.schoolNoteSaveBtn) elements.schoolNoteSaveBtn.onclick = saveSchoolNote;
     if (elements.schoolDetailModal) {
         elements.schoolDetailModal.onclick = (event) => {
             if (event.target === elements.schoolDetailModal) closeSchoolDetailModal();
@@ -374,7 +384,12 @@ function initHandlers() {
     document.addEventListener('click', (event) => {
         const schoolBtn = event.target.closest('.school-link[data-school-name]');
         if (schoolBtn) {
-            openSchoolDetail(schoolBtn.dataset.schoolName || '', schoolBtn.dataset.schoolGrade || '');
+            openSchoolDetail(schoolBtn.dataset.schoolName || '');
+            return;
+        }
+        const noteBtn = event.target.closest('.note-open-btn[data-school-name]');
+        if (noteBtn) {
+            openSchoolDetail(noteBtn.dataset.schoolName || '');
         }
     });
     document.addEventListener('keydown', (event) => {
@@ -614,30 +629,133 @@ function setDefaultDate() {
     return;
 }
 
-// 学校下拉框模糊搜索
-function filterSchoolOptions(keyword) {
-    const allRecs = [];
-    AppState.cache.forEach(d => allRecs.push(...d));
-    if (allRecs.length === 0) return;
-    
-    // 获取最后一周的数据（按weekStartDate排序）
-    const weeks = [...new Set(allRecs.map(r => r.weekStartDate))].sort();
-    const lastWeekStart = weeks[weeks.length - 1] || '';
-    const lastWeekRecs = allRecs.filter(r => r.weekStartDate === lastWeekStart);
-    
-    // 从最后一周数据中获取所有学校
-    const allSchools = [...new Set(lastWeekRecs.map(r => r['学校名称']).filter(Boolean))].sort();
-    
-    // 过滤学校选项
-    if (!keyword || !keyword.trim()) {
-        // 无关键词显示全部
-        updateSel(elements.schoolSelect, new Set(allSchools));
-    } else {
-        const searchLower = keyword.toLowerCase().trim();
-    const exactKeyword = keyword.trim();
-        const filtered = allSchools.filter(s => s.toLowerCase().includes(searchLower));
-        updateSel(elements.schoolSelect, new Set(filtered));
+// 学校筛选：与 Workspace 一致，直接展示当前值，点开后在下拉列表首行搜索。
+function enhanceSearchableSelect(selectId, inputId, popupId, wrapId) {
+    const select = document.getElementById(selectId);
+    const input = document.getElementById(inputId);
+    const popup = document.getElementById(popupId);
+    const wrap = document.getElementById(wrapId);
+    if (!select || !input || !popup || !wrap) return;
+
+    let view = [];
+    let activeIndex = -1;
+    input.readOnly = true;
+
+    const searchBox = document.createElement('div');
+    searchBox.className = 'searchable-select-search';
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.placeholder = '搜索学校…';
+    searchInput.autocomplete = 'off';
+    searchBox.appendChild(searchInput);
+    const listBox = document.createElement('div');
+    listBox.className = 'searchable-select-list';
+    popup.replaceChildren(searchBox, listBox);
+
+    const getOptions = () => [...select.options].map(option => ({ value: option.value, label: option.textContent || option.value }));
+    const placeholderLabel = () => (select.options[0]?.value === '' ? select.options[0].textContent : '全部学校');
+    const selectedLabel = () => {
+        const option = select.options[select.selectedIndex];
+        return option?.value ? option.textContent : '';
+    };
+    const isOpen = () => !popup.hidden;
+
+    function syncDisplay() {
+        const label = selectedLabel();
+        input.value = label;
+        input.placeholder = placeholderLabel();
+        wrap.classList.toggle('has-value', !!label);
     }
+
+    function renderList(keyword = '') {
+        const normalized = keyword.trim().toLowerCase();
+        view = getOptions().filter(option => option.value === '' ? !normalized : (!normalized || option.label.toLowerCase().includes(normalized)));
+        listBox.innerHTML = '';
+        if (!view.length) {
+            const empty = document.createElement('div');
+            empty.className = 'searchable-option-empty';
+            empty.textContent = '无匹配学校';
+            listBox.appendChild(empty);
+            return;
+        }
+        view.forEach((option, index) => {
+            const item = document.createElement('div');
+            item.className = 'searchable-option';
+            item.classList.toggle('is-selected', option.value === select.value);
+            item.classList.toggle('is-active', index === activeIndex);
+            item.textContent = option.label;
+            item.onmousedown = event => {
+                event.preventDefault();
+                choose(option.value);
+            };
+            listBox.appendChild(item);
+        });
+    }
+
+    function open() {
+        if (select.disabled || isOpen()) return;
+        activeIndex = -1;
+        searchInput.value = '';
+        renderList();
+        popup.hidden = false;
+        wrap.classList.add('is-open');
+        input.setAttribute('aria-expanded', 'true');
+        setTimeout(() => searchInput.focus(), 0);
+    }
+
+    function close() {
+        if (!isOpen()) return;
+        popup.hidden = true;
+        wrap.classList.remove('is-open');
+        input.setAttribute('aria-expanded', 'false');
+        activeIndex = -1;
+        syncDisplay();
+    }
+
+    function choose(value) {
+        select.value = value;
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+        close();
+    }
+
+    function setActive(next) {
+        if (!view.length) return;
+        activeIndex = (next + view.length) % view.length;
+        [...listBox.children].forEach((item, index) => item.classList.toggle('is-active', index === activeIndex));
+        listBox.children[activeIndex]?.scrollIntoView({ block: 'nearest' });
+    }
+
+    input.onmousedown = event => {
+        event.preventDefault();
+        if (isOpen()) close(); else open();
+    };
+    input.onkeydown = event => {
+        if (['Enter', ' ', 'ArrowDown'].includes(event.key)) {
+            open();
+            event.preventDefault();
+        }
+    };
+    searchInput.oninput = () => {
+        activeIndex = -1;
+        renderList(searchInput.value);
+    };
+    searchInput.onkeydown = event => {
+        if (event.key === 'ArrowDown') setActive(activeIndex + 1);
+        else if (event.key === 'ArrowUp') setActive(activeIndex - 1);
+        else if (event.key === 'Enter' && activeIndex >= 0 && view[activeIndex]) choose(view[activeIndex].value);
+        else if (event.key === 'Enter' && view.length === 1) choose(view[0].value);
+        else if (event.key === 'Escape') close();
+        else return;
+        event.preventDefault();
+    };
+    document.addEventListener('click', event => {
+        if (isOpen() && !wrap.contains(event.target)) close();
+    });
+    new MutationObserver(() => {
+        syncDisplay();
+        if (isOpen()) renderList(searchInput.value);
+    }).observe(select, { childList: true });
+    syncDisplay();
 }
 
 // 级联筛选 - 基于最后一周数据，级联映射：省份 → 城市 → 区县 → 学校 → 年级
@@ -998,7 +1116,7 @@ function applyHighValueFilter(page = 1) {
 
 function renderHighValueTable(grades, sortedWeeks, page = 1) {
     if (grades.length === 0) {
-        elements.highValueTableBody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:40px;color:#999;">请点击"应用筛选"查看结果</td></tr>';
+        elements.highValueTableBody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:40px;color:#999;">请点击"应用筛选"查看结果</td></tr>';
         document.getElementById('highValueTableHead').innerHTML = `
             <tr>
                 <th>省份</th>
@@ -1011,11 +1129,13 @@ function renderHighValueTable(grades, sortedWeeks, page = 1) {
                 <th>学生总数</th>
                 <th>未过期试用人数</th>
                 <th>年级付费率</th>
-            <th>收藏</th>
+                <th>收藏</th>
+                <th>备注</th>
             </tr>`;
         elements.highValueInfo.textContent = '';
         if (elements.highValuePagination) elements.highValuePagination.innerHTML = '';
         elements.highValueSection.style.display = 'block';
+        renderHighValueNotesFeed([]);
         renderHighValueTrendCharts();
         return;
     }
@@ -1045,7 +1165,8 @@ function renderHighValueTable(grades, sortedWeeks, page = 1) {
         <th rowspan="2">学生总数</th>
         <th rowspan="2">未过期试用人数</th>
         <th rowspan="2">年级付费率</th>
-        <th rowspan="2">收藏</th>`;
+        <th rowspan="2">收藏</th>
+        <th rowspan="2">备注</th>`;
     sortedWeeks.forEach(week => {
         theadHtml += `<th colspan="2" style="font-size:11px;">${escapeHtml(week)}</th>`;
     });
@@ -1064,19 +1185,20 @@ function renderHighValueTable(grades, sortedWeeks, page = 1) {
     const pageGrades = grades.slice(startIdx, startIdx + pageSize);
 
     // 生成数据行
-    elements.highValueTableBody.innerHTML = pageGrades.map(g => {
+    const bodyRows = pageGrades.map(g => {
         let cells = `
             <td>${escapeHtml(g.province)}</td>
             <td>${escapeHtml(g.city)}</td>
             <td>${escapeHtml(g.district)}</td>
-            <td class="school-name-cell" title="${escapeAttr(g.school)}"><button type="button" class="school-link" data-school-name="${escapeAttr(g.school)}" data-school-grade="${escapeAttr(g.grade)}">${escapeHtml(g.school)}</button></td>
+            <td class="school-name-cell" title="${escapeAttr(g.school)}"><button type="button" class="school-link" data-school-name="${escapeAttr(g.school)}">${escapeHtml(g.school)}</button></td>
             <td style="text-align:center;font-weight:600;color:${g.schoolCategory === '付费校' ? '#10b981' : g.schoolCategory === '付费率需提升校' ? '#f59e0b' : '#6b7280'};">${escapeHtml(g.schoolCategory)}</td>
             <td>${escapeHtml(g.grade)}</td>
             <td style="text-align:center;">${g.classCount}</td>
             <td style="text-align:center;">${g.studentCount.toLocaleString()}</td>
             <td style="text-align:center;">${g.trialCount.toLocaleString()}</td>
             <td style="text-align:center;font-weight:600;color:${g.payRate >= 30 ? '#10b981' : '#f59e0b'};">${g.payRate.toFixed(1)}%</td>
-            <td style="text-align:center;"><button class="favorite-toggle" data-fav-key="${favoriteKey(g)}" style="border:none;background:none;cursor:pointer;font-size:18px;">${loadFavorites().has(favoriteKey(g)) ? '⭐' : '☆'}</button></td>`;
+            <td style="text-align:center;"><button class="favorite-toggle" data-fav-key="${favoriteKey(g)}" style="border:none;background:none;cursor:pointer;font-size:18px;">${loadFavorites().has(favoriteKey(g)) ? '⭐' : '☆'}</button></td>
+            <td style="text-align:center;"><button type="button" class="note-open-btn" data-school-name="${escapeAttr(g.school)}" title="查看/添加备注">备注</button></td>`;
         
         // 每周的布置班级数和完成率
         sortedWeeks.forEach(week => {
@@ -1092,13 +1214,47 @@ function renderHighValueTable(grades, sortedWeeks, page = 1) {
         
         return '<tr>' + cells + '</tr>';
     }).join('');
+    elements.highValueTableBody.innerHTML = bodyRows + renderHighValueTotalRow(grades, sortedWeeks, true);
     
     const lastWeek = sortedWeeks.length > 0 ? sortedWeeks[sortedWeeks.length - 1] : '';
     elements.highValueInfo.textContent = `共 ${grades.length} 条记录 | 当前第 ${startIdx + 1}-${Math.min(startIdx + pageGrades.length, total)} 条 | 数据来源：${sortedWeeks.length}周（${lastWeek}）`;
     renderHighValuePagination(currentPage, totalPages, total);
     elements.highValueSection.style.display = 'block';
+    renderHighValueNotesFeed(grades);
     document.querySelectorAll('.favorite-toggle').forEach(btn => { btn.onclick = () => toggleFavoriteByKey(btn.dataset.favKey); });
     scheduleAdaptNameCells();
+}
+
+function renderHighValueTotalRow(grades = [], sortedWeeks = [], withNote = false) {
+    if (!grades.length) return '';
+    const schoolCount = new Set(grades.map(g => `${g.province}|${g.city}|${g.district}|${g.school}`).filter(Boolean)).size;
+    const classCount = grades.reduce((sum, g) => sum + (+g.classCount || 0), 0);
+    const studentCount = grades.reduce((sum, g) => sum + (+g.studentCount || 0), 0);
+    const trialCount = grades.reduce((sum, g) => sum + (+g.trialCount || 0), 0);
+    const payRateValues = grades.map(g => +g.payRate || 0);
+    const avgPayRate = payRateValues.length ? payRateValues.reduce((sum, value) => sum + value, 0) / payRateValues.length : 0;
+    let cells = `
+        <td>总计</td>
+        <td></td>
+        <td></td>
+        <td>学校 ${schoolCount}</td>
+        <td></td>
+        <td>年级 ${grades.length}</td>
+        <td style="text-align:center;">${classCount.toLocaleString()}</td>
+        <td style="text-align:center;">${studentCount.toLocaleString()}</td>
+        <td style="text-align:center;">${trialCount.toLocaleString()}</td>
+        <td style="text-align:center;">${avgPayRate.toFixed(1)}%</td>
+        <td></td>
+        ${withNote ? '<td></td>' : ''}`;
+    sortedWeeks.forEach(week => {
+        const weekRows = grades.map(g => g.weeklyMetrics.find(metric => metric.week === week)).filter(Boolean);
+        const assignedClassCount = weekRows.reduce((sum, row) => sum + (+row.assignedClassCount || 0), 0);
+        const completionValues = weekRows.map(row => +row.avgCompletionRate || 0);
+        const avgCompletion = completionValues.length ? completionValues.reduce((sum, value) => sum + value, 0) / completionValues.length : 0;
+        cells += `<td style="text-align:center;">${assignedClassCount.toLocaleString()}</td>`;
+        cells += `<td style="text-align:center;">${avgCompletion.toFixed(1)}%</td>`;
+    });
+    return `<tr class="high-value-total-row">${cells}</tr>`;
 }
 
 function recordFavoriteKey(r = {}) {
@@ -1384,10 +1540,9 @@ async function applyFilter() {
                 .filter(r => r.weekStartDate === lastWeekStart)
                 .filter(r => {
                     const count = getAssignmentValue(r);
-                    if (assignmentFilter === '0') return count === 0;
-                    if (assignmentFilter === '1') return count >= 1;
-                    if (assignmentFilter === '3') return count >= 3;
-                    if (assignmentFilter === '5') return count >= 5;
+                    if (assignmentFilter === 'eq0') return count === 0;
+                    if (assignmentFilter === 'gte1') return count >= 1;
+                    if (assignmentFilter === 'gte2') return count >= 2;
                     return true;
                 })
                 .map(getDetailClassKey)
@@ -1408,9 +1563,7 @@ async function applyFilter() {
 }
 
 function resetFilter() {
-    const schoolFilterInput = document.getElementById('schoolFilterInput');
     const schoolSearchInput = document.getElementById('schoolSearchInput');
-    if (schoolFilterInput) schoolFilterInput.value = '';
     if (schoolSearchInput) schoolSearchInput.value = '';
     elements.provinceSelect.value = '';
     elements.citySelect.value = '';
@@ -1991,10 +2144,10 @@ function buildDetailGroupBundle(records = []) {
     return { groups, sortedWeeks, weekMetaMap };
 }
 
-function renderSchoolDetailModalContent(records = [], schoolName = '', gradeName = '') {
+function renderSchoolDetailModalContent(records = [], schoolName = '') {
     const { groups, sortedWeeks, weekMetaMap } = buildDetailGroupBundle(records);
     if (elements.schoolDetailTitle) {
-        elements.schoolDetailTitle.textContent = `${schoolName || '学校'}${gradeName ? `｜${gradeName}` : ''} 班级数据`;
+        elements.schoolDetailTitle.textContent = `${schoolName || '学校'}｜班级数据明细`;
     }
     if (elements.schoolDetailMetrics) {
         const latestKey = sortedWeeks[sortedWeeks.length - 1];
@@ -2002,6 +2155,7 @@ function renderSchoolDetailModalContent(records = [], schoolName = '', gradeName
         let latestPaid = 0;
         let latestTrial = 0;
         let latestStudents = 0;
+        const completionValues = [];
         groups.forEach(g => {
             const w = g.weeks.get(latestKey);
             if (!w) return;
@@ -2009,14 +2163,21 @@ function renderSchoolDetailModalContent(records = [], schoolName = '', gradeName
             latestPaid += w.paidCount || 0;
             latestTrial += w.trialCount || 0;
             latestStudents += w.studentCount || 0;
+            const completion = parseFloat(w.completionRate);
+            if (Number.isFinite(completion)) completionValues.push(completion);
         });
+        const avgCompletion = completionValues.length
+            ? completionValues.reduce((sum, value) => sum + value, 0) / completionValues.length
+            : 0;
         elements.schoolDetailMetrics.innerHTML = [
-            ['班级数', groups.length.toLocaleString()],
-            ['最新周布置班级', latestAssigned.toLocaleString()],
-            ['最新周付费学生', latestPaid.toLocaleString()],
-            ['最新周试用学生', latestTrial.toLocaleString()],
-            ['最新周付费率', `${calcConvRate(latestPaid, latestStudents)}%`]
-        ].map(([label, value]) => `<div class="school-detail-metric"><span>${label}</span><b>${value}</b></div>`).join('');
+            ['覆盖班级', groups.length.toLocaleString(), '个班级'],
+            ['学生总数', latestStudents.toLocaleString(), '最后一周'],
+            ['未过期付费学生数', latestPaid.toLocaleString(), '最后一周'],
+            ['布置作业班级数', latestAssigned.toLocaleString(), '最后一周'],
+            ['作业完成率', `${avgCompletion.toFixed(1)}%`, '最后一周'],
+            ['未过期试用学生数', latestTrial.toLocaleString(), '最后一周'],
+            ['转化率', `${calcConvRate(latestPaid, latestStudents)}%`, '最后一周']
+        ].map(([label, value, hint]) => `<div class="school-detail-metric"><span>${label}</span><b>${value}</b><small>${hint}</small></div>`).join('');
     }
     if (elements.schoolDetailTableHead) {
         let theadHtml = '<tr>';
@@ -2038,7 +2199,7 @@ function renderSchoolDetailModalContent(records = [], schoolName = '', gradeName
             return;
         }
         const latestKey = sortedWeeks[sortedWeeks.length - 1];
-        let tbody = renderDetailTotalRow(groups, sortedWeeks, 3);
+        let tbody = '';
         groups.forEach(g => {
             tbody += '<tr>';
             tbody += `<td>${escapeHtml(g.grade)}</td>`;
@@ -2059,17 +2220,25 @@ function renderSchoolDetailModalContent(records = [], schoolName = '', gradeName
             tbody += `<td style="text-align:center;">${latest?.conversionRate || '--'}%</td>`;
             tbody += '</tr>';
         });
+        tbody += renderDetailTotalRow(groups, sortedWeeks, 3);
         elements.schoolDetailTableBody.innerHTML = tbody;
     }
+    const first = records[0] || {};
+    loadSchoolNotes({
+        province: first['省份'] || '',
+        city: first['城市'] || '',
+        district: first['区县'] || '',
+        school: schoolName
+    });
 }
 
-function openSchoolDetail(schoolName = '', gradeName = '') {
+function openSchoolDetail(schoolName = '') {
     if (!elements.schoolDetailModal || !schoolName) return;
     const allRecords = [];
     AppState.cache.forEach(rows => allRecords.push(...rows));
     const source = allRecords.length ? allRecords : AppState.filteredData;
-    const records = source.filter(r => (r['学校名称'] || '') === schoolName && (!gradeName || (r['年级'] || '') === gradeName));
-    renderSchoolDetailModalContent(records, schoolName, gradeName);
+    const records = source.filter(r => (r['学校名称'] || '') === schoolName);
+    renderSchoolDetailModalContent(records, schoolName);
     elements.schoolDetailModal.hidden = false;
     document.body.classList.add('modal-open');
 }
@@ -2512,9 +2681,126 @@ function inferStageFromGrade(grade = '') {
 }
 
 const FAVORITES_KEY = 'education-dashboard-hv-favorites';
+const SCHOOL_NOTES_KEY = 'education-dashboard-school-notes-v1';
 const CUSTOM_SCHOOL_TAB_KEY = 'education-dashboard-custom-school-tab';
 const EXPORT_IMAGE_SCALE = 2;
 const UPLOAD_SECTION_COLLAPSED_KEY = 'education-dashboard-upload-collapsed';
+let currentNoteSchool = null;
+
+function schoolNoteKey(school = {}) {
+    return [school.province, school.city, school.district, school.school].map(value => String(value || '').trim()).join('|');
+}
+
+function loadSchoolNotesStore() {
+    try {
+        const notes = JSON.parse(localStorage.getItem(SCHOOL_NOTES_KEY) || '[]');
+        return Array.isArray(notes) ? notes.filter(note => note && note.school && note.text) : [];
+    } catch {
+        return [];
+    }
+}
+
+function saveSchoolNotesStore(notes = []) {
+    try {
+        localStorage.setItem(SCHOOL_NOTES_KEY, JSON.stringify(notes));
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+function formatNoteTime(value = '') {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return date.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    });
+}
+
+function renderSchoolNoteList(notes = []) {
+    if (!elements.schoolNoteList) return;
+    if (!notes.length) {
+        elements.schoolNoteList.innerHTML = '<div class="school-note-empty">暂无备注</div>';
+        return;
+    }
+    elements.schoolNoteList.innerHTML = notes
+        .slice()
+        .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+        .map(note => `
+            <div class="school-note-item">
+                <div class="school-note-item-text">${escapeHtml(note.text || '')}</div>
+                <div class="school-note-item-meta">本地备注 · ${escapeHtml(formatNoteTime(note.createdAt))}</div>
+            </div>`)
+        .join('');
+}
+
+function loadSchoolNotes(school = {}) {
+    if (!elements.schoolNoteBox) return;
+    currentNoteSchool = school;
+    if (elements.schoolNoteInput) elements.schoolNoteInput.value = '';
+    if (elements.schoolNoteCount) elements.schoolNoteCount.textContent = '0/200';
+    elements.schoolNoteBox.hidden = false;
+    const key = schoolNoteKey(school);
+    renderSchoolNoteList(loadSchoolNotesStore().filter(note => schoolNoteKey(note) === key));
+}
+
+function saveSchoolNote() {
+    if (!currentNoteSchool || !elements.schoolNoteInput) return;
+    const text = elements.schoolNoteInput.value.trim();
+    if (!text) {
+        showMsg('⚠️ 备注内容不能为空', 'warning');
+        return;
+    }
+    const notes = loadSchoolNotesStore();
+    notes.push({ ...currentNoteSchool, text, createdAt: new Date().toISOString() });
+    if (!saveSchoolNotesStore(notes)) {
+        showMsg('⚠️ 备注保存失败，请检查浏览器存储权限', 'warning');
+        return;
+    }
+    elements.schoolNoteInput.value = '';
+    if (elements.schoolNoteCount) elements.schoolNoteCount.textContent = '0/200';
+    loadSchoolNotes(currentNoteSchool);
+    renderHighValueNotesFeed(highValuePageState.rows || []);
+    showMsg('✅ 备注已保存到当前浏览器', 'success');
+}
+
+function renderHighValueNotesFeed(grades = []) {
+    if (!elements.highValueNotesSection || !elements.highValueNotesFeed) return;
+    const schoolKeys = new Set(grades.map(g => schoolNoteKey({
+        province: g.province,
+        city: g.city,
+        district: g.district,
+        school: g.school
+    })));
+    if (!schoolKeys.size) {
+        elements.highValueNotesSection.hidden = true;
+        elements.highValueNotesFeed.innerHTML = '';
+        if (elements.highValueNotesInfo) elements.highValueNotesInfo.textContent = '';
+        return;
+    }
+    const notes = loadSchoolNotesStore()
+        .filter(note => schoolKeys.has(schoolNoteKey(note)))
+        .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+    elements.highValueNotesSection.hidden = false;
+    if (elements.highValueNotesInfo) elements.highValueNotesInfo.textContent = `共 ${notes.length} 条`;
+    elements.highValueNotesFeed.innerHTML = notes.length
+        ? notes.map(note => `
+            <div class="school-note-item">
+                <div class="school-note-item-head">
+                    <span class="school-note-item-school">${escapeHtml(note.school)}</span>
+                    <span class="school-note-item-meta">本地备注 · ${escapeHtml(formatNoteTime(note.createdAt))}</span>
+                </div>
+                <div class="school-note-item-text">${escapeHtml(note.text)}</div>
+            </div>`).join('')
+        : '<div class="school-note-empty">筛选结果学校暂无备注</div>';
+}
+
 function normalizeFavoriteKey(key = '') {
     const parts = String(key || '').split('|');
     if (parts.length < 5) return '';
