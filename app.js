@@ -6,7 +6,7 @@ const MAX_STORAGE_MB = 500; // 最大存储限制（MB）
 let db = null;
 const AppState = { files: [], filteredData: [], cache: new Map(), provinces: new Set(), cities: new Set(), districts: new Set(), schools: new Set(), grades: new Set() };
 const elements = {};
-const APP_VERSION = 'v2.4.2-root-20260803e';
+const APP_VERSION = 'v2.4.2-root-20260803f';
 const getClassId = (r = {}) => r['班级 id'] || r['班级ID'] || r['班级id'] || r['班级'] || r['classId'] || r['class_id'] || '';
 const getWeekKey = (r = {}) => r.weekStartDate || r.weekLabel || r.weekDisplay || '';
 const getAssignmentValue = (r = {}) => +r['布置作业数'] || +r['布置作业次数'] || 0;
@@ -14,6 +14,7 @@ const getDetailClassKey = (r = {}) => getClassId(r) || `${r['省份'] || ''}|${r
 const calcConvRate = (paid, students) => (students > 0 ? (paid / students * 100).toFixed(1) : '0.0');
 const HIGH_VALUE_ROWS_PER_PAGE = 100;
 let highValuePageState = { page: 1, pageSize: HIGH_VALUE_ROWS_PER_PAGE, total: 0, pages: 0, rows: [], weeks: [] };
+let favoritePageState = { page: 1, pageSize: HIGH_VALUE_ROWS_PER_PAGE, total: 0, pages: 0, rows: [], weeks: [] };
 let highValueTrendRecords = [];
 let favoriteTrendRecordsState = [];
 function escapeHtml(value = '') {
@@ -87,6 +88,8 @@ function initElements() {
     elements.schoolSelect = document.getElementById('schoolSelect');
     elements.gradeSelect = document.getElementById('gradeSelect');
     elements.assignmentCountSelect = document.getElementById('assignmentCountSelect');
+    elements.quickStageSelect = document.getElementById('quickStageSelect');
+    elements.quickGradeSelect = document.getElementById('quickGradeSelect');
     elements.applyFilter = document.getElementById('applyFilter');
     elements.resetFilter = document.getElementById('resetFilter');
     elements.dataCount = document.getElementById('dataCount');
@@ -121,13 +124,32 @@ function initElements() {
     elements.hvTrialCountSelect = document.getElementById('hvTrialCountSelect');
     elements.hvSchoolCategorySelect = document.getElementById('hvSchoolCategorySelect');
     elements.hvFavoriteSelect = document.getElementById('hvFavoriteSelect');
+    elements.highValueInsights = document.getElementById('highValueInsights');
     elements.highValueTableBody = document.getElementById('highValueTableBody');
     elements.highValueInfo = document.getElementById('highValueInfo');
     elements.highValuePagination = document.getElementById('highValuePagination');
     elements.highValueConversionChart = document.getElementById('highValueConversionChart');
-    elements.favoriteConversionChart = document.getElementById('favoriteConversionChart');
     elements.applyHighValueFilter = document.getElementById('applyHighValueFilter');
     elements.resetHighValueFilter = document.getElementById('resetHighValueFilter');
+    elements.favProvinceSelect = document.getElementById('favProvinceSelect');
+    elements.favCitySelect = document.getElementById('favCitySelect');
+    elements.favDistrictSelect = document.getElementById('favDistrictSelect');
+    elements.favGradeSelect = document.getElementById('favGradeSelect');
+    elements.favPayRateSelect = document.getElementById('favPayRateSelect');
+    elements.favStudentCountSelect = document.getElementById('favStudentCountSelect');
+    elements.favAssignRateSelect = document.getElementById('favAssignRateSelect');
+    elements.favCompletionRateSelect = document.getElementById('favCompletionRateSelect');
+    elements.favTrialCountSelect = document.getElementById('favTrialCountSelect');
+    elements.favSchoolCategorySelect = document.getElementById('favSchoolCategorySelect');
+    elements.applyFavoriteFilter = document.getElementById('applyFavoriteFilter');
+    elements.resetFavoriteFilter = document.getElementById('resetFavoriteFilter');
+    elements.favoriteSchoolTableHead = document.getElementById('favoriteSchoolTableHead');
+    elements.favoriteSchoolTableBody = document.getElementById('favoriteSchoolTableBody');
+    elements.favoriteSchoolInfo = document.getElementById('favoriteSchoolInfo');
+    elements.favoritePagination = document.getElementById('favoritePagination');
+    elements.trendProvinceSelect = document.getElementById('trendProvinceSelect');
+    elements.trendCitySelect = document.getElementById('trendCitySelect');
+    elements.trendDistrictSelect = document.getElementById('trendDistrictSelect');
     elements.customSchoolSection = document.getElementById('customSchoolSection');
     elements.customSchoolInput = document.getElementById('customSchoolInput');
     elements.customSchoolSearchBtn = document.getElementById('customSchoolSearchBtn');
@@ -248,6 +270,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     initHandlers();
     initMultiSelects();
+    initWorkspaceNavigation();
+    initCollapsibleControls();
     applyUploadSectionCollapsedState(getUploadSectionCollapsed());
 });
 
@@ -258,6 +282,51 @@ function updateStatus(text, ok) {
     if (debugBar) {
         debugBar.innerHTML = `<span>版本：${APP_VERSION}</span><span>状态：${text}</span><span>文件数：${AppState.files.length}</span>`;
     }
+}
+
+function initWorkspaceNavigation() {
+    const navItems = [...document.querySelectorAll('.workspace-nav-item')];
+    const blocks = [...document.querySelectorAll('.workspace-page-block')];
+    const openPage = (pageId) => {
+        navItems.forEach(item => item.classList.toggle('active', item.dataset.pageTarget === pageId));
+        blocks.forEach(block => { block.hidden = block.dataset.pageGroup !== pageId; });
+        if (pageId === 'pageHighValueView') renderHighValueInsights(getAllCachedRecords());
+        if (pageId === 'pageFavoriteView') {
+            if (!favoritePageState.rows.length) applyFavoriteFilter(1, false);
+            else renderFavoriteTrendChart();
+        }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    navItems.forEach(item => { item.onclick = () => openPage(item.dataset.pageTarget); });
+    window.openKanbanPage = openPage;
+    openPage('pageFilterView');
+}
+
+function initCollapsibleControls() {
+    document.querySelectorAll('[data-collapse-target]').forEach(button => {
+        button.onclick = () => {
+            const target = document.getElementById(button.dataset.collapseTarget || '');
+            if (!target) return;
+            const collapsed = target.classList.toggle('is-collapsed');
+            button.textContent = collapsed ? '展开' : '收起';
+            button.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        };
+    });
+    document.querySelectorAll('[data-chart-toggle]').forEach(button => {
+        button.onclick = () => {
+            const target = document.getElementById(button.dataset.chartToggle || '');
+            if (!target) return;
+            const collapsed = target.classList.toggle('is-collapsed');
+            button.textContent = collapsed ? '展开' : '折叠';
+            button.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        };
+    });
+}
+
+function getAllCachedRecords() {
+    const rows = [];
+    AppState.cache.forEach(data => rows.push(...data));
+    return rows;
 }
 
 // 事件处理 - 修改：省份等筛选独立于时间段，不再级联禁用
@@ -315,6 +384,7 @@ function initHandlers() {
         quickSearchBtn.onclick = () => quickSearch(schoolSearchInput.value);
         schoolSearchInput.onkeypress = (e) => { if (e.key === 'Enter') quickSearch(schoolSearchInput.value); };
     }
+    if (elements.quickStageSelect) elements.quickStageSelect.onchange = updateQuickGradeOptions;
     
     // 批量删除
     const batchDeleteBtn = document.getElementById('batchDeleteBtn');
@@ -358,6 +428,14 @@ function initHandlers() {
     if (elements.applyHighValueFilter) elements.applyHighValueFilter.onclick = applyHighValueFilter;
     if (elements.resetHighValueFilter) elements.resetHighValueFilter.onclick = resetHighValueFilter;
     if (elements.exportHighValueExcelBtn) elements.exportHighValueExcelBtn.onclick = exportHighValueExcel;
+    if (elements.favProvinceSelect) elements.favProvinceSelect.onchange = () => cascadeFavorite('province');
+    if (elements.favCitySelect) elements.favCitySelect.onchange = () => cascadeFavorite('city');
+    if (elements.favDistrictSelect) elements.favDistrictSelect.onchange = () => cascadeFavorite('district');
+    if (elements.applyFavoriteFilter) elements.applyFavoriteFilter.onclick = () => applyFavoriteFilter(1);
+    if (elements.resetFavoriteFilter) elements.resetFavoriteFilter.onclick = resetFavoriteFilter;
+    if (elements.trendProvinceSelect) elements.trendProvinceSelect.onchange = () => { cascadeFavoriteTrend('province'); renderFavoriteTrendChart(); };
+    if (elements.trendCitySelect) elements.trendCitySelect.onchange = () => { cascadeFavoriteTrend('city'); renderFavoriteTrendChart(); };
+    if (elements.trendDistrictSelect) elements.trendDistrictSelect.onchange = renderFavoriteTrendChart;
     if (elements.customSchoolSearchBtn) elements.customSchoolSearchBtn.onclick = applyCustomSchoolSearch;
     if (elements.customSchoolResetBtn) elements.customSchoolResetBtn.onclick = resetCustomSchoolSearch;
     if (elements.customSchoolTabSchool) elements.customSchoolTabSchool.onclick = () => switchCustomSchoolTab('school');
@@ -847,6 +925,66 @@ function updateHighValueSels() {
     setSelectedValues(elements.hvGradeSelect, selectedGrades.filter(g => grades.includes(g)));
 }
 
+function updateQuickGradeOptions() {
+    if (!elements.quickGradeSelect) return;
+    const stage = elements.quickStageSelect?.value || '';
+    const rows = getLatestWeekRows(getAllCachedRecords());
+    const grades = rows.map(r => r['年级']).filter(grade => grade && (!stage || inferStageFromGrade(grade) === stage));
+    updateSel(elements.quickGradeSelect, new Set(grades));
+}
+
+function getLatestWeekRows(rows = []) {
+    const weeks = [...new Set(rows.map(r => r.weekStartDate).filter(Boolean))].sort();
+    const latest = weeks[weeks.length - 1] || '';
+    return latest ? rows.filter(r => r.weekStartDate === latest) : rows;
+}
+
+function updateCascadeSelects(selects, sourceRows = []) {
+    const [provinceSelect, citySelect, districtSelect, gradeSelect] = selects;
+    if (!provinceSelect || !citySelect || !districtSelect) return;
+    const previous = selects.map(select => select.value || '');
+    const latestRows = getLatestWeekRows(sourceRows);
+    const provinces = [...new Set(latestRows.map(r => r['省份']).filter(Boolean))];
+    updateSel(provinceSelect, new Set(provinces));
+    provinceSelect.value = provinces.includes(previous[0]) ? previous[0] : '';
+    let rows = provinceSelect.value ? latestRows.filter(r => r['省份'] === provinceSelect.value) : latestRows;
+    const cities = [...new Set(rows.map(r => r['城市']).filter(Boolean))];
+    updateSel(citySelect, new Set(cities));
+    citySelect.value = cities.includes(previous[1]) ? previous[1] : '';
+    if (citySelect.value) rows = rows.filter(r => r['城市'] === citySelect.value);
+    const districts = [...new Set(rows.map(r => r['区县']).filter(Boolean))];
+    updateSel(districtSelect, new Set(districts));
+    districtSelect.value = districts.includes(previous[2]) ? previous[2] : '';
+    if (districtSelect.value) rows = rows.filter(r => r['区县'] === districtSelect.value);
+    if (gradeSelect) {
+        const grades = [...new Set(rows.map(r => r['年级']).filter(Boolean))];
+        updateSel(gradeSelect, new Set(grades));
+        gradeSelect.value = grades.includes(previous[3]) ? previous[3] : '';
+    }
+}
+
+function updateFavoriteSels() {
+    updateCascadeSelects([elements.favProvinceSelect, elements.favCitySelect, elements.favDistrictSelect, elements.favGradeSelect], getAllCachedRecords());
+    updateFavoriteTrendSels();
+}
+
+function cascadeFavorite() {
+    updateFavoriteSels();
+}
+
+function favoriteRecordsFromCache() {
+    const favorites = loadFavorites();
+    return getAllCachedRecords().filter(r => favorites.has(recordFavoriteKey(r)));
+}
+
+function updateFavoriteTrendSels() {
+    updateCascadeSelects([elements.trendProvinceSelect, elements.trendCitySelect, elements.trendDistrictSelect], favoriteRecordsFromCache());
+}
+
+function cascadeFavoriteTrend() {
+    updateFavoriteTrendSels();
+}
+
 // 高价值筛选级联
 function cascadeHighValue(lvl) {
     let allRecs = [];
@@ -888,8 +1026,16 @@ function cascadeHighValue(lvl) {
     setSelectedValues(elements.hvGradeSelect, selGrades.filter(g => grades.includes(g)));
 }
 
+function matchesRateFilter(value, filter) {
+    if (!filter) return true;
+    if (filter === 'lt50') return value < 50;
+    if (filter === 'gt50') return value > 50;
+    if (filter === 'gt80') return value > 80;
+    return true;
+}
+
 // 计算年级指标并应用筛选
-function applyHighValueFilter(page = 1) {
+function applyHighValueFilter(page = 1, notify = true) {
     // 获取所有周的数据
     let allRecs = [];
     AppState.cache.forEach(d => allRecs.push(...d));
@@ -910,6 +1056,7 @@ function applyHighValueFilter(page = 1) {
     if (selCity) allRecs = allRecs.filter(r => r['城市'] === selCity);
     if (selDistrict) allRecs = allRecs.filter(r => r['区县'] === selDistrict);
     if (selGrades.length) allRecs = allRecs.filter(r => selGrades.includes(r['年级']));
+    renderHighValueInsights(allRecs);
     
     const sortedWeeks = [...new Set(allRecs.map(r => r.weekStartDate))].sort();
     const lastWeekStart = sortedWeeks[sortedWeeks.length - 1] || '';
@@ -1054,8 +1201,8 @@ function applyHighValueFilter(page = 1) {
     // 获取筛选条件
     const payRateThreshold = parseFloat(elements.hvPayRateSelect.value) || 0;
     const studentCountThreshold = parseFloat(elements.hvStudentCountSelect.value) || 0;
-    const assignRateThreshold = parseFloat(elements.hvAssignRateSelect.value) || 0;
-    const completionRateThreshold = parseFloat(elements.hvCompletionRateSelect.value) || 0;
+    const assignRateFilter = elements.hvAssignRateSelect.value || '';
+    const completionRateFilter = elements.hvCompletionRateSelect.value || '';
     const trialCountThreshold = parseFloat(elements.hvTrialCountSelect.value) || 0;
     const schoolCategoryFilter = elements.hvSchoolCategorySelect.value;
     const favoriteFilter = elements.hvFavoriteSelect?.value || '';
@@ -1066,21 +1213,17 @@ function applyHighValueFilter(page = 1) {
         if (payRateThreshold > 0 && g.payRate > payRateThreshold) return false;
         if (studentCountThreshold > 0 && g.studentCount < studentCountThreshold) return false;
         // 布置率/完成率筛选基于所有周的平均值
-        if (assignRateThreshold > 0) {
+        if (assignRateFilter) {
             const avgAssignRate = g.weeklyMetrics.length > 0 
                 ? g.weeklyMetrics.reduce((a, w) => a + w.assignRate, 0) / g.weeklyMetrics.length 
                 : 0;
-            if (assignRateThreshold === 49 && avgAssignRate >= 50) return false;
-            if (assignRateThreshold === 50 && avgAssignRate <= 50) return false;
-            if (assignRateThreshold === 80 && avgAssignRate <= 80) return false;
+            if (!matchesRateFilter(avgAssignRate, assignRateFilter)) return false;
         }
-        if (completionRateThreshold > 0) {
+        if (completionRateFilter) {
             const avgCompletion = g.weeklyMetrics.length > 0 
                 ? g.weeklyMetrics.reduce((a, w) => a + w.avgCompletionRate, 0) / g.weeklyMetrics.length 
                 : 0;
-            if (completionRateThreshold === 49 && avgCompletion >= 50) return false;
-            if (completionRateThreshold === 50 && avgCompletion <= 50) return false;
-            if (completionRateThreshold === 80 && avgCompletion <= 80) return false;
+            if (!matchesRateFilter(avgCompletion, completionRateFilter)) return false;
         }
         if (trialCountThreshold > 0 && g.trialCount < trialCountThreshold) return false;
         if (schoolCategoryFilter && g.schoolCategory !== schoolCategoryFilter) return false;
@@ -1107,11 +1250,165 @@ function applyHighValueFilter(page = 1) {
     renderHighValueTable(filteredGrades, sortedWeeks, highValuePageState.page);
     renderHighValueTrendCharts();
     
-    if (filteredGrades.length === 0) {
-        showMsg('⚠️ 筛选后无数据', 'warning');
-    } else {
-        showMsg(`✅ 找到 ${filteredGrades.length} 条高价值年级数据，当前第 ${highValuePageState.page}/${highValuePageState.pages} 页`, 'success');
+    if (notify) {
+        if (filteredGrades.length === 0) showMsg('⚠️ 筛选后无数据', 'warning');
+        else showMsg(`✅ 找到 ${filteredGrades.length} 条高价值年级数据，当前第 ${highValuePageState.page}/${highValuePageState.pages} 页`, 'success');
     }
+}
+
+function buildLocalHighValueDataset(records = []) {
+    const sortedWeeks = [...new Set(records.map(r => r.weekStartDate).filter(Boolean))].sort();
+    const latestWeek = sortedWeeks[sortedWeeks.length - 1] || '';
+    const gradeMap = new Map();
+    records.forEach(r => {
+        const key = recordFavoriteKey(r);
+        if (!gradeMap.has(key)) {
+            gradeMap.set(key, {
+                province: r['省份'] || '', city: r['城市'] || '', district: r['区县'] || '',
+                school: r['学校名称'] || r['学校'] || '', grade: r['年级'] || '', weeklyData: new Map()
+            });
+        }
+        const group = gradeMap.get(key);
+        const weekKey = r.weekStartDate || '';
+        if (!group.weeklyData.has(weekKey)) {
+            group.weeklyData.set(weekKey, { classKeys: new Set(), assignedKeys: new Set(), students: 0, paid: 0, trial: 0, completion: [] });
+        }
+        const week = group.weeklyData.get(weekKey);
+        const classKey = getDetailClassKey(r);
+        if (!week.classKeys.has(classKey)) {
+            week.classKeys.add(classKey);
+            week.students += +r['总学生数'] || 0;
+            week.paid += +r['未过期付费学生数'] || 0;
+            week.trial += +r['未过期试用学生数'] || 0;
+            if (getAssignmentValue(r) >= 1) week.assignedKeys.add(classKey);
+            const completion = (+r['作业完成率'] || 0) * 100;
+            if (completion > 0) week.completion.push(completion);
+        }
+    });
+    const rows = [...gradeMap.values()].map(group => {
+        const latest = group.weeklyData.get(latestWeek) || { classKeys: new Set(), students: 0, paid: 0, trial: 0 };
+        return {
+            province: group.province, city: group.city, district: group.district, school: group.school, grade: group.grade,
+            classCount: latest.classKeys.size,
+            studentCount: latest.students,
+            trialCount: latest.trial,
+            payRate: Number(calcConvRate(latest.paid, latest.students)),
+            weeklyMetrics: sortedWeeks.map(weekKey => {
+                const week = group.weeklyData.get(weekKey);
+                if (!week) return null;
+                return {
+                    week: weekKey,
+                    assignedClassCount: week.assignedKeys.size,
+                    assignRate: week.classKeys.size ? week.assignedKeys.size / week.classKeys.size * 100 : 0,
+                    avgCompletionRate: week.completion.length ? week.completion.reduce((sum, value) => sum + value, 0) / week.completion.length : 0
+                };
+            }).filter(Boolean)
+        };
+    });
+    const schoolMaxPayRate = new Map();
+    rows.forEach(row => {
+        const key = `${row.province}|${row.city}|${row.district}|${row.school}`;
+        schoolMaxPayRate.set(key, Math.max(schoolMaxPayRate.get(key) || 0, row.payRate));
+    });
+    rows.forEach(row => {
+        const maxRate = schoolMaxPayRate.get(`${row.province}|${row.city}|${row.district}|${row.school}`) || 0;
+        row.schoolCategory = maxRate > 60 ? '付费校' : maxRate >= 10 ? '付费率需提升校' : '试用校';
+    });
+    return { rows, weeks: sortedWeeks };
+}
+
+function localHighValueControls(prefix = 'hv') {
+    return {
+        province: elements[`${prefix}ProvinceSelect`]?.value || '',
+        city: elements[`${prefix}CitySelect`]?.value || '',
+        district: elements[`${prefix}DistrictSelect`]?.value || '',
+        grade: elements[`${prefix}GradeSelect`]?.value || '',
+        payRateMax: parseFloat(elements[`${prefix}PayRateSelect`]?.value || '') || 0,
+        studentMin: parseFloat(elements[`${prefix}StudentCountSelect`]?.value || '') || 0,
+        assignRate: elements[`${prefix}AssignRateSelect`]?.value || '',
+        completionRate: elements[`${prefix}CompletionRateSelect`]?.value || '',
+        trialMin: parseFloat(elements[`${prefix}TrialCountSelect`]?.value || '') || 0,
+        schoolCategory: elements[`${prefix}SchoolCategorySelect`]?.value || ''
+    };
+}
+
+function filterLocalHighValueRows(rows = [], controls = {}, favoriteOnly = false) {
+    const favorites = loadFavorites();
+    return rows.filter(row => {
+        if (favoriteOnly && !favorites.has(favoriteKey(row))) return false;
+        if (controls.province && row.province !== controls.province) return false;
+        if (controls.city && row.city !== controls.city) return false;
+        if (controls.district && row.district !== controls.district) return false;
+        if (controls.grade && row.grade !== controls.grade) return false;
+        if (controls.payRateMax && row.payRate > controls.payRateMax) return false;
+        if (controls.studentMin && row.studentCount < controls.studentMin) return false;
+        if (controls.trialMin && row.trialCount < controls.trialMin) return false;
+        if (controls.schoolCategory && row.schoolCategory !== controls.schoolCategory) return false;
+        const avgAssign = row.weeklyMetrics.length ? row.weeklyMetrics.reduce((sum, week) => sum + week.assignRate, 0) / row.weeklyMetrics.length : 0;
+        const avgCompletion = row.weeklyMetrics.length ? row.weeklyMetrics.reduce((sum, week) => sum + week.avgCompletionRate, 0) / row.weeklyMetrics.length : 0;
+        return matchesRateFilter(avgAssign, controls.assignRate) && matchesRateFilter(avgCompletion, controls.completionRate);
+    });
+}
+
+function applyFavoriteFilter(page = 1, notify = true) {
+    const allRecords = getAllCachedRecords();
+    const { rows, weeks } = buildLocalHighValueDataset(allRecords);
+    const filteredRows = filterLocalHighValueRows(rows, localHighValueControls('fav'), true);
+    favoriteTrendRecordsState = allRecords.filter(r => loadFavorites().has(recordFavoriteKey(r)));
+    favoritePageState = {
+        page: Math.max(1, Number(page) || 1), pageSize: HIGH_VALUE_ROWS_PER_PAGE,
+        total: filteredRows.length, pages: Math.max(1, Math.ceil(filteredRows.length / HIGH_VALUE_ROWS_PER_PAGE)),
+        rows: filteredRows, weeks
+    };
+    if (favoritePageState.page > favoritePageState.pages) favoritePageState.page = favoritePageState.pages;
+    renderFavoriteTable(filteredRows, weeks, favoritePageState.page);
+    updateFavoriteTrendSels();
+    renderFavoriteTrendChart();
+    if (notify) showMsg(filteredRows.length ? `✅ 找到 ${filteredRows.length} 条收藏年级数据` : '⚠️ 当前筛选下暂无收藏年级', filteredRows.length ? 'success' : 'warning');
+}
+
+function renderFavoriteTable(rows = [], sortedWeeks = [], page = 1) {
+    if (!elements.favoriteSchoolTableHead || !elements.favoriteSchoolTableBody) return;
+    let head = '<tr><th rowspan="2">省份</th><th rowspan="2">城市</th><th rowspan="2">区县</th><th rowspan="2">学校</th><th rowspan="2">学校定义</th><th rowspan="2">年级</th><th rowspan="2">班级数</th><th rowspan="2">学生总数</th><th rowspan="2">未过期试用人数</th><th rowspan="2">年级付费率</th><th rowspan="2">收藏</th>';
+    sortedWeeks.forEach(week => { head += `<th colspan="2">${escapeHtml(week)}</th>`; });
+    head += '</tr><tr>' + sortedWeeks.map(() => '<th>布置班级数</th><th>作业完成率</th>').join('') + '</tr>';
+    elements.favoriteSchoolTableHead.innerHTML = head;
+    const start = (page - 1) * HIGH_VALUE_ROWS_PER_PAGE;
+    const pageRows = rows.slice(start, start + HIGH_VALUE_ROWS_PER_PAGE);
+    elements.favoriteSchoolTableBody.innerHTML = pageRows.length ? pageRows.map(row => {
+        let cells = `<td>${escapeHtml(row.province)}</td><td>${escapeHtml(row.city)}</td><td>${escapeHtml(row.district)}</td>` +
+            `<td class="school-name-cell"><button type="button" class="school-link" data-school-name="${escapeAttr(row.school)}">${escapeHtml(row.school)}</button></td>` +
+            `<td>${escapeHtml(row.schoolCategory)}</td><td>${escapeHtml(row.grade)}</td><td>${row.classCount}</td><td>${row.studentCount.toLocaleString()}</td><td>${row.trialCount.toLocaleString()}</td><td>${row.payRate.toFixed(1)}%</td>` +
+            `<td><button class="favorite-toggle" data-fav-key="${escapeAttr(favoriteKey(row))}">⭐</button></td>`;
+        sortedWeeks.forEach(weekKey => {
+            const week = row.weeklyMetrics.find(item => item.week === weekKey);
+            cells += week ? `<td>${week.assignedClassCount}</td><td>${week.avgCompletionRate.toFixed(1)}%</td>` : '<td>-</td><td>-</td>';
+        });
+        return `<tr>${cells}</tr>`;
+    }).join('') : `<tr><td colspan="${11 + sortedWeeks.length * 2}" class="table-empty-cell">请先收藏年级或调整筛选条件</td></tr>`;
+    if (elements.favoriteSchoolInfo) elements.favoriteSchoolInfo.textContent = `共 ${rows.length} 条收藏年级记录`;
+    renderFavoritePagination(page, favoritePageState.pages, rows.length);
+    document.querySelectorAll('#favoriteSchoolTable .favorite-toggle').forEach(button => { button.onclick = () => toggleFavoriteByKey(button.dataset.favKey); });
+    scheduleAdaptNameCells();
+}
+
+function renderFavoritePagination(page, pages, total) {
+    if (!elements.favoritePagination) return;
+    if (total <= HIGH_VALUE_ROWS_PER_PAGE) { elements.favoritePagination.innerHTML = ''; return; }
+    elements.favoritePagination.innerHTML = `<div class="pagination-info">共 ${total.toLocaleString()} 条，第 ${page}/${pages} 页</div><div class="pagination-controls"><button class="pagination-btn" onclick="goToFavoritePage(${page - 1})" ${page <= 1 ? 'disabled' : ''}>上一页</button><button class="pagination-btn" onclick="goToFavoritePage(${page + 1})" ${page >= pages ? 'disabled' : ''}>下一页</button></div>`;
+}
+
+function goToFavoritePage(page) {
+    const target = Math.min(Math.max(1, Number(page) || 1), favoritePageState.pages || 1);
+    favoritePageState.page = target;
+    renderFavoriteTable(favoritePageState.rows, favoritePageState.weeks, target);
+}
+
+function resetFavoriteFilter() {
+    ['favProvinceSelect', 'favCitySelect', 'favDistrictSelect', 'favGradeSelect', 'favPayRateSelect', 'favStudentCountSelect', 'favAssignRateSelect', 'favCompletionRateSelect', 'favTrialCountSelect', 'favSchoolCategorySelect'].forEach(key => { if (elements[key]) elements[key].value = ''; });
+    updateFavoriteSels();
+    applyFavoriteFilter(1, false);
+    showMsg('✅ 已重置', 'success');
 }
 
 function renderHighValueTable(grades, sortedWeeks, page = 1) {
@@ -1214,7 +1511,7 @@ function renderHighValueTable(grades, sortedWeeks, page = 1) {
         
         return '<tr>' + cells + '</tr>';
     }).join('');
-    elements.highValueTableBody.innerHTML = bodyRows + renderHighValueTotalRow(grades, sortedWeeks, true);
+    elements.highValueTableBody.innerHTML = bodyRows;
     
     const lastWeek = sortedWeeks.length > 0 ? sortedWeeks[sortedWeeks.length - 1] : '';
     elements.highValueInfo.textContent = `共 ${grades.length} 条记录 | 当前第 ${startIdx + 1}-${Math.min(startIdx + pageGrades.length, total)} 条 | 数据来源：${sortedWeeks.length}周（${lastWeek}）`;
@@ -1386,14 +1683,75 @@ function renderTrendChart(container, rows = [], emptyText = '暂无趋势数据'
 
 function renderHighValueTrendCharts() {
     renderTrendChart(elements.highValueConversionChart, highValueTrendRecords, '当前高价值筛选结果暂无趋势数据');
-    renderTrendChart(elements.favoriteConversionChart, favoriteTrendRecordsState, loadFavorites().size ? '当前筛选范围内暂无收藏校趋势数据' : '请先收藏年级后查看趋势');
+}
+
+function renderFavoriteTrendChart() {
+    const province = elements.trendProvinceSelect?.value || '';
+    const city = elements.trendCitySelect?.value || '';
+    const district = elements.trendDistrictSelect?.value || '';
+    const rows = favoriteTrendRecordsState.filter(r => {
+        if (province && r['省份'] !== province) return false;
+        if (city && r['城市'] !== city) return false;
+        if (district && r['区县'] !== district) return false;
+        return true;
+    });
+    renderTrendChart(document.getElementById('conversionChart'), rows, loadFavorites().size ? '当前筛选范围内暂无收藏校趋势数据' : '请先收藏年级后查看趋势');
+}
+
+function renderHighValueInsights(records = []) {
+    if (!elements.highValueInsights) return;
+    const favorites = loadFavorites();
+    if (!favorites.size) {
+        elements.highValueInsights.innerHTML = '<div class="insight-empty">价值洞察：请先在高价值学校/年级中收藏单个年级。</div>';
+        return;
+    }
+    const favoriteRecords = records.filter(r => favorites.has(recordFavoriteKey(r)));
+    if (!favoriteRecords.length) {
+        elements.highValueInsights.innerHTML = '<div class="insight-empty">价值洞察：当前数据范围内暂无已收藏年级。</div>';
+        return;
+    }
+    const weeks = [...new Set(favoriteRecords.map(r => r.weekStartDate).filter(Boolean))].sort();
+    const latestWeek = weeks[weeks.length - 1] || '';
+    const previousWeek = weeks[weeks.length - 2] || '';
+    const paidMap = new Map();
+    const assignmentMap = new Map();
+    favoriteRecords.forEach(r => {
+        const key = recordFavoriteKey(r);
+        const label = `${r['学校名称'] || r['学校'] || ''}${r['年级'] ? ` ${r['年级']}` : ''}`;
+        const paidKey = `${key}|${r.weekStartDate || ''}`;
+        if (!paidMap.has(paidKey)) paidMap.set(paidKey, { label, paid: 0 });
+        paidMap.get(paidKey).paid += +r['未过期付费学生数'] || 0;
+        if (r.weekStartDate === latestWeek) {
+            if (!assignmentMap.has(key)) assignmentMap.set(key, { label, assigned: new Set() });
+            if (getAssignmentValue(r) >= 1) assignmentMap.get(key).assigned.add(getDetailClassKey(r));
+        }
+    });
+    const favoriteKeys = [...new Set(favoriteRecords.map(recordFavoriteKey))];
+    const increases = favoriteKeys.map(key => {
+        const latest = paidMap.get(`${key}|${latestWeek}`) || { label: key.split('|').slice(3).join(' '), paid: 0 };
+        const previous = paidMap.get(`${key}|${previousWeek}`) || { paid: 0 };
+        return { label: latest.label, delta: latest.paid - previous.paid };
+    }).filter(item => item.delta > 50).sort((a, b) => b.delta - a.delta);
+    const noAssignments = [...assignmentMap.values()].filter(item => item.assigned.size === 0).sort((a, b) => itemLabelCompare(a.label, b.label));
+    const increaseTotal = increases.reduce((sum, item) => sum + item.delta, 0);
+    const paidText = increases.length
+        ? `本周新增付费人数 ${increaseTotal.toLocaleString()} 人，涉及到的收藏年级是${increases.map(item => `${escapeHtml(item.label)}（${item.delta.toLocaleString()}人）`).join('、')}。`
+        : '本周暂无收藏年级未过期付费人数较上周增加超过 50 人。';
+    const assignmentText = noAssignments.length
+        ? `最新一周未布置作业的收藏年级是：${noAssignments.map(item => escapeHtml(item.label)).join('、')}。`
+        : '最新一周收藏年级均有布置作业。';
+    elements.highValueInsights.innerHTML = `<div class="insight-title">价值洞察</div><ul><li>${paidText}</li><li>${assignmentText}</li></ul>`;
+}
+
+function itemLabelCompare(a, b) {
+    return String(a).localeCompare(String(b), 'zh-CN');
 }
 
 function resetHighValueFilter() {
     elements.hvProvinceSelect.value = '';
     elements.hvCitySelect.value = '';
     elements.hvDistrictSelect.value = '';
-    elements.hvGradeSelect.selectedIndex = -1;
+    elements.hvGradeSelect.value = '';
     elements.hvPayRateSelect.value = '';
     elements.hvStudentCountSelect.value = '';
     elements.hvAssignRateSelect.value = '';
@@ -1407,7 +1765,7 @@ function resetHighValueFilter() {
     favoriteTrendRecordsState = [];
     highValuePageState = { page: 1, pageSize: HIGH_VALUE_ROWS_PER_PAGE, total: 0, pages: 0, rows: [], weeks: [] };
     renderHighValueTrendCharts();
-    elements.highValueSection.style.display = AppState.filteredData.length ? 'block' : 'none';
+    renderHighValueInsights(getAllCachedRecords());
     showMsg('✅ 已重置', 'success');
 }
 
@@ -1565,11 +1923,13 @@ async function applyFilter() {
 function resetFilter() {
     const schoolSearchInput = document.getElementById('schoolSearchInput');
     if (schoolSearchInput) schoolSearchInput.value = '';
+    if (elements.quickStageSelect) elements.quickStageSelect.value = '';
+    if (elements.quickGradeSelect) elements.quickGradeSelect.value = '';
     elements.provinceSelect.value = '';
     elements.citySelect.value = '';
     elements.districtSelect.value = '';
     elements.schoolSelect.value = '';
-    elements.gradeSelect.selectedIndex = -1;
+    elements.gradeSelect.value = '';
     if (elements.assignmentCountSelect) elements.assignmentCountSelect.value = '';
     syncMultiSelectUI(elements.gradeSelect);
     updateAllSels();
@@ -1610,6 +1970,10 @@ async function quickSearch(keyword) {
             if (schoolNameRaw === exactKeyword) return true;
             return schoolName.includes(searchLower);
         });
+        const quickStage = elements.quickStageSelect?.value || '';
+        const quickGrade = elements.quickGradeSelect?.value || '';
+        if (quickStage) AppState.filteredData = AppState.filteredData.filter(r => inferStageFromGrade(r['年级'] || '') === quickStage);
+        if (quickGrade) AppState.filteredData = AppState.filteredData.filter(r => (r['年级'] || '') === quickGrade);
         
         // DEBUG quickSearch
         console.log('quickSearch Debug:', {
@@ -1624,20 +1988,17 @@ async function quickSearch(keyword) {
         elements.dataCount.textContent = AppState.filteredData.length.toLocaleString();
         if (elements.dataCountSummary) elements.dataCountSummary.textContent = AppState.filteredData.length.toLocaleString();
         renderDash();
-        renderCharts();
         renderTbl();
         
         if (AppState.filteredData.length === 0) {
             showMsg('⚠️ 未搜索到学校名称', 'warning');
             elements.emptyState.style.display = 'block';
             elements.metricsSection.style.display = 'none';
-            elements.chartsSection.style.display = 'none';
             elements.tableSection.style.display = 'none';
         } else {
             showMsg(`🔍 找到 ${AppState.filteredData.length} 条结果`, 'success');
             elements.emptyState.style.display = 'none';
             elements.metricsSection.style.display = 'block';
-            elements.chartsSection.style.display = 'block';
             elements.tableSection.style.display = 'block';
         }
     } catch (e) {
@@ -1679,88 +2040,46 @@ function updateAllSels() {
     
     // 更新高价值筛选项
     updateHighValueSels();
+    updateFavoriteSels();
+    updateQuickGradeOptions();
+    renderHighValueInsights(allRecs);
 }
 
 // 渲染看板
 function renderDash() {
     if (!AppState.filteredData.length) {
         elements.metricsSection.style.display = 'none';
-        elements.chartsSection.style.display = 'none';
         elements.tableSection.style.display = 'none';
-        const filterExport = document.getElementById('filterResultExport');
-        if (filterExport) filterExport.style.display = 'none';
-        elements.highValueSection.style.display = 'none';
-        if (elements.customSchoolSection) elements.customSchoolSection.style.display = 'none';
         elements.emptyState.style.display = 'block';
         return;
     }
     elements.emptyState.style.display = 'none';
     elements.metricsSection.style.display = 'block';
-    elements.chartsSection.style.display = 'block';
     elements.tableSection.style.display = 'block';
-    const filterExport = document.getElementById('filterResultExport');
-    if (filterExport) filterExport.style.display = 'block';
-    // 有数据时默认显示高价值筛选区域（仅显示筛选项，不自动统计）
-    elements.highValueSection.style.display = 'block';
-    if (elements.customSchoolSection) elements.customSchoolSection.style.display = 'block';
     updateHighValueSels();
+    updateFavoriteSels();
     renderMet();
-    renderCharts();
     renderTbl();
 }
 
 // 指标 - 修复：Excel 中转化率和完成率是小数（0.1967），需要乘以 100 显示为百分数
 function renderMet() {
-    const ta = AppState.filteredData.reduce((s, r) => s + getAssignmentValue(r), 0);
-    const weeks = [...new Set(AppState.filteredData.map(r => r.weekStartDate))].sort();
-    const lastWeekStart = weeks[weeks.length - 1];
+    const weeks = [...new Set(AppState.filteredData.map(r => r.weekStartDate).filter(Boolean))].sort();
+    const lastWeekStart = weeks[weeks.length - 1] || '';
     const lastWeekData = AppState.filteredData.filter(r => r.weekStartDate === lastWeekStart);
-    const tc = lastWeekData.reduce((s, r) => s + (+r['作业完成率'] || 0) * 100, 0);
-    const avgC = lastWeekData.length ? (tc / lastWeekData.length).toFixed(1) : 0;
-    // 覆盖班级：筛选项下班级总数（按班级ID去重）- 基于实际筛选结果
-    const cls = new Set(AppState.filteredData.map(r => getClassId(r)).filter(Boolean));
-    const clsCount = cls.size;
-    const weeksForSum = [...new Set(AppState.filteredData.map(r => r.weekStartDate))].sort();
-    const lastWeekForSum = weeksForSum[weeksForSum.length - 1];
-    const lastWeekDataForSum = AppState.filteredData.filter(r => r.weekStartDate === lastWeekForSum);
-    const stu = lastWeekDataForSum.reduce((s, r) => s + (+r['总学生数'] || 0), 0);
-    
-    // 平均布置作业次数 = 布置作业次数求和 / 班级数求和
-    const avgAssignments = clsCount > 0 ? (ta / clsCount).toFixed(1) : 0;
-    
-    // DEBUG - show values before assignment
-    window._debugMet = {
-        filteredDataLength: AppState.filteredData.length,
-        clsCount: clsCount,
-        ta: ta,
-        avgAssignments: avgAssignments,
-        first3Records: AppState.filteredData.slice(0, 3).map(r => ({班级ID: getClassId(r), 学校: r['学校名称'], 班级IDType: typeof getClassId(r)})),
-        allClassIds: AppState.filteredData.map(r => getClassId(r)).filter(Boolean).slice(0, 10)
-    };
-    console.log('renderMet Debug:', window._debugMet);
-    
-    // 1.1 总学生数
+    const classes = new Set(lastWeekData.map(getDetailClassKey).filter(Boolean));
+    const assignedClasses = new Set(lastWeekData.filter(r => getAssignmentValue(r) >= 1).map(getDetailClassKey).filter(Boolean));
+    const stu = lastWeekData.reduce((sum, r) => sum + (+r['总学生数'] || 0), 0);
+    const paidNotExpired = lastWeekData.reduce((sum, r) => sum + (+r['未过期付费学生数'] || 0), 0);
+    const completionRows = lastWeekData.map(r => (+r['作业完成率'] || 0) * 100).filter(value => value > 0);
+    const avgCompletion = completionRows.length ? (completionRows.reduce((sum, value) => sum + value, 0) / completionRows.length).toFixed(1) : '0.0';
+
     elements.studentCount.textContent = stu.toLocaleString();
-    
-    // 1.2 未过期付费学生数：基于筛选条件，仅取最后一周数据求和
-    const paidNotExpired = lastWeekData.reduce((s, r) => s + (+r['未过期付费学生数'] || 0), 0);
     elements.paidNotExpired.textContent = paidNotExpired.toLocaleString();
-    
-    // 1.3 转化率：未过期付费学生数 / 总学生数
     elements.conversionRate.textContent = calcConvRate(paidNotExpired, stu) + '%';
-    
-    // 1.4 覆盖班级
-    const displayClsCount = clsCount.toLocaleString();
-    console.log('Setting classCount to:', displayClsCount);
-    elements.classCount.textContent = displayClsCount;
-    
-    // 1.5 平均布置作业次数
-    const displayAvgAssignments = avgAssignments;
-    console.log('Setting avgAssignments to:', displayAvgAssignments);
-    elements.avgAssignments.textContent = displayAvgAssignments;
-    
-    // 1.6 作业完成率
-    elements.avgCompletionRate.textContent = avgC + '%';
+    elements.classCount.textContent = classes.size.toLocaleString();
+    elements.avgAssignments.textContent = assignedClasses.size.toLocaleString();
+    elements.avgCompletionRate.textContent = avgCompletion + '%';
 }
 
 // 图表 - 修复：作业完成率显示平均值
@@ -2807,7 +3126,10 @@ function toggleFavoriteByKey(key) {
     if (!normalizedKey) return;
     if (favs.has(normalizedKey)) favs.delete(normalizedKey); else favs.add(normalizedKey);
     saveFavorites(favs);
-    applyHighValueFilter(highValuePageState.page || 1);
+    applyHighValueFilter(highValuePageState.page || 1, false);
+    updateFavoriteSels();
+    applyFavoriteFilter(favoritePageState.page || 1, false);
+    renderHighValueInsights(getAllCachedRecords());
 }
 function getCustomSchoolTab() { return localStorage.getItem(CUSTOM_SCHOOL_TAB_KEY) || 'grade'; }
 function setCustomSchoolTab(tab) { localStorage.setItem(CUSTOM_SCHOOL_TAB_KEY, tab); }
