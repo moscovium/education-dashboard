@@ -244,8 +244,8 @@
                     教育数据看板
                 </h1>
                 <p class="dashboard-subtitle">转化率与作业完成情况监测 - 基于班级 ID 关联</p>
-                <div id="debugBar" style="margin-top:8px;font-size:12px;color:#475569;display:flex;gap:12px;flex-wrap:wrap;">页面版本占位：root-20260704b</div>
-                <div id="pageVersion" style="margin-top:6px;font-size:12px;color:#0f172a;font-weight:600;background:#e2e8f0;display:inline-block;padding:4px 10px;border-radius:999px;">页面版本：v20260704b</div>
+                <div id="debugBar" style="margin-top:8px;font-size:12px;color:#475569;display:flex;gap:12px;flex-wrap:wrap;">页面版本占位：root-20260803a</div>
+                <div id="pageVersion" style="margin-top:6px;font-size:12px;color:#0f172a;font-weight:600;background:#e2e8f0;display:inline-block;padding:4px 10px;border-radius:999px;">页面版本：v20260803a</div>
             </div>
         </header>
 
@@ -372,6 +372,19 @@
                             <div class="multi-select-panel" data-multi-select-panel="gradeSelect"></div>
                             <select id="gradeSelect" class="multi-select-native" multiple size="5"></select>
                         </div>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">
+                            <span class="label-icon">📝</span>
+                            布置次数
+                        </label>
+                        <select id="assignmentCountSelect" class="filter-select">
+                            <option value="">不限</option>
+                            <option value="0">最新周未布置</option>
+                            <option value="1">最新周 ≥1 次</option>
+                            <option value="3">最新周 ≥3 次</option>
+                            <option value="5">最新周 ≥5 次</option>
+                        </select>
                     </div>
                 </div>
             </div>
@@ -633,7 +646,7 @@
                     <div class="filter-group">
                         <label class="filter-label">
                             <span class="label-icon">📝</span>
-                            年级作业布置率
+                            年级布置占比
                         </label>
                         <select id="hvAssignRateSelect" class="filter-select">
                             <option value="">不限</option>
@@ -886,6 +899,25 @@
         </section>
     </div>
 
+    <section id="schoolDetailModal" class="modal-shell school-detail-modal" hidden>
+        <div class="modal-card school-detail-card">
+            <div class="modal-head">
+                <div>
+                    <h2 id="schoolDetailTitle">单校班级数据</h2>
+                    <p class="modal-subtitle">按班级查看当前学校/年级的周度布置、完成与付费数据</p>
+                </div>
+                <button id="closeSchoolDetailModal" class="btn btn-secondary btn-small" type="button">关闭</button>
+            </div>
+            <div id="schoolDetailMetrics" class="school-detail-metrics"></div>
+            <div class="table-wrapper school-detail-table-wrapper">
+                <table class="data-table school-detail-table">
+                    <thead id="schoolDetailTableHead"></thead>
+                    <tbody id="schoolDetailTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
     <div id="imageExportModal" class="image-export-modal" style="display:none;">
         <div class="image-export-dialog">
             <div class="image-export-header">
@@ -903,11 +935,11 @@
     </div>
 
     <script>
-        window.__ROOT_DEPLOY_MARKER__='root-20260704b';
+        window.__ROOT_DEPLOY_MARKER__='root-20260803a';
         document.addEventListener('DOMContentLoaded', function () {
             var input = document.getElementById('fileInput');
             var debugBar = document.getElementById('debugBar');
-            if (debugBar) debugBar.textContent = '页面版本占位：root-20260704b';
+            if (debugBar) debugBar.textContent = '页面版本占位：root-20260803a';
             if (input) {
                 input.addEventListener('change', function (e) {
                     var files = Array.from((e.target && e.target.files) || []);
@@ -922,6 +954,6 @@
             }
         });
     </script>
-    <script src="app.js?v=20260704b"></script>
+    <script src="app.js?v=20260803a"></script>
 </body>
 </html>
