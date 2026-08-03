@@ -244,8 +244,8 @@
                     教育数据看板
                 </h1>
                 <p class="dashboard-subtitle">转化率与作业完成情况监测 - 基于班级 ID 关联</p>
-                <div id="debugBar" style="margin-top:8px;font-size:12px;color:#475569;display:flex;gap:12px;flex-wrap:wrap;">页面版本占位：root-20260803a</div>
-                <div id="pageVersion" style="margin-top:6px;font-size:12px;color:#0f172a;font-weight:600;background:#e2e8f0;display:inline-block;padding:4px 10px;border-radius:999px;">页面版本：v20260803a</div>
+                <div id="debugBar" style="margin-top:8px;font-size:12px;color:#475569;display:flex;gap:12px;flex-wrap:wrap;">页面版本占位：root-20260803b</div>
+                <div id="pageVersion" style="margin-top:6px;font-size:12px;color:#0f172a;font-weight:600;background:#e2e8f0;display:inline-block;padding:4px 10px;border-radius:999px;">页面版本：v20260803b</div>
             </div>
         </header>
 
@@ -353,10 +353,13 @@
                             <span class="label-icon">🏫</span>
                             学校
                         </label>
-                        <input type="text" id="schoolFilterInput" class="filter-select" placeholder="搜索学校..." style="width:130px;">
-                        <select id="schoolSelect" class="filter-select" style="width:130px;">
-                            <option value="">全部学校</option>
-                        </select>
+                        <div class="searchable-select" id="schoolSelectWrap">
+                            <input type="text" id="schoolSelectSearch" class="filter-select searchable-select-input" placeholder="全部学校" autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list">
+                            <div class="searchable-select-popup" id="schoolSelectPopup" hidden></div>
+                            <select id="schoolSelect" class="filter-select" hidden aria-hidden="true" tabindex="-1">
+                                <option value="">全部学校</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div class="filter-group">
@@ -380,10 +383,9 @@
                         </label>
                         <select id="assignmentCountSelect" class="filter-select">
                             <option value="">不限</option>
-                            <option value="0">最新周未布置</option>
-                            <option value="1">最新周 ≥1 次</option>
-                            <option value="3">最新周 ≥3 次</option>
-                            <option value="5">最新周 ≥5 次</option>
+                            <option value="eq0">=0</option>
+                            <option value="gte1">≧1</option>
+                            <option value="gte2">≧2</option>
                         </select>
                     </div>
                 </div>
@@ -738,13 +740,14 @@
                             <th>学生总数</th>
                             <th>未过期试用人数</th>
                             <th>年级付费率</th>
-                            <th class="high-value-tail-col">收藏</th>
+                            <th>收藏</th>
+                            <th class="high-value-tail-col">备注</th>
                         </tr>
                     </thead>
                     <tbody id="highValueTableBody"></tbody>
                     <tfoot>
                         <tr>
-                            <td colspan="11" class="high-value-footer-cell">
+                            <td colspan="12" class="high-value-footer-cell">
                                 <div class="high-value-info high-value-info-inline" id="highValueInfo"></div>
                             </td>
                         </tr>
@@ -768,6 +771,13 @@
                     <div class="chart-container" id="favoriteConversionChart"></div>
                 </div>
             </div>
+            <section class="high-value-notes-section" id="highValueNotesSection" hidden>
+                <div class="section-header">
+                    <h3 class="chart-title"><span class="section-icon">📝</span> 学校备注动态</h3>
+                    <span class="filter-status" id="highValueNotesInfo"></span>
+                </div>
+                <div class="school-note-feed" id="highValueNotesFeed"></div>
+            </section>
         </section>
         </div>
 
@@ -903,12 +913,21 @@
         <div class="modal-card school-detail-card">
             <div class="modal-head">
                 <div>
-                    <h2 id="schoolDetailTitle">单校班级数据</h2>
-                    <p class="modal-subtitle">按班级查看当前学校/年级的周度布置、完成与付费数据</p>
+                    <h2 id="schoolDetailTitle">单校班级数据明细</h2>
                 </div>
                 <button id="closeSchoolDetailModal" class="btn btn-secondary btn-small" type="button">关闭</button>
             </div>
             <div id="schoolDetailMetrics" class="school-detail-metrics"></div>
+            <div class="school-note-box" id="schoolNoteBox" hidden>
+                <div class="school-note-input-row">
+                    <textarea id="schoolNoteInput" class="school-note-input" maxlength="200" rows="2" placeholder="添加备注（最多 200 字）…"></textarea>
+                    <div class="school-note-actions">
+                        <span class="school-note-count" id="schoolNoteCount">0/200</span>
+                        <button type="button" class="btn btn-small btn-primary" id="schoolNoteSaveBtn">保存备注</button>
+                    </div>
+                </div>
+                <div class="school-note-list" id="schoolNoteList"></div>
+            </div>
             <div class="table-wrapper school-detail-table-wrapper">
                 <table class="data-table school-detail-table">
                     <thead id="schoolDetailTableHead"></thead>
@@ -935,11 +954,11 @@
     </div>
 
     <script>
-        window.__ROOT_DEPLOY_MARKER__='root-20260803a';
+        window.__ROOT_DEPLOY_MARKER__='root-20260803b';
         document.addEventListener('DOMContentLoaded', function () {
             var input = document.getElementById('fileInput');
             var debugBar = document.getElementById('debugBar');
-            if (debugBar) debugBar.textContent = '页面版本占位：root-20260803a';
+            if (debugBar) debugBar.textContent = '页面版本占位：root-20260803b';
             if (input) {
                 input.addEventListener('change', function (e) {
                     var files = Array.from((e.target && e.target.files) || []);
@@ -954,6 +973,6 @@
             }
         });
     </script>
-    <script src="app.js?v=20260803a"></script>
+    <script src="app.js?v=20260803b"></script>
 </body>
 </html>
