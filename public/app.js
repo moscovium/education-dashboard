@@ -6,13 +6,14 @@ const MAX_STORAGE_MB = 500; // 最大存储限制（MB）
 let db = null;
 const AppState = { files: [], filteredData: [], cache: new Map(), provinces: new Set(), cities: new Set(), districts: new Set(), schools: new Set(), grades: new Set() };
 const elements = {};
-const APP_VERSION = 'v2.4.2-root-20260803f';
+const APP_VERSION = 'v2.4.2-root-20260804a';
 const getClassId = (r = {}) => r['班级 id'] || r['班级ID'] || r['班级id'] || r['班级'] || r['classId'] || r['class_id'] || '';
 const getWeekKey = (r = {}) => r.weekStartDate || r.weekLabel || r.weekDisplay || '';
 const getAssignmentValue = (r = {}) => +r['布置作业数'] || +r['布置作业次数'] || 0;
 const getDetailClassKey = (r = {}) => getClassId(r) || `${r['省份'] || ''}|${r['城市'] || ''}|${r['区县'] || ''}|${r['学校名称'] || ''}|${r['年级'] || ''}|${r['班级名称'] || ''}`;
 const calcConvRate = (paid, students) => (students > 0 ? (paid / students * 100).toFixed(1) : '0.0');
 const HIGH_VALUE_ROWS_PER_PAGE = 100;
+const DYNAMIC_MULTI_GRADE_IDS = new Set(['gradeSelect', 'hvGradeSelect', 'favGradeSelect']);
 let highValuePageState = { page: 1, pageSize: HIGH_VALUE_ROWS_PER_PAGE, total: 0, pages: 0, rows: [], weeks: [] };
 let favoritePageState = { page: 1, pageSize: HIGH_VALUE_ROWS_PER_PAGE, total: 0, pages: 0, rows: [], weeks: [] };
 let highValueTrendRecords = [];
@@ -247,6 +248,8 @@ function getFile(filename) {
 // 主初始化
 document.addEventListener('DOMContentLoaded', async () => {
     initElements();
+    initMultiSelects();
+    initDynamicGradeMultiSelects();
     try {
         await initDB();
         console.log('✅ 数据库初始化成功', APP_VERSION);
@@ -269,7 +272,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         showMsg('❌ 数据库初始化失败：' + e.message, 'error');
     }
     initHandlers();
-    initMultiSelects();
     initWorkspaceNavigation();
     initCollapsibleControls();
     applyUploadSectionCollapsedState(getUploadSectionCollapsed());
@@ -943,6 +945,7 @@ function updateCascadeSelects(selects, sourceRows = []) {
     const [provinceSelect, citySelect, districtSelect, gradeSelect] = selects;
     if (!provinceSelect || !citySelect || !districtSelect) return;
     const previous = selects.map(select => select.value || '');
+    const previousGrades = getSelectedValues(gradeSelect);
     const latestRows = getLatestWeekRows(sourceRows);
     const provinces = [...new Set(latestRows.map(r => r['省份']).filter(Boolean))];
     updateSel(provinceSelect, new Set(provinces));
@@ -959,7 +962,7 @@ function updateCascadeSelects(selects, sourceRows = []) {
     if (gradeSelect) {
         const grades = [...new Set(rows.map(r => r['年级']).filter(Boolean))];
         updateSel(gradeSelect, new Set(grades));
-        gradeSelect.value = grades.includes(previous[3]) ? previous[3] : '';
+        setSelectedValues(gradeSelect, previousGrades.filter(grade => grades.includes(grade)));
     }
 }
 
@@ -1322,7 +1325,7 @@ function localHighValueControls(prefix = 'hv') {
         province: elements[`${prefix}ProvinceSelect`]?.value || '',
         city: elements[`${prefix}CitySelect`]?.value || '',
         district: elements[`${prefix}DistrictSelect`]?.value || '',
-        grade: elements[`${prefix}GradeSelect`]?.value || '',
+        grades: getSelectedValues(elements[`${prefix}GradeSelect`]),
         payRateMax: parseFloat(elements[`${prefix}PayRateSelect`]?.value || '') || 0,
         studentMin: parseFloat(elements[`${prefix}StudentCountSelect`]?.value || '') || 0,
         assignRate: elements[`${prefix}AssignRateSelect`]?.value || '',
@@ -1339,7 +1342,7 @@ function filterLocalHighValueRows(rows = [], controls = {}, favoriteOnly = false
         if (controls.province && row.province !== controls.province) return false;
         if (controls.city && row.city !== controls.city) return false;
         if (controls.district && row.district !== controls.district) return false;
-        if (controls.grade && row.grade !== controls.grade) return false;
+        if (!matchesMulti(row.grade, controls.grades)) return false;
         if (controls.payRateMax && row.payRate > controls.payRateMax) return false;
         if (controls.studentMin && row.studentCount < controls.studentMin) return false;
         if (controls.trialMin && row.trialCount < controls.trialMin) return false;
@@ -1405,7 +1408,8 @@ function goToFavoritePage(page) {
 }
 
 function resetFavoriteFilter() {
-    ['favProvinceSelect', 'favCitySelect', 'favDistrictSelect', 'favGradeSelect', 'favPayRateSelect', 'favStudentCountSelect', 'favAssignRateSelect', 'favCompletionRateSelect', 'favTrialCountSelect', 'favSchoolCategorySelect'].forEach(key => { if (elements[key]) elements[key].value = ''; });
+    ['favProvinceSelect', 'favCitySelect', 'favDistrictSelect', 'favPayRateSelect', 'favStudentCountSelect', 'favAssignRateSelect', 'favCompletionRateSelect', 'favTrialCountSelect', 'favSchoolCategorySelect'].forEach(key => { if (elements[key]) elements[key].value = ''; });
+    setSelectedValues(elements.favGradeSelect, []);
     updateFavoriteSels();
     applyFavoriteFilter(1, false);
     showMsg('✅ 已重置', 'success');
@@ -1751,7 +1755,7 @@ function resetHighValueFilter() {
     elements.hvProvinceSelect.value = '';
     elements.hvCitySelect.value = '';
     elements.hvDistrictSelect.value = '';
-    elements.hvGradeSelect.value = '';
+    setSelectedValues(elements.hvGradeSelect, []);
     elements.hvPayRateSelect.value = '';
     elements.hvStudentCountSelect.value = '';
     elements.hvAssignRateSelect.value = '';
@@ -1790,6 +1794,7 @@ function setSelectedValues(sel, values = []) {
     const set = new Set(values || []);
     [...sel.options].forEach(o => { o.selected = !!o.value && set.has(o.value); });
     syncMultiSelectUI(sel);
+    refreshDynamicGradeMultiSelect(sel);
 }
 
 function matchesMulti(value, selectedValues) {
@@ -1810,6 +1815,70 @@ function updateSel(sel, vals) {
     });
     if (!isMultiple && prevSelected[0]) sel.value = prevSelected[0];
     syncMultiSelectUI(sel);
+    refreshDynamicGradeMultiSelect(sel);
+}
+
+function initDynamicGradeMultiSelects() {
+    DYNAMIC_MULTI_GRADE_IDS.forEach(id => {
+        const select = document.getElementById(id);
+        if (!select || select.dataset.multiReady) return;
+        select.dataset.multiReady = '1';
+        select.multiple = true;
+        select.classList.add('multi-source-select');
+        const wrapper = document.createElement('div');
+        wrapper.className = 'multi-select';
+        wrapper.dataset.multiFor = id;
+        wrapper.innerHTML = '<button type="button" class="multi-select-trigger"><span>全部年级</span><span>▾</span></button><div class="multi-select-menu"></div>';
+        select.insertAdjacentElement('afterend', wrapper);
+        wrapper.querySelector('.multi-select-trigger').onclick = event => {
+            event.preventDefault();
+            event.stopPropagation();
+            const willOpen = !wrapper.classList.contains('open');
+            document.querySelectorAll('.multi-select.open').forEach(el => { if (el !== wrapper) el.classList.remove('open'); });
+            wrapper.classList.toggle('open', willOpen);
+        };
+        wrapper.querySelector('.multi-select-menu').onclick = event => event.stopPropagation();
+        select.addEventListener('change', () => refreshDynamicGradeMultiSelect(select));
+        new MutationObserver(() => refreshDynamicGradeMultiSelect(select)).observe(select, { childList: true });
+        refreshDynamicGradeMultiSelect(select);
+    });
+    if (!window.__dynamicGradeMultiSelectCloseBound) {
+        window.__dynamicGradeMultiSelectCloseBound = true;
+        document.addEventListener('click', () => {
+            document.querySelectorAll('.multi-select.open').forEach(el => el.classList.remove('open'));
+        });
+    }
+}
+
+function refreshDynamicGradeMultiSelect(select) {
+    if (!select || !DYNAMIC_MULTI_GRADE_IDS.has(select.id)) return;
+    const wrapper = document.querySelector(`.multi-select[data-multi-for="${select.id}"]`);
+    if (!wrapper) return;
+    const menu = wrapper.querySelector('.multi-select-menu');
+    const triggerText = wrapper.querySelector('.multi-select-trigger span:first-child');
+    const selected = getSelectedValues(select);
+    const options = [...select.options].filter(option => option.value);
+    triggerText.textContent = selected.length
+        ? `${selected.slice(0, 2).join('、')}${selected.length > 2 ? ` +${selected.length - 2}` : ''}`
+        : '全部年级';
+    menu.innerHTML = [
+        `<label><input type="checkbox" value="" ${selected.length ? '' : 'checked'}> 全部年级</label>`,
+        ...options.map(option => `<label><input type="checkbox" value="${escapeAttr(option.value)}" ${selected.includes(option.value) ? 'checked' : ''}> ${escapeHtml(option.textContent || option.value)}</label>`)
+    ].join('');
+    menu.querySelectorAll('input').forEach(input => {
+        input.onclick = event => {
+            event.stopPropagation();
+            if (!input.value) {
+                setSelectedValues(select, []);
+            } else {
+                const values = new Set(getSelectedValues(select));
+                if (input.checked) values.add(input.value);
+                else values.delete(input.value);
+                setSelectedValues(select, [...values]);
+            }
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+        };
+    });
 }
 
 function initMultiSelects() {
@@ -1929,9 +1998,8 @@ function resetFilter() {
     elements.citySelect.value = '';
     elements.districtSelect.value = '';
     elements.schoolSelect.value = '';
-    elements.gradeSelect.value = '';
+    setSelectedValues(elements.gradeSelect, []);
     if (elements.assignmentCountSelect) elements.assignmentCountSelect.value = '';
-    syncMultiSelectUI(elements.gradeSelect);
     updateAllSels();
     AppState.filteredData = [];
     elements.dataCount.textContent = '0';
