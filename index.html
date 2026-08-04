@@ -9,7 +9,7 @@
     <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/dayjs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/locale/zh-cn.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-    <link rel="stylesheet" href="styles.css?v=20260803f">
+    <link rel="stylesheet" href="styles.css?v=20260804a">
     <style>
         /* 进度条样式 */
         #uploadProgress {
@@ -243,8 +243,8 @@
                 <div class="header-content">
                     <h1 class="dashboard-title">教育数据看板</h1>
                     <p class="dashboard-subtitle">浏览器本地数据工作台</p>
-                    <div id="pageVersion" class="page-version-inline">页面版本：v20260803f</div>
-                    <div id="debugBar" class="debug-bar">页面版本占位：root-20260803f</div>
+                    <div id="pageVersion" class="page-version-inline">页面版本：v20260804a</div>
+                    <div id="debugBar" class="debug-bar">页面版本占位：root-20260804a</div>
                 </div>
             </div>
         </header>
@@ -1002,11 +1002,11 @@
     </div>
 
     <script>
-        window.__ROOT_DEPLOY_MARKER__='root-20260803f';
+        window.__ROOT_DEPLOY_MARKER__='root-20260804a';
         document.addEventListener('DOMContentLoaded', function () {
             var input = document.getElementById('fileInput');
             var debugBar = document.getElementById('debugBar');
-            if (debugBar) debugBar.textContent = '页面版本占位：root-20260803f';
+            if (debugBar) debugBar.textContent = '页面版本占位：root-20260804a';
             if (input) {
                 input.addEventListener('change', function (e) {
                     var files = Array.from((e.target && e.target.files) || []);
@@ -1021,6 +1021,6 @@
             }
         });
     </script>
-    <script src="app.js?v=20260803f"></script>
+    <script src="app.js?v=20260804a"></script>
 </body>
 </html>
