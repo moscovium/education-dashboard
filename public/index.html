@@ -9,7 +9,7 @@
     <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/dayjs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/locale/zh-cn.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-    <link rel="stylesheet" href="styles.css?v=20260804a">
+    <link rel="stylesheet" href="styles.css?v=20260920a">
     <style>
         /* 进度条样式 */
         #uploadProgress {
@@ -243,8 +243,8 @@
                 <div class="header-content">
                     <h1 class="dashboard-title">教育数据看板</h1>
                     <p class="dashboard-subtitle">浏览器本地数据工作台</p>
-                    <div id="pageVersion" class="page-version-inline">页面版本：v20260804a</div>
-                    <div id="debugBar" class="debug-bar">页面版本占位：root-20260804a</div>
+                    <div id="pageVersion" class="page-version-inline">页面版本：v20260920a</div>
+                    <div id="debugBar" class="debug-bar">页面版本占位：root-20260920a</div>
                 </div>
             </div>
         </header>
@@ -388,6 +388,17 @@
                             <option value="gte2">≧2</option>
                         </select>
                     </div>
+                    <div class="filter-group">
+                        <label class="filter-label" for="filterFavoriteSelect">
+                            <span class="label-icon">⭐</span>
+                            是否收藏
+                        </label>
+                        <select id="filterFavoriteSelect" class="filter-select" title="按学校匹配：任一年级被收藏即为收藏学校；收藏年级在下钻结果中以🌟标注">
+                            <option value="">不限</option>
+                            <option value="yes">是</option>
+                            <option value="no">否</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
@@ -495,7 +506,7 @@
                         <span class="metric-icon">👨</span>
                         <span class="metric-title">学生总数</span>
                     </div>
-                    <div class="metric-value" id="studentCount">--</div>
+                    <button type="button" class="metric-value metric-drill-trigger" id="studentCount" data-metric-key="studentCount" aria-label="下钻查看学生总数">--</button>
                     <div class="metric-subtitle">名学生</div>
                 </div>
 
@@ -505,7 +516,7 @@
                         <span class="metric-icon">💰</span>
                         <span class="metric-title">未过期付费学生数</span>
                     </div>
-                    <div class="metric-value" id="paidNotExpired">--</div>
+                    <button type="button" class="metric-value metric-drill-trigger" id="paidNotExpired" data-metric-key="paidNotExpired" aria-label="下钻查看未过期付费学生数">--</button>
                     <div class="metric-subtitle">最后一周</div>
                 </div>
 
@@ -515,7 +526,7 @@
                         <span class="metric-icon">📊</span>
                         <span class="metric-title">转化率</span>
                     </div>
-                    <div class="metric-value" id="conversionRate">--</div>
+                    <button type="button" class="metric-value metric-drill-trigger" id="conversionRate" data-metric-key="conversionRate" aria-label="下钻查看转化率">--</button>
                     <div class="metric-subtitle">平均转化率</div>
                 </div>
 
@@ -525,7 +536,7 @@
                         <span class="metric-icon">📚</span>
                         <span class="metric-title">覆盖班级</span>
                     </div>
-                    <div class="metric-value" id="classCount">--</div>
+                    <button type="button" class="metric-value metric-drill-trigger" id="classCount" data-metric-key="classCount" aria-label="下钻查看覆盖班级">--</button>
                     <div class="metric-subtitle">个班级</div>
                 </div>
 
@@ -535,19 +546,52 @@
                         <span class="metric-icon">📈</span>
                         <span class="metric-title">布置作业班级数</span>
                     </div>
-                    <div class="metric-value" id="avgAssignments">--</div>
+                    <button type="button" class="metric-value metric-drill-trigger" id="avgAssignments" data-metric-key="assignedClassCount" aria-label="下钻查看布置作业班级数">--</button>
                     <div class="metric-subtitle">最后一周作业布置数≥1</div>
                 </div>
 
-                <!-- 1.6 作业完成率 -->
+                <!-- 1.6 未过期试用人数 -->
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <span class="metric-icon">🧪</span>
+                        <span class="metric-title">未过期试用人数</span>
+                    </div>
+                    <button type="button" class="metric-value metric-drill-trigger" id="trialNotExpired" data-metric-key="trialNotExpired" aria-label="下钻查看未过期试用人数">--</button>
+                    <div class="metric-subtitle">最后一周</div>
+                </div>
+
+                <!-- 1.7 作业完成率 -->
                 <div class="metric-card metric-primary">
                     <div class="metric-header">
                         <span class="metric-icon">✅</span>
                         <span class="metric-title">作业完成率</span>
                     </div>
-                    <div class="metric-value" id="avgCompletionRate">--</div>
+                    <button type="button" class="metric-value metric-drill-trigger" id="avgCompletionRate" data-metric-key="avgCompletionRate" aria-label="下钻查看作业完成率">--</button>
                     <div class="metric-subtitle">平均完成比例</div>
                 </div>
+            </div>
+            <div class="metric-drill-panel" id="metricDrillPanel" hidden>
+                <div class="metric-drill-head">
+                    <div>
+                        <div class="metric-drill-breadcrumb" id="metricDrillBreadcrumb" aria-label="数字下钻路径"></div>
+                        <h3 class="metric-drill-title" id="metricDrillTitle">指标下钻</h3>
+                    </div>
+                    <div class="metric-drill-actions">
+                        <div class="metric-drill-mode-switch" id="metricDrillModeSwitch" role="group" aria-label="查看方式">
+                            <button type="button" class="metric-drill-mode-btn active" data-drill-mode="school" aria-pressed="true">按学校查看</button>
+                            <button type="button" class="metric-drill-mode-btn" data-drill-mode="grade" aria-pressed="false">按年级查看</button>
+                        </div>
+                        <button type="button" class="btn btn-secondary btn-small" id="metricDrillClose">关闭</button>
+                    </div>
+                </div>
+                <div class="metric-drill-period" id="metricDrillPeriod"></div>
+                <div class="table-wrapper metric-drill-table-wrap">
+                    <table class="data-table metric-drill-table">
+                        <thead id="metricDrillTableHead"></thead>
+                        <tbody id="metricDrillTableBody"></tbody>
+                    </table>
+                </div>
+                <div class="metric-drill-empty" id="metricDrillEmpty" hidden>当前层级暂无可展示数据</div>
             </div>
             </div>
         </section>
@@ -1002,11 +1046,11 @@
     </div>
 
     <script>
-        window.__ROOT_DEPLOY_MARKER__='root-20260804a';
+        window.__ROOT_DEPLOY_MARKER__='root-20260920a';
         document.addEventListener('DOMContentLoaded', function () {
             var input = document.getElementById('fileInput');
             var debugBar = document.getElementById('debugBar');
-            if (debugBar) debugBar.textContent = '页面版本占位：root-20260804a';
+            if (debugBar) debugBar.textContent = '页面版本占位：root-20260920a';
             if (input) {
                 input.addEventListener('change', function (e) {
                     var files = Array.from((e.target && e.target.files) || []);
@@ -1021,6 +1065,6 @@
             }
         });
     </script>
-    <script src="app.js?v=20260804a"></script>
+    <script src="app.js?v=20260920a"></script>
 </body>
 </html>

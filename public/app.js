@@ -6,10 +6,15 @@ const MAX_STORAGE_MB = 500; // 最大存储限制（MB）
 let db = null;
 const AppState = { files: [], filteredData: [], cache: new Map(), provinces: new Set(), cities: new Set(), districts: new Set(), schools: new Set(), grades: new Set() };
 const elements = {};
-const APP_VERSION = 'v2.4.2-root-20260804a';
+const APP_VERSION = 'v2.4.2-root-20260920a';
 const getClassId = (r = {}) => r['班级 id'] || r['班级ID'] || r['班级id'] || r['班级'] || r['classId'] || r['class_id'] || '';
 const getWeekKey = (r = {}) => r.weekStartDate || r.weekLabel || r.weekDisplay || '';
 const getAssignmentValue = (r = {}) => +r['布置作业数'] || +r['布置作业次数'] || 0;
+const getStudentCountValue = (r = {}) => +r['总学生数'] || +r['学生总数'] || +r.studentCount || 0;
+const getCompletionRateValue = (r = {}) => {
+    const value = +r['作业完成率'] || 0;
+    return value > 1 ? value : value * 100;
+};
 const getDetailClassKey = (r = {}) => getClassId(r) || `${r['省份'] || ''}|${r['城市'] || ''}|${r['区县'] || ''}|${r['学校名称'] || ''}|${r['年级'] || ''}|${r['班级名称'] || ''}`;
 const calcConvRate = (paid, students) => (students > 0 ? (paid / students * 100).toFixed(1) : '0.0');
 const HIGH_VALUE_ROWS_PER_PAGE = 100;
@@ -18,6 +23,7 @@ let highValuePageState = { page: 1, pageSize: HIGH_VALUE_ROWS_PER_PAGE, total: 0
 let favoritePageState = { page: 1, pageSize: HIGH_VALUE_ROWS_PER_PAGE, total: 0, pages: 0, rows: [], weeks: [] };
 let highValueTrendRecords = [];
 let favoriteTrendRecordsState = [];
+const metricDrillState = { activeMetric: '', mode: 'school', path: [], baseLevelIndex: -1, baseLabel: '全部筛选结果' };
 function escapeHtml(value = '') {
     return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 }
@@ -89,6 +95,7 @@ function initElements() {
     elements.schoolSelect = document.getElementById('schoolSelect');
     elements.gradeSelect = document.getElementById('gradeSelect');
     elements.assignmentCountSelect = document.getElementById('assignmentCountSelect');
+    elements.filterFavoriteSelect = document.getElementById('filterFavoriteSelect');
     elements.quickStageSelect = document.getElementById('quickStageSelect');
     elements.quickGradeSelect = document.getElementById('quickGradeSelect');
     elements.applyFilter = document.getElementById('applyFilter');
@@ -104,7 +111,17 @@ function initElements() {
     elements.classCount = document.getElementById('classCount');
     elements.studentCount = document.getElementById('studentCount');
     elements.paidNotExpired = document.getElementById('paidNotExpired');
+    elements.trialNotExpired = document.getElementById('trialNotExpired');
     elements.avgAssignments = document.getElementById('avgAssignments');
+    elements.metricDrillPanel = document.getElementById('metricDrillPanel');
+    elements.metricDrillBreadcrumb = document.getElementById('metricDrillBreadcrumb');
+    elements.metricDrillTitle = document.getElementById('metricDrillTitle');
+    elements.metricDrillPeriod = document.getElementById('metricDrillPeriod');
+    elements.metricDrillTableHead = document.getElementById('metricDrillTableHead');
+    elements.metricDrillTableBody = document.getElementById('metricDrillTableBody');
+    elements.metricDrillEmpty = document.getElementById('metricDrillEmpty');
+    elements.metricDrillClose = document.getElementById('metricDrillClose');
+    elements.metricDrillModeSwitch = document.getElementById('metricDrillModeSwitch');
     elements.tableBody = document.getElementById('tableBody');
     elements.exportBtn = document.getElementById('exportBtn');
     elements.exportFilterExcelBtn = document.getElementById('exportFilterExcelBtn');
@@ -422,6 +439,36 @@ function initHandlers() {
     if (elements.exportBtn) elements.exportBtn.onclick = exportCSV;
     if (elements.exportFilterExcelBtn) elements.exportFilterExcelBtn.onclick = exportFilteredExcel;
     if (elements.toggleUploadSection) elements.toggleUploadSection.onclick = toggleUploadSectionCollapsed;
+    document.querySelectorAll('.metric-drill-trigger').forEach(button => {
+        button.onclick = () => toggleMetricDrill(button.dataset.metricKey || '');
+    });
+    if (elements.metricDrillClose) elements.metricDrillClose.onclick = () => closeMetricDrill();
+    if (elements.metricDrillModeSwitch) elements.metricDrillModeSwitch.onclick = (event) => {
+        const button = event.target.closest('[data-drill-mode]');
+        if (!button) return;
+        const mode = button.dataset.drillMode === 'grade' ? 'grade' : 'school';
+        if (metricDrillState.mode === mode) return;
+        metricDrillState.mode = mode;
+        metricDrillState.path = [];
+        renderMetricDrill();
+    };
+    if (elements.metricDrillBreadcrumb) elements.metricDrillBreadcrumb.onclick = (event) => {
+        const button = event.target.closest('[data-drill-depth]');
+        if (!button) return;
+        metricDrillState.path = metricDrillState.path.slice(0, Number(button.dataset.drillDepth) || 0);
+        renderMetricDrill();
+    };
+    if (elements.metricDrillTableBody) elements.metricDrillTableBody.onclick = (event) => {
+        const button = event.target.closest('[data-drill-value]');
+        if (!button) return;
+        const currentLevelIndex = getMetricDrillStartLevelIndex() + metricDrillState.path.length;
+        metricDrillState.path.push({
+            levelIndex: currentLevelIndex,
+            value: button.dataset.drillValue || '',
+            label: button.dataset.drillLabel || button.dataset.drillValue || '未填写'
+        });
+        renderMetricDrill();
+    };
     
     // 高价值筛选事件
     if (elements.hvProvinceSelect) elements.hvProvinceSelect.onchange = () => { cascadeHighValue('province'); };
@@ -1976,7 +2023,9 @@ async function applyFilter() {
                 .filter(Boolean));
             filtered = filtered.filter(r => allowedClassKeys.has(getDetailClassKey(r)));
         }
+        filtered = filterRecordsByFavorite(filtered, elements.filterFavoriteSelect?.value || '');
         AppState.filteredData = filtered;
+        resetMetricDrill(getAppliedMetricContext());
         
         hideLoading();
         elements.dataCount.textContent = AppState.filteredData.length.toLocaleString();
@@ -2000,8 +2049,10 @@ function resetFilter() {
     elements.schoolSelect.value = '';
     setSelectedValues(elements.gradeSelect, []);
     if (elements.assignmentCountSelect) elements.assignmentCountSelect.value = '';
+    if (elements.filterFavoriteSelect) elements.filterFavoriteSelect.value = '';
     updateAllSels();
     AppState.filteredData = [];
+    resetMetricDrill();
     elements.dataCount.textContent = '0';
     if (elements.dataCountSummary) elements.dataCountSummary.textContent = '0';
     renderDash();
@@ -2042,6 +2093,7 @@ async function quickSearch(keyword) {
         const quickGrade = elements.quickGradeSelect?.value || '';
         if (quickStage) AppState.filteredData = AppState.filteredData.filter(r => inferStageFromGrade(r['年级'] || '') === quickStage);
         if (quickGrade) AppState.filteredData = AppState.filteredData.filter(r => (r['年级'] || '') === quickGrade);
+        resetMetricDrill({ baseLevelIndex: -1, baseLabel: `快速搜索：${exactKeyword}` });
         
         // DEBUG quickSearch
         console.log('quickSearch Debug:', {
@@ -2116,6 +2168,7 @@ function updateAllSels() {
 // 渲染看板
 function renderDash() {
     if (!AppState.filteredData.length) {
+        closeMetricDrill();
         elements.metricsSection.style.display = 'none';
         elements.tableSection.style.display = 'none';
         elements.emptyState.style.display = 'block';
@@ -2130,24 +2183,232 @@ function renderDash() {
     renderTbl();
 }
 
-// 指标 - 修复：Excel 中转化率和完成率是小数（0.1967），需要乘以 100 显示为百分数
-function renderMet() {
-    const weeks = [...new Set(AppState.filteredData.map(r => r.weekStartDate).filter(Boolean))].sort();
-    const lastWeekStart = weeks[weeks.length - 1] || '';
-    const lastWeekData = AppState.filteredData.filter(r => r.weekStartDate === lastWeekStart);
+const METRIC_DRILL_CLASS_LEVEL = {
+    label: '班级',
+    field: '班级名称',
+    getValue: row => getDetailClassKey(row),
+    getDisplayValue: row => row['班级名称'] || getClassId(row) || '未填写'
+};
+const METRIC_DRILL_LEVELS = {
+    school: [
+        { label: '省份', field: '省份' },
+        { label: '城市', field: '城市' },
+        { label: '区县', field: '区县' },
+        { label: '学校', field: '学校名称' },
+        { label: '年级', field: '年级' },
+        METRIC_DRILL_CLASS_LEVEL
+    ],
+    grade: [
+        { label: '年级', field: '年级' },
+        { label: '学校', field: '学校名称' },
+        METRIC_DRILL_CLASS_LEVEL
+    ]
+};
+const METRIC_DRILL_CONFIG = {
+    studentCount: { label: '学生总数', kind: 'count' },
+    paidNotExpired: { label: '未过期付费学生数', kind: 'count' },
+    conversionRate: { label: '转化率', kind: 'rate' },
+    trialNotExpired: { label: '未过期试用人数', kind: 'count' },
+    classCount: { label: '覆盖班级', kind: 'count' },
+    assignedClassCount: { label: '布置作业班级数', kind: 'count' },
+    avgCompletionRate: { label: '作业完成率', kind: 'rate' }
+};
+
+function getMetricLatestWeek(rows = AppState.filteredData) {
+    const weeks = [...new Set(rows.map(r => r.weekStartDate).filter(Boolean))].sort();
+    return weeks[weeks.length - 1] || '';
+}
+
+function calculateMetricSummary(rows, latestWeekStart = getMetricLatestWeek(rows)) {
+    const lastWeekData = rows.filter(r => r.weekStartDate === latestWeekStart);
     const classes = new Set(lastWeekData.map(getDetailClassKey).filter(Boolean));
     const assignedClasses = new Set(lastWeekData.filter(r => getAssignmentValue(r) >= 1).map(getDetailClassKey).filter(Boolean));
-    const stu = lastWeekData.reduce((sum, r) => sum + (+r['总学生数'] || 0), 0);
-    const paidNotExpired = lastWeekData.reduce((sum, r) => sum + (+r['未过期付费学生数'] || 0), 0);
-    const completionRows = lastWeekData.map(r => (+r['作业完成率'] || 0) * 100).filter(value => value > 0);
-    const avgCompletion = completionRows.length ? (completionRows.reduce((sum, value) => sum + value, 0) / completionRows.length).toFixed(1) : '0.0';
+    const studentCount = lastWeekData.reduce((sum, row) => sum + getStudentCountValue(row), 0);
+    const paidNotExpired = lastWeekData.reduce((sum, row) => sum + (+row['未过期付费学生数'] || 0), 0);
+    const trialNotExpired = lastWeekData.reduce((sum, row) => sum + (+row['未过期试用学生数'] || 0), 0);
+    const completionRows = lastWeekData.map(getCompletionRateValue).filter(value => value > 0);
+    return {
+        studentCount,
+        paidNotExpired,
+        conversionRate: studentCount > 0 ? paidNotExpired / studentCount * 100 : 0,
+        trialNotExpired,
+        classCount: classes.size,
+        assignedClassCount: assignedClasses.size,
+        avgCompletionRate: completionRows.length ? completionRows.reduce((sum, value) => sum + value, 0) / completionRows.length : 0
+    };
+}
 
-    elements.studentCount.textContent = stu.toLocaleString();
-    elements.paidNotExpired.textContent = paidNotExpired.toLocaleString();
-    elements.conversionRate.textContent = calcConvRate(paidNotExpired, stu) + '%';
-    elements.classCount.textContent = classes.size.toLocaleString();
-    elements.avgAssignments.textContent = assignedClasses.size.toLocaleString();
-    elements.avgCompletionRate.textContent = avgCompletion + '%';
+function formatMetricValue(metricKey, value) {
+    return METRIC_DRILL_CONFIG[metricKey]?.kind === 'rate'
+        ? `${Number(value || 0).toFixed(1)}%`
+        : Number(value || 0).toLocaleString();
+}
+
+function getMetricDrillLevels() {
+    return METRIC_DRILL_LEVELS[metricDrillState.mode] || METRIC_DRILL_LEVELS.school;
+}
+
+function getMetricDrillStartLevelIndex() {
+    return metricDrillState.mode === 'grade' ? 0 : metricDrillState.baseLevelIndex + 1;
+}
+
+function getMetricDrillDisplayValue(level, row = {}) {
+    const value = level?.getDisplayValue ? level.getDisplayValue(row) : row[level?.field];
+    return String(value || '未填写');
+}
+
+function updateMetricDrillModeSwitch() {
+    elements.metricDrillModeSwitch?.querySelectorAll('[data-drill-mode]').forEach(button => {
+        const active = button.dataset.drillMode === metricDrillState.mode;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-pressed', String(active));
+    });
+}
+
+function getAppliedMetricContext() {
+    const selected = [
+        elements.provinceSelect?.value || '',
+        elements.citySelect?.value || '',
+        elements.districtSelect?.value || '',
+        elements.schoolSelect?.value || ''
+    ];
+    let baseLevelIndex = -1;
+    selected.forEach((value, index) => { if (value) baseLevelIndex = index; });
+    return {
+        baseLevelIndex,
+        baseLabel: selected.filter(Boolean).join(' / ') || '全部筛选结果'
+    };
+}
+
+function resetMetricDrill(context = { baseLevelIndex: -1, baseLabel: '全部筛选结果' }) {
+    metricDrillState.activeMetric = '';
+    metricDrillState.path = [];
+    metricDrillState.baseLevelIndex = Number.isInteger(context.baseLevelIndex) ? context.baseLevelIndex : -1;
+    metricDrillState.baseLabel = context.baseLabel || '全部筛选结果';
+    closeMetricDrill();
+}
+
+function closeMetricDrill() {
+    metricDrillState.activeMetric = '';
+    if (elements.metricDrillPanel) elements.metricDrillPanel.hidden = true;
+    document.querySelectorAll('.metric-card').forEach(card => card.classList.remove('metric-card-active'));
+}
+
+function toggleMetricDrill(metricKey) {
+    if (!METRIC_DRILL_CONFIG[metricKey] || !AppState.filteredData.length) return;
+    if (metricDrillState.activeMetric === metricKey && !elements.metricDrillPanel?.hidden) {
+        closeMetricDrill();
+        return;
+    }
+    metricDrillState.activeMetric = metricKey;
+    renderMetricDrill();
+}
+
+function renderMetricDrill() {
+    const metricKey = metricDrillState.activeMetric;
+    const config = METRIC_DRILL_CONFIG[metricKey];
+    if (!config || !elements.metricDrillPanel) return;
+
+    const levels = getMetricDrillLevels();
+    const currentLevelIndex = getMetricDrillStartLevelIndex() + metricDrillState.path.length;
+    const currentLevel = levels[currentLevelIndex];
+    let rows = AppState.filteredData;
+    metricDrillState.path.forEach(item => {
+        const level = levels[item.levelIndex];
+        if (!level) return;
+        rows = rows.filter(row => String(level.getValue ? level.getValue(row) : row[level.field] || '') === item.value);
+    });
+
+    const latestWeek = getMetricLatestWeek(AppState.filteredData);
+    const parentValue = calculateMetricSummary(rows, latestWeek)[metricKey] || 0;
+    const drillFavorites = loadFavorites();
+    const groups = new Map();
+    if (currentLevel) {
+        rows.forEach(row => {
+            const value = String(currentLevel.getValue ? currentLevel.getValue(row) : row[currentLevel.field] || '');
+            if (!groups.has(value)) {
+                groups.set(value, {
+                    displayName: String(currentLevel.getDisplayValue ? currentLevel.getDisplayValue(row) : value || '未填写'),
+                    sampleRow: row,
+                    rows: []
+                });
+            }
+            groups.get(value).rows.push(row);
+        });
+    }
+    const groupRows = [...groups.entries()].map(([value, group]) => {
+        const summary = calculateMetricSummary(group.rows, latestWeek);
+        return {
+            value,
+            displayName: group.displayName,
+            sampleRow: group.sampleRow,
+            hasFavoriteGrade: group.rows.some(row => drillFavorites.has(recordFavoriteKey(row))),
+            summary,
+            metricValue: summary[metricKey] || 0
+        };
+    }).sort((a, b) => b.metricValue - a.metricValue || a.displayName.localeCompare(b.displayName, 'zh-CN'));
+
+    elements.metricDrillPanel.hidden = false;
+    updateMetricDrillModeSwitch();
+    document.querySelectorAll('.metric-card').forEach(card => {
+        card.classList.toggle('metric-card-active', !!card.querySelector(`[data-metric-key="${metricKey}"]`));
+    });
+    const crumbs = [`<button type="button" data-drill-depth="0">${escapeHtml(metricDrillState.baseLabel)}</button>`];
+    metricDrillState.path.forEach((item, index) => {
+        crumbs.push('<span>›</span>');
+        crumbs.push(`<button type="button" data-drill-depth="${index + 1}">${escapeHtml(item.label || item.value || '未填写')}</button>`);
+    });
+    elements.metricDrillBreadcrumb.innerHTML = crumbs.join('');
+    elements.metricDrillTitle.textContent = currentLevel
+        ? `${config.label} · 按${currentLevel.label}查看`
+        : `${config.label} · 已到最小层级`;
+    elements.metricDrillPeriod.textContent = `统计周期：${latestWeek || '-'}（当前筛选结果最后一周）`;
+
+    const dimensionLevels = currentLevel ? levels.slice(0, currentLevelIndex + 1) : [];
+    const dimensionHeaders = dimensionLevels
+        .map(level => `<th class="metric-drill-dimension${level.field === '学校名称' ? ' metric-drill-dimension-school' : ''}">${escapeHtml(level.label)}</th>`)
+        .join('');
+    elements.metricDrillTableHead.innerHTML = currentLevel
+        ? `<tr>${dimensionHeaders}<th>学生总数</th><th>未过期付费学生数</th><th>转化率</th><th>未过期试用人数</th><th>覆盖班级</th><th>布置作业班级数</th><th>作业完成率</th><th>占上级</th></tr>`
+        : '';
+    elements.metricDrillTableBody.innerHTML = groupRows.map(item => {
+        const displayName = item.displayName || '未填写';
+        const relation = config.kind === 'rate'
+            ? `${item.metricValue - parentValue >= 0 ? '+' : ''}${(item.metricValue - parentValue).toFixed(1)} 个百分点`
+            : `${parentValue > 0 ? (item.metricValue / parentValue * 100).toFixed(1) : '0.0'}%`;
+        const nameCell = currentLevelIndex < levels.length - 1 && item.value
+            ? `<button type="button" class="metric-drill-name" data-drill-value="${escapeAttr(item.value)}" data-drill-label="${escapeAttr(displayName)}" aria-label="继续查看${escapeAttr(displayName)}下一级">${escapeHtml(displayName)}<span>›</span></button>`
+            : `<span class="metric-drill-final-name">${escapeHtml(displayName)}</span>`;
+        const dimensionCells = dimensionLevels.map((level, levelIndex) => {
+            const cellValue = getMetricDrillDisplayValue(level, item.sampleRow);
+            const cellContent = levelIndex === currentLevelIndex
+                ? nameCell
+                : `<span class="metric-drill-context-name">${escapeHtml(cellValue)}</span>`;
+            const badge = level.field === '年级' && item.hasFavoriteGrade
+                ? '<span class="favorite-grade-badge" title="当前结果范围内包含已收藏的学校年级" aria-label="包含收藏年级">🌟</span>' : '';
+            return `<td class="metric-drill-dimension${level.field === '学校名称' ? ' metric-drill-dimension-school' : ''}">${cellContent}${badge}</td>`;
+        }).join('');
+        const metricCells = ['studentCount', 'paidNotExpired', 'conversionRate', 'trialNotExpired', 'classCount', 'assignedClassCount', 'avgCompletionRate']
+            .map(key => `<td class="metric-drill-number">${formatMetricValue(key, item.summary[key])}</td>`)
+            .join('');
+        return `<tr>${dimensionCells}${metricCells}<td class="metric-drill-number">${relation}</td></tr>`;
+    }).join('');
+    const empty = !currentLevel || !groupRows.length;
+    elements.metricDrillTableHead.hidden = empty;
+    elements.metricDrillTableBody.hidden = empty;
+    elements.metricDrillEmpty.hidden = !empty;
+}
+
+// 指标统一按当前筛选范围的最后一周统计，并与数字下钻共用同一套口径。
+function renderMet() {
+    const summary = calculateMetricSummary(AppState.filteredData);
+    elements.studentCount.textContent = formatMetricValue('studentCount', summary.studentCount);
+    elements.paidNotExpired.textContent = formatMetricValue('paidNotExpired', summary.paidNotExpired);
+    elements.conversionRate.textContent = formatMetricValue('conversionRate', summary.conversionRate);
+    elements.classCount.textContent = formatMetricValue('classCount', summary.classCount);
+    elements.avgAssignments.textContent = formatMetricValue('assignedClassCount', summary.assignedClassCount);
+    elements.trialNotExpired.textContent = formatMetricValue('trialNotExpired', summary.trialNotExpired);
+    elements.avgCompletionRate.textContent = formatMetricValue('avgCompletionRate', summary.avgCompletionRate);
 }
 
 // 图表 - 修复：作业完成率显示平均值
@@ -3188,6 +3449,12 @@ function loadFavorites() {
 }
 function saveFavorites(set) { localStorage.setItem(FAVORITES_KEY, JSON.stringify([...set].map(normalizeFavoriteKey).filter(Boolean))); }
 function favoriteKey(g) { return `${g.province}|${g.city}|${g.district}|${g.school}|${g.grade || ''}`; }
+function recordFavoriteKey(r = {}) { return `${r['省份'] || ''}|${r['城市'] || ''}|${r['区县'] || ''}|${r['学校名称'] || r['学校'] || ''}|${r['年级'] || ''}`; }
+function filterRecordsByFavorite(rows, selection, favorites = loadFavorites()) {
+    if (selection !== 'yes' && selection !== 'no') return rows;
+    const schoolKeys = new Set([...favorites].map(key => key.split('|').slice(0, 4).join('|')));
+    return rows.filter(row => schoolKeys.has(recordFavoriteKey(row).split('|').slice(0, 4).join('|')) === (selection === 'yes'));
+}
 function toggleFavoriteByKey(key) {
     const favs = loadFavorites();
     const normalizedKey = normalizeFavoriteKey(key);
